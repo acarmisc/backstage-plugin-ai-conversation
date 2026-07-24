@@ -51,6 +51,13 @@ function normalizeChunk(raw) {
       text: r.text ?? r.snippet ?? r.content ?? ""
     }));
   }
+  if (raw?.usage && typeof raw.usage === "object") {
+    chunk.usage = {
+      prompt_tokens: raw.usage.prompt_tokens ?? 0,
+      completion_tokens: raw.usage.completion_tokens ?? 0,
+      total_tokens: raw.usage.total_tokens ?? 0
+    };
+  }
   if (raw?.error) chunk.error = String(raw.error);
   return chunk;
 }
@@ -75,7 +82,7 @@ var init_api = __esm({
       async getChatConfig() {
         const res = await this.fetchApi.fetch(`${BASE_PATH}/config`);
         if (!res.ok) {
-          return { defaultModel: null, defaultVectorStoreId: null, maxRequestBudget: null };
+          return { defaultModel: null, defaultVectorStoreIds: null, maxRequestBudget: null };
         }
         return res.json();
       }
@@ -114,7 +121,7 @@ var init_api = __esm({
                 try {
                   const raw = JSON.parse(payload);
                   const chunk = normalizeChunk(raw);
-                  if (chunk.delta || chunk.error || chunk.search_results) {
+                  if (chunk.delta || chunk.error || chunk.search_results || chunk.usage) {
                     onToken(chunk);
                   }
                 } catch {
@@ -173,6 +180,13 @@ var init_api = __esm({
         }
         return res.json();
       }
+      async getKeySpend(alias) {
+        const res = await this.fetchApi.fetch(
+          `${BASE_PATH}/chat/key/${encodeURIComponent(alias)}/spend`
+        );
+        if (!res.ok) return null;
+        return res.json();
+      }
     };
   }
 });
@@ -196,7 +210,7 @@ function genId() {
   return `t_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 function useChat(opts) {
-  const { userId, model, vectorStoreId, keyAlias, keyToken, topK } = opts;
+  const { userId, model, vectorStoreIds, keyAlias, keyToken, topK } = opts;
   const api = (0, import_core_plugin_api2.useApi)(liteLlmChatApiRef);
   const [threads, setThreads] = (0, import_react.useState)(() => loadThreads(userId));
   const [activeId, setActiveId] = (0, import_react.useState)(
@@ -205,10 +219,32 @@ function useChat(opts) {
   const [isStreaming, setIsStreaming] = (0, import_react.useState)(false);
   const [error, setError] = (0, import_react.useState)(null);
   const [citations, setCitations] = (0, import_react.useState)([]);
+  const [keySpend, setKeySpend] = (0, import_react.useState)(null);
   const abortRef = (0, import_react.useRef)(null);
+  const threadsRef = (0, import_react.useRef)(threads);
+  threadsRef.current = threads;
+  const saveTimeoutRef = (0, import_react.useRef)(null);
   (0, import_react.useEffect)(() => {
-    saveThreads(userId, threads);
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      saveTimeoutRef.current = null;
+      saveThreads(userId, threadsRef.current);
+    }, SAVE_DEBOUNCE_MS);
   }, [userId, threads]);
+  (0, import_react.useEffect)(() => {
+    const flush = () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+      }
+      saveThreads(userId, threadsRef.current);
+    };
+    window.addEventListener("beforeunload", flush);
+    return () => {
+      window.removeEventListener("beforeunload", flush);
+      flush();
+    };
+  }, [userId]);
   const activeThread = threads.find((t) => t.id === activeId) ?? null;
   const newThread = (0, import_react.useCallback)(() => {
     const thread = {
@@ -216,21 +252,25 @@ function useChat(opts) {
       title: "New chat",
       messages: [],
       model,
-      vectorStoreId,
+      vectorStoreIds,
       keyAlias,
       keyToken,
       createdAt: Date.now(),
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
+      totalTokens: 0,
+      lastTurnUsage: null
     };
     setThreads((prev) => [thread, ...prev]);
     setActiveId(thread.id);
     setError(null);
     setCitations([]);
-  }, [model, vectorStoreId, keyAlias, keyToken]);
+    setKeySpend(null);
+  }, [model, vectorStoreIds, keyAlias, keyToken]);
   const selectThread = (0, import_react.useCallback)((id) => {
     setActiveId(id);
     setError(null);
     setCitations([]);
+    setKeySpend(null);
   }, []);
   const deleteThread = (0, import_react.useCallback)(
     (id) => {
@@ -261,6 +301,7 @@ function useChat(opts) {
       const assistantMsg = { role: "assistant", content: "" };
       const threadId = activeThread.id;
       const updatedMessages = [...activeThread.messages, userMsg, assistantMsg];
+      const currentKeyAlias = keyAlias;
       setThreads(
         (prev) => prev.map(
           (t) => t.id === threadId ? {
@@ -268,7 +309,7 @@ function useChat(opts) {
             messages: updatedMessages,
             title: t.messages.length === 0 ? text.slice(0, 40) : t.title,
             model,
-            vectorStoreId,
+            vectorStoreIds,
             keyAlias,
             keyToken,
             updatedAt: Date.now()
@@ -281,7 +322,7 @@ function useChat(opts) {
         {
           model,
           messages: reqMessages,
-          vector_store_id: vectorStoreId ?? void 0,
+          vector_store_ids: vectorStoreIds.length ? vectorStoreIds : void 0,
           top_k: topK,
           user_key: keyToken
         },
@@ -297,6 +338,18 @@ function useChat(opts) {
                 score: r.score,
                 snippet: r.text
               }))
+            );
+          }
+          if (chunk.usage) {
+            const usage = chunk.usage;
+            setThreads(
+              (prev) => prev.map(
+                (t) => t.id === threadId ? {
+                  ...t,
+                  lastTurnUsage: usage,
+                  totalTokens: t.totalTokens + usage.total_tokens
+                } : t
+              )
             );
           }
           if (chunk.delta) {
@@ -317,6 +370,10 @@ function useChat(opts) {
         () => {
           setIsStreaming(false);
           abortRef.current = null;
+          if (currentKeyAlias) {
+            api.getKeySpend(currentKeyAlias).then(setKeySpend).catch(() => {
+            });
+          }
         },
         (err) => {
           setError(err.message);
@@ -326,7 +383,7 @@ function useChat(opts) {
       );
       abortRef.current = controller;
     },
-    [activeThread, api, keyToken, model, vectorStoreId, keyAlias, topK]
+    [activeThread, api, keyToken, model, vectorStoreIds, keyAlias, topK]
   );
   return {
     threads,
@@ -338,10 +395,11 @@ function useChat(opts) {
     stopGeneration,
     isStreaming,
     error,
-    citations
+    citations,
+    keySpend
   };
 }
-var import_react, import_core_plugin_api2, STORAGE_PREFIX;
+var import_react, import_core_plugin_api2, STORAGE_PREFIX, SAVE_DEBOUNCE_MS;
 var init_useChat = __esm({
   "src/hooks/useChat.ts"() {
     "use strict";
@@ -349,6 +407,7 @@ var init_useChat = __esm({
     import_core_plugin_api2 = require("@backstage/core-plugin-api");
     init_api();
     STORAGE_PREFIX = "litellm-chat:threads";
+    SAVE_DEBOUNCE_MS = 400;
   }
 });
 
@@ -369,6 +428,7 @@ var init_ModelPicker = __esm({
       const liteLlmApi = (0, import_core_plugin_api3.useApi)(import_backstage_plugin_litellm.liteLlmApiRef);
       const [models, setModels] = (0, import_react2.useState)([]);
       const [loading, setLoading] = (0, import_react2.useState)(true);
+      const [error, setError] = (0, import_react2.useState)(null);
       (0, import_react2.useEffect)(() => {
         let alive = true;
         liteLlmApi.listModels().then((all) => {
@@ -379,13 +439,14 @@ var init_ModelPicker = __esm({
             const def = defaultModel && m.find((x) => x.model_name === defaultModel)?.model_name || m[0].model_name;
             onChange(def);
           }
-        }).catch(() => {
+        }).catch((err) => {
+          if (alive) setError(err.message ?? "Failed to load models");
         }).finally(() => alive && setLoading(false));
         return () => {
           alive = false;
         };
       }, []);
-      return /* @__PURE__ */ import_react2.default.createElement(import_material.FormControl, { size: "small", sx: { minWidth: 200 } }, /* @__PURE__ */ import_react2.default.createElement(import_material.InputLabel, null, "Model"), /* @__PURE__ */ import_react2.default.createElement(
+      return /* @__PURE__ */ import_react2.default.createElement(import_material.FormControl, { size: "small", error: !!error, sx: { minWidth: 200 } }, /* @__PURE__ */ import_react2.default.createElement(import_material.InputLabel, null, "Model"), /* @__PURE__ */ import_react2.default.createElement(
         import_material.Select,
         {
           value,
@@ -394,54 +455,93 @@ var init_ModelPicker = __esm({
           disabled: loading
         },
         models.map((m) => /* @__PURE__ */ import_react2.default.createElement(import_material.MenuItem, { key: m.model_name, value: m.model_name }, m.model_name))
-      ));
+      ), error && /* @__PURE__ */ import_react2.default.createElement(import_material.Typography, { variant: "caption", color: "error", sx: { mt: 0.5 } }, error));
     };
   }
 });
 
 // src/components/VectorStorePicker.tsx
-var import_react3, import_material2, import_core_plugin_api4, VectorStorePicker;
+var import_react3, import_material2, import_CheckBoxOutlineBlank, import_CheckBox, import_core_plugin_api4, VectorStorePicker;
 var init_VectorStorePicker = __esm({
   "src/components/VectorStorePicker.tsx"() {
     "use strict";
     import_react3 = __toESM(require("react"));
     import_material2 = require("@mui/material");
+    import_CheckBoxOutlineBlank = __toESM(require("@mui/icons-material/CheckBoxOutlineBlank"));
+    import_CheckBox = __toESM(require("@mui/icons-material/CheckBox"));
     import_core_plugin_api4 = require("@backstage/core-plugin-api");
     init_api();
     VectorStorePicker = ({
       value,
       onChange,
-      defaultVectorStoreId
+      defaultVectorStoreIds
     }) => {
       const chatApi = (0, import_core_plugin_api4.useApi)(liteLlmChatApiRef);
       const [stores, setStores] = (0, import_react3.useState)([]);
       const [loading, setLoading] = (0, import_react3.useState)(true);
+      const [error, setError] = (0, import_react3.useState)(null);
       (0, import_react3.useEffect)(() => {
         let alive = true;
         chatApi.listVectorStores().then((s) => {
           if (!alive) return;
           setStores(s);
-          if (value === null && s.length) {
-            const def = defaultVectorStoreId && s.find((x) => x.id === defaultVectorStoreId)?.id || null;
-            onChange(def);
+          if (value.length === 0 && s.length && defaultVectorStoreIds?.length) {
+            const defaults = defaultVectorStoreIds.filter(
+              (id) => s.some((x) => x.id === id)
+            );
+            if (defaults.length) onChange(defaults);
           }
-        }).catch(() => {
+        }).catch((err) => {
+          if (alive) setError(err.message ?? "Failed to load knowledge bases");
         }).finally(() => alive && setLoading(false));
         return () => {
           alive = false;
         };
       }, []);
-      return /* @__PURE__ */ import_react3.default.createElement(import_material2.FormControl, { size: "small", sx: { minWidth: 200 } }, /* @__PURE__ */ import_react3.default.createElement(import_material2.InputLabel, null, "Knowledge base"), /* @__PURE__ */ import_react3.default.createElement(
-        import_material2.Select,
+      const selected = stores.filter((s) => value.includes(s.id));
+      return /* @__PURE__ */ import_react3.default.createElement(import_material2.Box, null, /* @__PURE__ */ import_react3.default.createElement(
+        import_material2.Autocomplete,
         {
-          value: value ?? "",
-          label: "Knowledge base",
-          onChange: (e) => onChange(e.target.value === "" ? null : e.target.value),
-          disabled: loading
-        },
-        /* @__PURE__ */ import_react3.default.createElement(import_material2.MenuItem, { value: "" }, /* @__PURE__ */ import_react3.default.createElement("em", null, "None (no grounding)")),
-        stores.map((s) => /* @__PURE__ */ import_react3.default.createElement(import_material2.MenuItem, { key: s.id, value: s.id }, s.name, " ", s.file_count != null ? `(${s.file_count})` : ""))
-      ));
+          multiple: true,
+          size: "small",
+          options: stores,
+          value: selected,
+          loading,
+          disableCloseOnSelect: true,
+          getOptionLabel: (s) => s.name,
+          isOptionEqualToValue: (a, b) => a.id === b.id,
+          onChange: (_e, newValue) => onChange(newValue.map((s) => s.id)),
+          renderOption: (props, option, { selected: isSelected }) => /* @__PURE__ */ import_react3.default.createElement("li", { ...props, key: option.id }, /* @__PURE__ */ import_react3.default.createElement(
+            import_material2.Checkbox,
+            {
+              icon: /* @__PURE__ */ import_react3.default.createElement(import_CheckBoxOutlineBlank.default, { fontSize: "small" }),
+              checkedIcon: /* @__PURE__ */ import_react3.default.createElement(import_CheckBox.default, { fontSize: "small" }),
+              checked: isSelected,
+              size: "small",
+              sx: { mr: 1, p: 0 }
+            }
+          ), option.name, " ", option.file_count != null ? `(${option.file_count})` : ""),
+          renderTags: (tagValue, getTagProps) => tagValue.map((option, index) => /* @__PURE__ */ import_react3.default.createElement(
+            import_material2.Chip,
+            {
+              ...getTagProps({ index }),
+              key: option.id,
+              size: "small",
+              label: option.name
+            }
+          )),
+          renderInput: (params) => /* @__PURE__ */ import_react3.default.createElement(
+            import_material2.TextField,
+            {
+              ...params,
+              label: "Knowledge bases",
+              placeholder: value.length ? void 0 : "None (no grounding)",
+              error: !!error
+            }
+          ),
+          sx: { minWidth: 200 }
+        }
+      ), error && /* @__PURE__ */ import_react3.default.createElement(import_material2.Typography, { variant: "caption", color: "error", sx: { display: "block", mt: 0.5 } }, error));
     };
   }
 });
@@ -500,69 +600,15 @@ var init_KeyPicker = __esm({
   }
 });
 
-// src/components/CitationsPanel.tsx
-var import_react5, import_material4, import_ExpandMore, CitationsPanel;
-var init_CitationsPanel = __esm({
-  "src/components/CitationsPanel.tsx"() {
-    "use strict";
-    import_react5 = __toESM(require("react"));
-    import_material4 = require("@mui/material");
-    import_ExpandMore = __toESM(require("@mui/icons-material/ExpandMore"));
-    CitationsPanel = ({ citations }) => {
-      const [expanded, setExpanded] = (0, import_react5.useState)(false);
-      if (!citations.length) return null;
-      return /* @__PURE__ */ import_react5.default.createElement(import_material4.Box, { sx: { mt: 1, border: 1, borderColor: "divider", borderRadius: 1 } }, /* @__PURE__ */ import_react5.default.createElement(
-        import_material4.Box,
-        {
-          sx: {
-            display: "flex",
-            alignItems: "center",
-            cursor: "pointer",
-            px: 1,
-            py: 0.5
-          },
-          onClick: () => setExpanded((v) => !v)
-        },
-        /* @__PURE__ */ import_react5.default.createElement(import_material4.IconButton, { size: "small", sx: { p: 0.5, transform: expanded ? "rotate(180deg)" : "none" } }, /* @__PURE__ */ import_react5.default.createElement(import_ExpandMore.default, { fontSize: "small" })),
-        /* @__PURE__ */ import_react5.default.createElement(import_material4.Typography, { variant: "caption", color: "text.secondary" }, citations.length, " source", citations.length > 1 ? "s" : "")
-      ), /* @__PURE__ */ import_react5.default.createElement(import_material4.Collapse, { in: expanded }, /* @__PURE__ */ import_react5.default.createElement(import_material4.Box, { sx: { px: 1, pb: 1 } }, citations.map((c, i) => /* @__PURE__ */ import_react5.default.createElement(import_material4.Box, { key: i, sx: { mb: 1 } }, /* @__PURE__ */ import_react5.default.createElement(import_material4.Box, { sx: { display: "flex", gap: 1, alignItems: "center" } }, /* @__PURE__ */ import_react5.default.createElement(import_material4.Typography, { variant: "body2", fontWeight: 500 }, c.filename), /* @__PURE__ */ import_react5.default.createElement(
-        import_material4.Chip,
-        {
-          size: "small",
-          label: c.score.toFixed(3),
-          color: "primary",
-          variant: "outlined"
-        }
-      )), /* @__PURE__ */ import_react5.default.createElement(
-        import_material4.Typography,
-        {
-          variant: "body2",
-          color: "text.secondary",
-          sx: {
-            mt: 0.5,
-            whiteSpace: "pre-wrap",
-            maxHeight: 120,
-            overflow: "auto",
-            fontFamily: "monospace",
-            fontSize: "0.75rem"
-          }
-        },
-        c.snippet
-      ))))));
-    };
-  }
-});
-
 // src/components/MessageList.tsx
-var import_react6, import_material5, import_react_markdown, import_remark_gfm, blink, MessageList;
+var import_react5, import_material4, import_react_markdown, import_remark_gfm, blink, MessageList;
 var init_MessageList = __esm({
   "src/components/MessageList.tsx"() {
     "use strict";
-    import_react6 = __toESM(require("react"));
-    import_material5 = require("@mui/material");
+    import_react5 = __toESM(require("react"));
+    import_material4 = require("@mui/material");
     import_react_markdown = __toESM(require("react-markdown"));
     import_remark_gfm = __toESM(require("remark-gfm"));
-    init_CitationsPanel();
     blink = {
       "@keyframes blink": {
         "0%, 50%": { opacity: 1 },
@@ -571,11 +617,10 @@ var init_MessageList = __esm({
     };
     MessageList = ({
       messages,
-      citations,
       isStreaming
     }) => {
-      return /* @__PURE__ */ import_react6.default.createElement(
-        import_material5.Box,
+      return /* @__PURE__ */ import_react5.default.createElement(
+        import_material4.Box,
         {
           sx: {
             flex: 1,
@@ -587,8 +632,8 @@ var init_MessageList = __esm({
             gap: 1.5
           }
         },
-        messages.length === 0 && /* @__PURE__ */ import_react6.default.createElement(
-          import_material5.Box,
+        messages.length === 0 && /* @__PURE__ */ import_react5.default.createElement(
+          import_material4.Box,
           {
             sx: {
               flex: 1,
@@ -597,14 +642,13 @@ var init_MessageList = __esm({
               justifyContent: "center"
             }
           },
-          /* @__PURE__ */ import_react6.default.createElement(import_material5.Typography, { color: "text.secondary" }, "Start a conversation\u2026")
+          /* @__PURE__ */ import_react5.default.createElement(import_material4.Typography, { color: "text.secondary" }, "Start a conversation\u2026")
         ),
         messages.map((msg, i) => {
           const isUser = msg.role === "user";
           const isLast = i === messages.length - 1;
-          const showCitations = !isUser && isLast && !isStreaming && citations.length > 0;
-          return /* @__PURE__ */ import_react6.default.createElement(
-            import_material5.Box,
+          return /* @__PURE__ */ import_react5.default.createElement(
+            import_material4.Box,
             {
               key: i,
               sx: {
@@ -612,8 +656,8 @@ var init_MessageList = __esm({
                 maxWidth: "80%"
               }
             },
-            /* @__PURE__ */ import_react6.default.createElement(
-              import_material5.Box,
+            /* @__PURE__ */ import_react5.default.createElement(
+              import_material4.Box,
               {
                 sx: {
                   bgcolor: isUser ? "primary.main" : "background.paper",
@@ -636,8 +680,8 @@ var init_MessageList = __esm({
                   "& pre code": { bgcolor: "transparent", px: 0 }
                 }
               },
-              isUser ? /* @__PURE__ */ import_react6.default.createElement(import_material5.Box, { sx: { whiteSpace: "pre-wrap" } }, msg.content) : msg.content ? /* @__PURE__ */ import_react6.default.createElement(import_react_markdown.default, { remarkPlugins: [import_remark_gfm.default] }, msg.content) : isStreaming && isLast ? /* @__PURE__ */ import_react6.default.createElement(
-                import_material5.Box,
+              isUser ? /* @__PURE__ */ import_react5.default.createElement(import_material4.Box, { sx: { whiteSpace: "pre-wrap" } }, msg.content) : msg.content ? /* @__PURE__ */ import_react5.default.createElement(import_react_markdown.default, { remarkPlugins: [import_remark_gfm.default] }, msg.content) : isStreaming && isLast ? /* @__PURE__ */ import_react5.default.createElement(
+                import_material4.Box,
                 {
                   component: "span",
                   sx: {
@@ -651,8 +695,7 @@ var init_MessageList = __esm({
                   }
                 }
               ) : null
-            ),
-            showCitations && /* @__PURE__ */ import_react6.default.createElement(CitationsPanel, { citations })
+            )
           );
         })
       );
@@ -661,15 +704,73 @@ var init_MessageList = __esm({
 });
 
 // src/components/ErrorBanner.tsx
-var import_react7, import_material6, ErrorBanner;
+var import_react6, import_material5, ErrorBanner;
 var init_ErrorBanner = __esm({
   "src/components/ErrorBanner.tsx"() {
     "use strict";
-    import_react7 = __toESM(require("react"));
-    import_material6 = require("@mui/material");
+    import_react6 = __toESM(require("react"));
+    import_material5 = require("@mui/material");
     ErrorBanner = ({ error, onDismiss }) => {
       if (!error) return null;
-      return /* @__PURE__ */ import_react7.default.createElement(import_material6.Alert, { severity: "error", onClose: onDismiss, sx: { mb: 1 } }, /* @__PURE__ */ import_react7.default.createElement(import_material6.AlertTitle, null, "Chat error"), error);
+      return /* @__PURE__ */ import_react6.default.createElement(import_material5.Alert, { severity: "error", onClose: onDismiss, sx: { mb: 1 } }, /* @__PURE__ */ import_react6.default.createElement(import_material5.AlertTitle, null, "Chat error"), error);
+    };
+  }
+});
+
+// src/components/SourcesPanel.tsx
+var import_react7, import_material6, SourcesPanel;
+var init_SourcesPanel = __esm({
+  "src/components/SourcesPanel.tsx"() {
+    "use strict";
+    import_react7 = __toESM(require("react"));
+    import_material6 = require("@mui/material");
+    SourcesPanel = ({ citations }) => {
+      return /* @__PURE__ */ import_react7.default.createElement(import_material6.Box, { sx: { p: 1.5 } }, /* @__PURE__ */ import_react7.default.createElement(import_material6.Typography, { variant: "overline", color: "text.secondary" }, "Sources"), citations.length === 0 ? /* @__PURE__ */ import_react7.default.createElement(import_material6.Typography, { variant: "body2", color: "text.secondary", sx: { mt: 0.5 } }, "No sources for the latest reply yet.") : citations.map((c, i) => /* @__PURE__ */ import_react7.default.createElement(import_material6.Box, { key: i, sx: { mt: 1.5 } }, /* @__PURE__ */ import_react7.default.createElement(import_material6.Box, { sx: { display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" } }, /* @__PURE__ */ import_react7.default.createElement(import_material6.Typography, { variant: "body2", fontWeight: 500 }, c.filename), /* @__PURE__ */ import_react7.default.createElement(import_material6.Chip, { size: "small", label: c.score.toFixed(3), color: "primary", variant: "outlined" })), /* @__PURE__ */ import_react7.default.createElement(
+        import_material6.Typography,
+        {
+          variant: "body2",
+          color: "text.secondary",
+          sx: {
+            mt: 0.5,
+            whiteSpace: "pre-wrap",
+            maxHeight: 120,
+            overflow: "auto",
+            fontFamily: "monospace",
+            fontSize: "0.75rem"
+          }
+        },
+        c.snippet
+      ))));
+    };
+  }
+});
+
+// src/components/UsagePanel.tsx
+function formatUsd(n) {
+  return `$${n.toFixed(4)}`;
+}
+var import_react8, import_material7, Stat, UsagePanel;
+var init_UsagePanel = __esm({
+  "src/components/UsagePanel.tsx"() {
+    "use strict";
+    import_react8 = __toESM(require("react"));
+    import_material7 = require("@mui/material");
+    Stat = ({ label, value }) => /* @__PURE__ */ import_react8.default.createElement(import_material7.Box, { sx: { display: "flex", justifyContent: "space-between", py: 0.25 } }, /* @__PURE__ */ import_react8.default.createElement(import_material7.Typography, { variant: "body2", color: "text.secondary" }, label), /* @__PURE__ */ import_react8.default.createElement(import_material7.Typography, { variant: "body2", fontWeight: 500 }, value));
+    UsagePanel = ({
+      lastTurnUsage,
+      totalTokens,
+      keySpend
+    }) => {
+      const budgetPct = keySpend?.max_budget && keySpend.max_budget > 0 ? Math.min(100, keySpend.spend / keySpend.max_budget * 100) : null;
+      return /* @__PURE__ */ import_react8.default.createElement(import_material7.Box, { sx: { p: 1.5 } }, /* @__PURE__ */ import_react8.default.createElement(import_material7.Typography, { variant: "overline", color: "text.secondary" }, "Usage"), !lastTurnUsage && !keySpend ? /* @__PURE__ */ import_react8.default.createElement(import_material7.Typography, { variant: "body2", color: "text.secondary", sx: { mt: 0.5 } }, "Send a message to see token and budget usage.") : /* @__PURE__ */ import_react8.default.createElement(import_material7.Box, { sx: { mt: 0.5 } }, lastTurnUsage && /* @__PURE__ */ import_react8.default.createElement(import_react8.default.Fragment, null, /* @__PURE__ */ import_react8.default.createElement(Stat, { label: "This turn", value: `${lastTurnUsage.total_tokens.toLocaleString()} tokens` }), /* @__PURE__ */ import_react8.default.createElement(Stat, { label: "Prompt / completion", value: `${lastTurnUsage.prompt_tokens.toLocaleString()} / ${lastTurnUsage.completion_tokens.toLocaleString()}` }), /* @__PURE__ */ import_react8.default.createElement(Stat, { label: "Session total", value: `${totalTokens.toLocaleString()} tokens` })), keySpend && /* @__PURE__ */ import_react8.default.createElement(import_react8.default.Fragment, null, /* @__PURE__ */ import_react8.default.createElement(import_material7.Divider, { sx: { my: 1 } }), /* @__PURE__ */ import_react8.default.createElement(Stat, { label: "Spent", value: formatUsd(keySpend.spend) }), keySpend.max_budget != null && /* @__PURE__ */ import_react8.default.createElement(import_react8.default.Fragment, null, /* @__PURE__ */ import_react8.default.createElement(Stat, { label: "Budget", value: `${formatUsd(keySpend.spend)} / ${formatUsd(keySpend.max_budget)}` }), /* @__PURE__ */ import_react8.default.createElement(
+        import_material7.LinearProgress,
+        {
+          variant: "determinate",
+          value: budgetPct ?? 0,
+          sx: { mt: 0.5, borderRadius: 1, height: 6 },
+          color: budgetPct != null && budgetPct > 90 ? "error" : "primary"
+        }
+      )))));
     };
   }
 });
@@ -679,16 +780,16 @@ var ChatPage_exports = {};
 __export(ChatPage_exports, {
   ChatPage: () => ChatPage
 });
-var import_react8, import_material7, import_Add, import_Delete2, import_Settings, import_ExpandMore2, import_Chat, import_Send, import_Stop, import_core_plugin_api6, SIDEBAR_WIDTH, ChatPage;
+var import_react9, import_material8, import_Add, import_Delete2, import_Settings, import_ExpandMore, import_Chat, import_Send, import_Stop, import_core_plugin_api6, SIDEBAR_WIDTH, RIGHT_RAIL_WIDTH, CHAT_MAX_WIDTH, ChatPage;
 var init_ChatPage = __esm({
   "src/components/ChatPage.tsx"() {
     "use strict";
-    import_react8 = __toESM(require("react"));
-    import_material7 = require("@mui/material");
+    import_react9 = __toESM(require("react"));
+    import_material8 = require("@mui/material");
     import_Add = __toESM(require("@mui/icons-material/Add"));
     import_Delete2 = __toESM(require("@mui/icons-material/Delete"));
     import_Settings = __toESM(require("@mui/icons-material/Settings"));
-    import_ExpandMore2 = __toESM(require("@mui/icons-material/ExpandMore"));
+    import_ExpandMore = __toESM(require("@mui/icons-material/ExpandMore"));
     import_Chat = __toESM(require("@mui/icons-material/Chat"));
     import_Send = __toESM(require("@mui/icons-material/Send"));
     import_Stop = __toESM(require("@mui/icons-material/Stop"));
@@ -700,43 +801,54 @@ var init_ChatPage = __esm({
     init_KeyPicker();
     init_MessageList();
     init_ErrorBanner();
+    init_SourcesPanel();
+    init_UsagePanel();
     SIDEBAR_WIDTH = 280;
+    RIGHT_RAIL_WIDTH = 300;
+    CHAT_MAX_WIDTH = 900;
     ChatPage = () => {
       const chatApi = (0, import_core_plugin_api6.useApi)(liteLlmChatApiRef);
       const identityApi = (0, import_core_plugin_api6.useApi)(import_core_plugin_api6.identityApiRef);
-      const [userId, setUserId] = (0, import_react8.useState)("default");
-      const [config, setConfig] = (0, import_react8.useState)({
+      const [userId, setUserId] = (0, import_react9.useState)("default");
+      const [config, setConfig] = (0, import_react9.useState)({
         defaultModel: null,
-        defaultVectorStoreId: null,
+        defaultVectorStoreIds: null,
         maxRequestBudget: null
       });
-      const [model, setModel] = (0, import_react8.useState)("");
-      const [vectorStoreId, setVectorStoreId] = (0, import_react8.useState)(null);
-      const [keyVal, setKeyVal] = (0, import_react8.useState)({
+      const [model, setModel] = (0, import_react9.useState)("");
+      const [vectorStoreIds, setVectorStoreIds] = (0, import_react9.useState)([]);
+      const [keyVal, setKeyVal] = (0, import_react9.useState)({
         alias: "",
         token: ""
       });
-      const [showSettings, setShowSettings] = (0, import_react8.useState)(true);
-      const [input, setInput] = (0, import_react8.useState)("");
-      const messagesEndRef = (0, import_react8.useRef)(null);
-      const messagesContainerRef = (0, import_react8.useRef)(null);
-      (0, import_react8.useEffect)(() => {
-        chatApi.getChatConfig().then(setConfig).catch(() => {
-        });
+      const [showSettings, setShowSettings] = (0, import_react9.useState)(true);
+      const [input, setInput] = (0, import_react9.useState)("");
+      const [configError, setConfigError] = (0, import_react9.useState)(null);
+      const messagesEndRef = (0, import_react9.useRef)(null);
+      const messagesContainerRef = (0, import_react9.useRef)(null);
+      (0, import_react9.useEffect)(() => {
+        chatApi.getChatConfig().then(setConfig).catch((err) => setConfigError(err.message ?? "Failed to reach the chat backend"));
         identityApi.getCredentials().then((c) => setUserId(c.token ? "oidc" : "default")).catch(() => {
         });
       }, [chatApi, identityApi]);
       const chat = useChat({
         userId,
         model,
-        vectorStoreId,
+        vectorStoreIds,
         keyAlias: keyVal.alias,
         keyToken: keyVal.token,
         topK: 5
       });
+      const activeThreadId = chat.activeThread?.id ?? null;
+      (0, import_react9.useEffect)(() => {
+        if (!chat.activeThread) return;
+        setModel(chat.activeThread.model);
+        setVectorStoreIds(chat.activeThread.vectorStoreIds);
+        setKeyVal({ alias: chat.activeThread.keyAlias, token: chat.activeThread.keyToken });
+      }, [activeThreadId]);
       const messages = chat.activeThread?.messages ?? [];
       const isStreaming = chat.isStreaming;
-      (0, import_react8.useEffect)(() => {
+      (0, import_react9.useEffect)(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
       }, [messages, isStreaming]);
       const handleSend = () => {
@@ -753,8 +865,20 @@ var init_ChatPage = __esm({
           handleSend();
         }
       };
-      return /* @__PURE__ */ import_react8.default.createElement(import_material7.Box, { sx: { display: "flex", height: "100dvh", overflow: "hidden" } }, /* @__PURE__ */ import_react8.default.createElement(
-        import_material7.Box,
+      const lastTurnUsage = chat.activeThread?.lastTurnUsage ?? null;
+      const totalTokens = chat.activeThread?.totalTokens ?? 0;
+      const statusParts = [];
+      if (lastTurnUsage) {
+        statusParts.push(`${lastTurnUsage.total_tokens.toLocaleString()} tokens this turn`);
+      }
+      if (chat.keySpend) {
+        statusParts.push(`$${chat.keySpend.spend.toFixed(4)} spent`);
+        if (chat.keySpend.max_budget != null) {
+          statusParts.push(`$${chat.keySpend.spend.toFixed(2)} / $${chat.keySpend.max_budget.toFixed(2)} budget`);
+        }
+      }
+      return /* @__PURE__ */ import_react9.default.createElement(import_material8.Box, { sx: { display: "flex", height: "100dvh", overflow: "hidden" } }, /* @__PURE__ */ import_react9.default.createElement(
+        import_material8.Box,
         {
           sx: {
             width: SIDEBAR_WIDTH,
@@ -766,55 +890,8 @@ var init_ChatPage = __esm({
             overflow: "hidden"
           }
         },
-        /* @__PURE__ */ import_react8.default.createElement(import_material7.Box, { sx: { p: 1.5 } }, /* @__PURE__ */ import_react8.default.createElement(
-          import_material7.Button,
-          {
-            fullWidth: true,
-            variant: "outlined",
-            startIcon: /* @__PURE__ */ import_react8.default.createElement(import_Add.default, null),
-            onClick: chat.newThread,
-            size: "small"
-          },
-          "New chat"
-        )),
-        /* @__PURE__ */ import_react8.default.createElement(import_material7.Box, { sx: { flex: 1, overflowY: "auto", minHeight: 0 } }, /* @__PURE__ */ import_react8.default.createElement(import_material7.List, { dense: true }, chat.threads.map((t) => /* @__PURE__ */ import_react8.default.createElement(
-          import_material7.ListItem,
-          {
-            key: t.id,
-            disablePadding: true,
-            secondaryAction: /* @__PURE__ */ import_react8.default.createElement(
-              import_material7.IconButton,
-              {
-                edge: "end",
-                size: "small",
-                onClick: (e) => {
-                  e.stopPropagation();
-                  chat.deleteThread(t.id);
-                }
-              },
-              /* @__PURE__ */ import_react8.default.createElement(import_Delete2.default, { fontSize: "small" })
-            )
-          },
-          /* @__PURE__ */ import_react8.default.createElement(
-            import_material7.ListItemButton,
-            {
-              selected: chat.activeThread?.id === t.id,
-              onClick: () => chat.selectThread(t.id),
-              sx: { pr: 6 }
-            },
-            /* @__PURE__ */ import_react8.default.createElement(
-              import_material7.ListItemText,
-              {
-                primary: t.title,
-                primaryTypographyProps: { noWrap: true, variant: "body2" },
-                secondaryTypographyProps: { noWrap: true, variant: "caption" }
-              }
-            )
-          )
-        )))),
-        /* @__PURE__ */ import_react8.default.createElement(import_material7.Divider, null),
-        /* @__PURE__ */ import_react8.default.createElement(import_material7.Box, { sx: { flexShrink: 0 } }, /* @__PURE__ */ import_react8.default.createElement(
-          import_material7.Box,
+        /* @__PURE__ */ import_react9.default.createElement(import_material8.Box, { sx: { flexShrink: 0 } }, /* @__PURE__ */ import_react9.default.createElement(
+          import_material8.Box,
           {
             sx: {
               display: "flex",
@@ -826,10 +903,10 @@ var init_ChatPage = __esm({
             },
             onClick: () => setShowSettings((v) => !v)
           },
-          /* @__PURE__ */ import_react8.default.createElement(import_Settings.default, { fontSize: "small", sx: { mr: 1 } }),
-          /* @__PURE__ */ import_react8.default.createElement(import_material7.Typography, { variant: "overline", sx: { flex: 1 } }, "Settings"),
-          /* @__PURE__ */ import_react8.default.createElement(
-            import_ExpandMore2.default,
+          /* @__PURE__ */ import_react9.default.createElement(import_Settings.default, { fontSize: "small", sx: { mr: 1 } }),
+          /* @__PURE__ */ import_react9.default.createElement(import_material8.Typography, { variant: "overline", sx: { flex: 1 } }, "Settings"),
+          /* @__PURE__ */ import_react9.default.createElement(
+            import_ExpandMore.default,
             {
               fontSize: "small",
               sx: {
@@ -838,14 +915,14 @@ var init_ChatPage = __esm({
               }
             }
           )
-        ), /* @__PURE__ */ import_react8.default.createElement(import_material7.Collapse, { in: showSettings }, /* @__PURE__ */ import_react8.default.createElement(import_material7.Box, { sx: { p: 1.5, display: "flex", flexDirection: "column", gap: 1.5 } }, /* @__PURE__ */ import_react8.default.createElement(ModelPicker, { value: model, onChange: setModel, defaultModel: config.defaultModel }), /* @__PURE__ */ import_react8.default.createElement(
+        ), /* @__PURE__ */ import_react9.default.createElement(import_material8.Collapse, { in: showSettings }, /* @__PURE__ */ import_react9.default.createElement(import_material8.Box, { sx: { p: 1.5, display: "flex", flexDirection: "column", gap: 1.5 } }, configError && /* @__PURE__ */ import_react9.default.createElement(import_material8.Typography, { variant: "caption", color: "error" }, "Couldn't load chat defaults: ", configError), /* @__PURE__ */ import_react9.default.createElement(ModelPicker, { value: model, onChange: setModel, defaultModel: config.defaultModel }), /* @__PURE__ */ import_react9.default.createElement(
           VectorStorePicker,
           {
-            value: vectorStoreId,
-            onChange: setVectorStoreId,
-            defaultVectorStoreId: config.defaultVectorStoreId
+            value: vectorStoreIds,
+            onChange: setVectorStoreIds,
+            defaultVectorStoreIds: config.defaultVectorStoreIds
           }
-        ), /* @__PURE__ */ import_react8.default.createElement(
+        ), /* @__PURE__ */ import_react9.default.createElement(
           KeyPicker,
           {
             value: keyVal,
@@ -857,102 +934,177 @@ var init_ChatPage = __esm({
               }
             }
           }
+        )))),
+        /* @__PURE__ */ import_react9.default.createElement(import_material8.Divider, null),
+        /* @__PURE__ */ import_react9.default.createElement(import_material8.Box, { sx: { p: 1.5 } }, /* @__PURE__ */ import_react9.default.createElement(
+          import_material8.Button,
+          {
+            fullWidth: true,
+            variant: "outlined",
+            startIcon: /* @__PURE__ */ import_react9.default.createElement(import_Add.default, null),
+            onClick: chat.newThread,
+            size: "small"
+          },
+          "New chat"
+        )),
+        /* @__PURE__ */ import_react9.default.createElement(import_material8.Box, { sx: { flex: 1, overflowY: "auto", minHeight: 0 } }, /* @__PURE__ */ import_react9.default.createElement(import_material8.List, { dense: true }, chat.threads.map((t) => /* @__PURE__ */ import_react9.default.createElement(
+          import_material8.ListItem,
+          {
+            key: t.id,
+            disablePadding: true,
+            secondaryAction: /* @__PURE__ */ import_react9.default.createElement(
+              import_material8.IconButton,
+              {
+                edge: "end",
+                size: "small",
+                onClick: (e) => {
+                  e.stopPropagation();
+                  chat.deleteThread(t.id);
+                }
+              },
+              /* @__PURE__ */ import_react9.default.createElement(import_Delete2.default, { fontSize: "small" })
+            )
+          },
+          /* @__PURE__ */ import_react9.default.createElement(
+            import_material8.ListItemButton,
+            {
+              selected: chat.activeThread?.id === t.id,
+              onClick: () => chat.selectThread(t.id),
+              sx: { pr: 6 }
+            },
+            /* @__PURE__ */ import_react9.default.createElement(
+              import_material8.ListItemText,
+              {
+                primary: t.title,
+                primaryTypographyProps: { noWrap: true, variant: "body2" },
+                secondaryTypographyProps: { noWrap: true, variant: "caption" }
+              }
+            )
+          )
         ))))
-      ), /* @__PURE__ */ import_react8.default.createElement(
-        import_material7.Box,
+      ), /* @__PURE__ */ import_react9.default.createElement(
+        import_material8.Box,
         {
           sx: {
-            flex: 1,
+            flex: 3,
             display: "flex",
-            flexDirection: "column",
+            justifyContent: "center",
             overflow: "hidden"
           }
         },
-        /* @__PURE__ */ import_react8.default.createElement(
-          import_material7.Box,
+        /* @__PURE__ */ import_react9.default.createElement(
+          import_material8.Box,
           {
             sx: {
-              flexShrink: 0,
-              px: 2,
-              py: 1,
-              borderBottom: 1,
-              borderColor: "divider",
+              width: "100%",
+              maxWidth: CHAT_MAX_WIDTH,
               display: "flex",
-              alignItems: "center",
-              gap: 1
+              flexDirection: "column",
+              overflow: "hidden"
             }
           },
-          /* @__PURE__ */ import_react8.default.createElement(import_Chat.default, { fontSize: "small", color: "action" }),
-          /* @__PURE__ */ import_react8.default.createElement(import_material7.Typography, { variant: "subtitle2", noWrap: true, sx: { flex: 1 } }, chat.activeThread?.title ?? "AI Chat"),
-          model && /* @__PURE__ */ import_react8.default.createElement(import_material7.Typography, { variant: "caption", color: "text.secondary" }, model)
-        ),
-        chat.error && /* @__PURE__ */ import_react8.default.createElement(import_material7.Box, { sx: { px: 2, pt: 1 } }, /* @__PURE__ */ import_react8.default.createElement(ErrorBanner, { error: chat.error, onDismiss: () => {
-        } })),
-        /* @__PURE__ */ import_react8.default.createElement(
-          import_material7.Box,
-          {
-            ref: messagesContainerRef,
-            sx: {
-              flex: 1,
-              overflowY: "auto",
-              minHeight: 0
-            }
-          },
-          /* @__PURE__ */ import_react8.default.createElement(
-            MessageList,
+          /* @__PURE__ */ import_react9.default.createElement(
+            import_material8.Box,
             {
-              messages,
-              citations: chat.citations,
-              isStreaming
-            }
-          ),
-          /* @__PURE__ */ import_react8.default.createElement("div", { ref: messagesEndRef })
-        ),
-        /* @__PURE__ */ import_react8.default.createElement(
-          import_material7.Box,
-          {
-            sx: {
-              flexShrink: 0,
-              borderTop: 1,
-              borderColor: "divider",
-              px: 2,
-              py: 1.5,
-              display: "flex",
-              gap: 1,
-              alignItems: "flex-end"
-            }
-          },
-          /* @__PURE__ */ import_react8.default.createElement(
-            import_material7.InputBase,
-            {
-              multiline: true,
-              minRows: 1,
-              maxRows: 5,
-              fullWidth: true,
-              placeholder: keyVal.token ? "Send a message\u2026  (Enter to send, Shift+Enter for newline)" : "Generate a chat key in Settings to start\u2026",
-              value: input,
-              onChange: (e) => setInput(e.target.value),
-              onKeyDown: handleKeyDown,
-              disabled: !keyVal.token,
               sx: {
-                border: 1,
+                flexShrink: 0,
+                px: 2,
+                py: 1,
+                borderBottom: 1,
                 borderColor: "divider",
-                borderRadius: 2,
-                px: 1.5,
-                py: 0.75,
-                fontSize: "0.9rem"
+                display: "flex",
+                alignItems: "center",
+                gap: 1
               }
-            }
-          ),
-          isStreaming ? /* @__PURE__ */ import_react8.default.createElement(import_material7.Tooltip, { title: "Stop" }, /* @__PURE__ */ import_react8.default.createElement(import_material7.IconButton, { color: "error", onClick: chat.stopGeneration }, /* @__PURE__ */ import_react8.default.createElement(import_Stop.default, null))) : /* @__PURE__ */ import_react8.default.createElement(import_material7.Tooltip, { title: "Send" }, /* @__PURE__ */ import_react8.default.createElement(
-            import_material7.IconButton,
-            {
-              color: "primary",
-              onClick: handleSend,
-              disabled: !input.trim() || !keyVal.token
             },
-            /* @__PURE__ */ import_react8.default.createElement(import_Send.default, null)
-          ))
+            /* @__PURE__ */ import_react9.default.createElement(import_Chat.default, { fontSize: "small", color: "action" }),
+            /* @__PURE__ */ import_react9.default.createElement(import_material8.Typography, { variant: "subtitle2", noWrap: true, sx: { flex: 1 } }, chat.activeThread?.title ?? "AI Chat")
+          ),
+          chat.error && /* @__PURE__ */ import_react9.default.createElement(import_material8.Box, { sx: { px: 2, pt: 1 } }, /* @__PURE__ */ import_react9.default.createElement(ErrorBanner, { error: chat.error, onDismiss: () => {
+          } })),
+          /* @__PURE__ */ import_react9.default.createElement(
+            import_material8.Box,
+            {
+              ref: messagesContainerRef,
+              sx: {
+                flex: 1,
+                overflowY: "auto",
+                minHeight: 0
+              }
+            },
+            /* @__PURE__ */ import_react9.default.createElement(MessageList, { messages, isStreaming }),
+            /* @__PURE__ */ import_react9.default.createElement("div", { ref: messagesEndRef })
+          ),
+          /* @__PURE__ */ import_react9.default.createElement(
+            import_material8.Box,
+            {
+              sx: {
+                flexShrink: 0,
+                borderTop: 1,
+                borderColor: "divider",
+                px: 2,
+                py: 1.5,
+                display: "flex",
+                gap: 1,
+                alignItems: "flex-end"
+              }
+            },
+            /* @__PURE__ */ import_react9.default.createElement(
+              import_material8.InputBase,
+              {
+                multiline: true,
+                minRows: 1,
+                maxRows: 5,
+                fullWidth: true,
+                placeholder: keyVal.token ? "Send a message\u2026  (Enter to send, Shift+Enter for newline)" : "Generate a chat key in Settings to start\u2026",
+                value: input,
+                onChange: (e) => setInput(e.target.value),
+                onKeyDown: handleKeyDown,
+                disabled: !keyVal.token,
+                sx: {
+                  border: 1,
+                  borderColor: "divider",
+                  borderRadius: 2,
+                  px: 1.5,
+                  py: 0.75,
+                  fontSize: "0.9rem"
+                }
+              }
+            ),
+            isStreaming ? /* @__PURE__ */ import_react9.default.createElement(import_material8.Tooltip, { title: "Stop" }, /* @__PURE__ */ import_react9.default.createElement(import_material8.IconButton, { color: "error", onClick: chat.stopGeneration }, /* @__PURE__ */ import_react9.default.createElement(import_Stop.default, null))) : /* @__PURE__ */ import_react9.default.createElement(import_material8.Tooltip, { title: "Send" }, /* @__PURE__ */ import_react9.default.createElement(
+              import_material8.IconButton,
+              {
+                color: "primary",
+                onClick: handleSend,
+                disabled: !input.trim() || !keyVal.token
+              },
+              /* @__PURE__ */ import_react9.default.createElement(import_Send.default, null)
+            ))
+          ),
+          statusParts.length > 0 && /* @__PURE__ */ import_react9.default.createElement(import_material8.Box, { sx: { px: 2, pb: 1 } }, /* @__PURE__ */ import_react9.default.createElement(import_material8.Typography, { variant: "caption", color: "text.secondary" }, statusParts.join(" \xB7 ")))
+        )
+      ), /* @__PURE__ */ import_react9.default.createElement(
+        import_material8.Box,
+        {
+          sx: {
+            width: RIGHT_RAIL_WIDTH,
+            flexShrink: 0,
+            borderLeft: 1,
+            borderColor: "divider",
+            display: "flex",
+            flexDirection: "column",
+            overflowY: "auto"
+          }
+        },
+        /* @__PURE__ */ import_react9.default.createElement(SourcesPanel, { citations: chat.citations }),
+        /* @__PURE__ */ import_react9.default.createElement(import_material8.Divider, null),
+        /* @__PURE__ */ import_react9.default.createElement(
+          UsagePanel,
+          {
+            lastTurnUsage,
+            totalTokens,
+            keySpend: chat.keySpend
+          }
         )
       ));
     };
@@ -970,7 +1122,7 @@ __export(index_exports, {
 module.exports = __toCommonJS(index_exports);
 
 // src/plugin.tsx
-var import_react9 = __toESM(require("react"));
+var import_react10 = __toESM(require("react"));
 var import_icons_material = require("@mui/icons-material");
 var import_frontend_plugin_api = require("@backstage/frontend-plugin-api");
 init_api();
@@ -985,10 +1137,10 @@ var chatPage = import_frontend_plugin_api.PageBlueprint.make({
   params: {
     path: "/ai-chat",
     title: "AI Chat",
-    icon: /* @__PURE__ */ import_react9.default.createElement(import_icons_material.Chat, null),
+    icon: /* @__PURE__ */ import_react10.default.createElement(import_icons_material.Chat, null),
     loader: async () => {
       const { ChatPage: ChatPage2 } = await Promise.resolve().then(() => (init_ChatPage(), ChatPage_exports));
-      return /* @__PURE__ */ import_react9.default.createElement(ChatPage2, null);
+      return /* @__PURE__ */ import_react10.default.createElement(ChatPage2, null);
     }
   }
 });

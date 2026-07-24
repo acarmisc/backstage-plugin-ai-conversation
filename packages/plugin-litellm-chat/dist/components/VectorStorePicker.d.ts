@@ -1,7 +1,7 @@
 import React from 'react';
 export interface VectorStorePickerProps {
-    value: string | null;
-    onChange: (id: string | null) => void;
-    defaultVectorStoreId?: string | null;
+    value: string[];
+    onChange: (ids: string[]) => void;
+    defaultVectorStoreIds?: string[] | null;
 }
 export declare const VectorStorePicker: React.FC<VectorStorePickerProps>;

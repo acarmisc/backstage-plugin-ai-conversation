@@ -1,8 +1,8 @@
-import type { Thread, Citation } from '../types';
+import type { Thread, Citation, KeySpend } from '../types';
 export interface UseChatOptions {
     userId: string;
     model: string;
-    vectorStoreId: string | null;
+    vectorStoreIds: string[];
     keyAlias: string;
     keyToken: string;
     topK?: number;
@@ -18,5 +18,6 @@ export interface UseChatResult {
     isStreaming: boolean;
     error: string | null;
     citations: Citation[];
+    keySpend: KeySpend | null;
 }
 export declare function useChat(opts: UseChatOptions): UseChatResult;

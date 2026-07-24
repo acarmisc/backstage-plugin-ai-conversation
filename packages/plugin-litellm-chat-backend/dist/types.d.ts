@@ -11,7 +11,7 @@ export interface ChatMessage {
 export interface ChatStreamRequest {
     model: string;
     messages: ChatMessage[];
-    vector_store_id?: string;
+    vector_store_ids?: string[];
     top_k?: number;
     user_key: string;
 }
@@ -23,10 +23,16 @@ export interface SearchResult {
     score: number;
     text: string;
 }
+export interface UsageInfo {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+}
 export interface ChatStreamChunk {
     delta?: string;
     error?: string;
     search_results?: SearchResult[];
+    usage?: UsageInfo;
 }
 export interface ChatResult {
     content: string;
@@ -39,6 +45,6 @@ export interface ChatResult {
 export interface LiteLLMChatConfig {
     baseUrl: string;
     defaultModel?: string;
-    defaultVectorStoreId?: string;
+    defaultVectorStoreIds?: string[];
     maxRequestBudget?: number;
 }

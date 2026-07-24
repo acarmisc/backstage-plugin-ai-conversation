@@ -108,8 +108,8 @@ function readChatConfig(config) {
   return {
     baseUrl: config.getString("litellm.baseUrl"),
     defaultModel: config.getOptionalString("litellm.chat.defaultModel"),
-    defaultVectorStoreId: config.getOptionalString(
-      "litellm.chat.defaultVectorStoreId"
+    defaultVectorStoreIds: config.getOptionalStringArray(
+      "litellm.chat.defaultVectorStoreIds"
     ),
     maxRequestBudget: config.getOptionalNumber("litellm.chat.maxRequestBudget")
   };
@@ -127,7 +127,7 @@ async function createRouter(options) {
   router.get("/config", (_req, res) => {
     res.json({
       defaultModel: chatConfig.defaultModel ?? null,
-      defaultVectorStoreId: chatConfig.defaultVectorStoreId ?? null,
+      defaultVectorStoreIds: chatConfig.defaultVectorStoreIds ?? null,
       maxRequestBudget: chatConfig.maxRequestBudget ?? null
     });
   });
@@ -210,6 +210,27 @@ async function createRouter(options) {
       res.status(502).json({ error: err.message });
     }
   });
+  router.get("/chat/key/:alias/spend", async (req, res) => {
+    try {
+      const tokenEntityRef = await (0, import_backstage_plugin_litellm_backend.resolveUserId)(req, auth);
+      if (!tokenEntityRef) {
+        res.status(401).json({ error: "unauthenticated" });
+        return;
+      }
+      const userId = (0, import_backstage_plugin_litellm_backend.toLiteLLMUserId)(tokenEntityRef, userIdDomain);
+      const client = new import_backstage_plugin_litellm_backend.LiteLLMClient({ baseUrl: chatConfig.baseUrl, masterKey });
+      const keys = await client.listKeys(userId);
+      const match = keys.find((k) => k.key_alias === req.params.alias);
+      if (!match) {
+        res.status(404).json({ error: "key not found" });
+        return;
+      }
+      res.json({ spend: match.spend, max_budget: match.max_budget ?? null });
+    } catch (err) {
+      logger.error("Failed to fetch chat key spend", err);
+      res.status(502).json({ error: err.message });
+    }
+  });
   router.post("/chat/completions", async (req, res) => {
     try {
       const body = req.body;
@@ -230,8 +251,8 @@ async function createRouter(options) {
         messages: body.messages,
         stream: false
       };
-      if (body.vector_store_id) {
-        payload.vector_store_ids = [body.vector_store_id];
+      if (body.vector_store_ids?.length) {
+        payload.vector_store_ids = body.vector_store_ids;
         payload.top_k = body.top_k ?? 5;
       }
       const upstream = await fetch(
@@ -275,10 +296,11 @@ async function createRouter(options) {
       const chatBody = {
         model: body.model,
         messages: body.messages,
-        stream: true
+        stream: true,
+        stream_options: { include_usage: true }
       };
-      if (body.vector_store_id) {
-        chatBody.vector_store_ids = [body.vector_store_id];
+      if (body.vector_store_ids?.length) {
+        chatBody.vector_store_ids = body.vector_store_ids;
       }
       await proxySSE({
         upstreamUrl: `${base}/v1/chat/completions`,
