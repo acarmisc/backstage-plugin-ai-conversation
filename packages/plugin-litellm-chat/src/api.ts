@@ -6,6 +6,7 @@ import type {
   SearchResult,
   ChatResult,
   ChatConfig,
+  KeySpend,
 } from './types';
 
 export interface LiteLlmChatApiInterface {
@@ -20,6 +21,7 @@ export interface LiteLlmChatApiInterface {
   chatCompletions(req: ChatRequest): Promise<ChatResult>;
   mintChatKey(opts?: { models?: string[]; max_budget?: number }): Promise<ChatKey>;
   deleteChatKey(key: string): Promise<{ success: boolean }>;
+  getKeySpend(alias: string): Promise<KeySpend | null>;
 }
 
 export interface ChatKey {
@@ -56,6 +58,13 @@ function normalizeChunk(raw: any): ChatStreamChunk {
       text: r.text ?? r.snippet ?? r.content ?? '',
     }));
   }
+  if (raw?.usage && typeof raw.usage === 'object') {
+    chunk.usage = {
+      prompt_tokens: raw.usage.prompt_tokens ?? 0,
+      completion_tokens: raw.usage.completion_tokens ?? 0,
+      total_tokens: raw.usage.total_tokens ?? 0,
+    };
+  }
   if (raw?.error) chunk.error = String(raw.error);
   return chunk;
 }
@@ -76,7 +85,7 @@ export class LiteLlmChatApi implements LiteLlmChatApiInterface {
   async getChatConfig(): Promise<ChatConfig> {
     const res = await this.fetchApi.fetch(`${BASE_PATH}/config`);
     if (!res.ok) {
-      return { defaultModel: null, defaultVectorStoreId: null, maxRequestBudget: null };
+      return { defaultModel: null, defaultVectorStoreIds: null, maxRequestBudget: null };
     }
     return res.json();
   }
@@ -127,8 +136,8 @@ export class LiteLlmChatApi implements LiteLlmChatApiInterface {
             try {
               const raw = JSON.parse(payload);
               const chunk = normalizeChunk(raw);
-              // Skip empty chunks (e.g. role-only deltas, usage-only final chunks).
-              if (chunk.delta || chunk.error || chunk.search_results) {
+              // Skip genuinely empty chunks (e.g. role-only deltas).
+              if (chunk.delta || chunk.error || chunk.search_results || chunk.usage) {
                 onToken(chunk);
               }
             } catch {
@@ -191,6 +200,14 @@ export class LiteLlmChatApi implements LiteLlmChatApiInterface {
       const text = await res.text().catch(() => '');
       throw new Error(`delete key ${res.status}: ${text}`);
     }
+    return res.json();
+  }
+
+  async getKeySpend(alias: string): Promise<KeySpend | null> {
+    const res = await this.fetchApi.fetch(
+      `${BASE_PATH}/chat/key/${encodeURIComponent(alias)}/spend`,
+    );
+    if (!res.ok) return null;
     return res.json();
   }
 }

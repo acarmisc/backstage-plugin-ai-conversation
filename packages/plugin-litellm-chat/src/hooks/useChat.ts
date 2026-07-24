@@ -6,6 +6,7 @@ import type {
   ChatMessage,
   ChatStreamChunk,
   Citation,
+  KeySpend,
 } from '../types';
 
 const STORAGE_PREFIX = 'litellm-chat:threads';
@@ -31,10 +32,12 @@ function genId(): string {
   return `t_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+const SAVE_DEBOUNCE_MS = 400;
+
 export interface UseChatOptions {
   userId: string;
   model: string;
-  vectorStoreId: string | null;
+  vectorStoreIds: string[];
   keyAlias: string;
   keyToken: string;
   topK?: number;
@@ -51,10 +54,11 @@ export interface UseChatResult {
   isStreaming: boolean;
   error: string | null;
   citations: Citation[];
+  keySpend: KeySpend | null;
 }
 
 export function useChat(opts: UseChatOptions): UseChatResult {
-  const { userId, model, vectorStoreId, keyAlias, keyToken, topK } = opts;
+  const { userId, model, vectorStoreIds, keyAlias, keyToken, topK } = opts;
   const api = useApi(liteLlmChatApiRef) as InstanceType<typeof LiteLlmChatApi>;
 
   const [threads, setThreads] = useState<Thread[]>(() => loadThreads(userId));
@@ -64,12 +68,41 @@ export function useChat(opts: UseChatOptions): UseChatResult {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [citations, setCitations] = useState<Citation[]>([]);
+  const [keySpend, setKeySpend] = useState<KeySpend | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
 
+  // Debounce localStorage writes — `threads` changes on every streamed
+  // token, and writing the full (growing) history to localStorage on each
+  // one is a synchronous, main-thread-blocking JSON.stringify per token.
+  const threadsRef = useRef<Thread[]>(threads);
+  threadsRef.current = threads;
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
-    saveThreads(userId, threads);
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      saveTimeoutRef.current = null;
+      saveThreads(userId, threadsRef.current);
+    }, SAVE_DEBOUNCE_MS);
   }, [userId, threads]);
+
+  // Flush any pending debounced write on unmount or tab close so a save
+  // scheduled just before either doesn't get lost.
+  useEffect(() => {
+    const flush = () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+      }
+      saveThreads(userId, threadsRef.current);
+    };
+    window.addEventListener('beforeunload', flush);
+    return () => {
+      window.removeEventListener('beforeunload', flush);
+      flush();
+    };
+  }, [userId]);
 
   const activeThread = threads.find(t => t.id === activeId) ?? null;
 
@@ -79,22 +112,26 @@ export function useChat(opts: UseChatOptions): UseChatResult {
       title: 'New chat',
       messages: [],
       model,
-      vectorStoreId,
+      vectorStoreIds,
       keyAlias,
       keyToken,
       createdAt: Date.now(),
       updatedAt: Date.now(),
+      totalTokens: 0,
+      lastTurnUsage: null,
     };
     setThreads(prev => [thread, ...prev]);
     setActiveId(thread.id);
     setError(null);
     setCitations([]);
-  }, [model, vectorStoreId, keyAlias, keyToken]);
+    setKeySpend(null);
+  }, [model, vectorStoreIds, keyAlias, keyToken]);
 
   const selectThread = useCallback((id: string) => {
     setActiveId(id);
     setError(null);
     setCitations([]);
+    setKeySpend(null);
   }, []);
 
   const deleteThread = useCallback(
@@ -131,6 +168,7 @@ export function useChat(opts: UseChatOptions): UseChatResult {
 
       const threadId = activeThread.id;
       const updatedMessages = [...activeThread.messages, userMsg, assistantMsg];
+      const currentKeyAlias = keyAlias;
 
       setThreads(prev =>
         prev.map(t =>
@@ -140,7 +178,7 @@ export function useChat(opts: UseChatOptions): UseChatResult {
                 messages: updatedMessages,
                 title: t.messages.length === 0 ? text.slice(0, 40) : t.title,
                 model,
-                vectorStoreId,
+                vectorStoreIds,
                 keyAlias,
                 keyToken,
                 updatedAt: Date.now(),
@@ -157,7 +195,7 @@ export function useChat(opts: UseChatOptions): UseChatResult {
         {
           model,
           messages: reqMessages,
-          vector_store_id: vectorStoreId ?? undefined,
+          vector_store_ids: vectorStoreIds.length ? vectorStoreIds : undefined,
           top_k: topK,
           user_key: keyToken,
         },
@@ -173,6 +211,20 @@ export function useChat(opts: UseChatOptions): UseChatResult {
                 score: r.score,
                 snippet: r.text,
               })),
+            );
+          }
+          if (chunk.usage) {
+            const usage = chunk.usage;
+            setThreads(prev =>
+              prev.map(t =>
+                t.id === threadId
+                  ? {
+                      ...t,
+                      lastTurnUsage: usage,
+                      totalTokens: t.totalTokens + usage.total_tokens,
+                    }
+                  : t,
+              ),
             );
           }
           if (chunk.delta) {
@@ -193,6 +245,9 @@ export function useChat(opts: UseChatOptions): UseChatResult {
         () => {
           setIsStreaming(false);
           abortRef.current = null;
+          if (currentKeyAlias) {
+            api.getKeySpend(currentKeyAlias).then(setKeySpend).catch(() => {});
+          }
         },
         (err: Error) => {
           setError(err.message);
@@ -203,7 +258,7 @@ export function useChat(opts: UseChatOptions): UseChatResult {
 
       abortRef.current = controller;
     },
-    [activeThread, api, keyToken, model, vectorStoreId, keyAlias, topK],
+    [activeThread, api, keyToken, model, vectorStoreIds, keyAlias, topK],
   );
 
   return {
@@ -217,5 +272,6 @@ export function useChat(opts: UseChatOptions): UseChatResult {
     isStreaming,
     error,
     citations,
+    keySpend,
   };
 }

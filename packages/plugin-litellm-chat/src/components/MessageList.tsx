@@ -2,12 +2,10 @@ import React from 'react';
 import { Box, Typography } from '@mui/material';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import type { ChatMessage, Citation } from '../types';
-import { CitationsPanel } from './CitationsPanel';
+import type { ChatMessage } from '../types';
 
 export interface MessageListProps {
   messages: ChatMessage[];
-  citations: Citation[];
   isStreaming: boolean;
 }
 
@@ -20,7 +18,6 @@ const blink = {
 
 export const MessageList: React.FC<MessageListProps> = ({
   messages,
-  citations,
   isStreaming,
 }) => {
   return (
@@ -52,7 +49,6 @@ export const MessageList: React.FC<MessageListProps> = ({
       {messages.map((msg, i) => {
         const isUser = msg.role === 'user';
         const isLast = i === messages.length - 1;
-        const showCitations = !isUser && isLast && !isStreaming && citations.length > 0;
 
         return (
           <Box
@@ -105,7 +101,6 @@ export const MessageList: React.FC<MessageListProps> = ({
                 />
               ) : null}
             </Box>
-            {showCitations && <CitationsPanel citations={citations} />}
           </Box>
         );
       })}

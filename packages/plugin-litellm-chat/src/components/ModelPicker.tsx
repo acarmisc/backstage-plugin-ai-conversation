@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Select, MenuItem, FormControl, InputLabel } from '@mui/material';
+import { Select, MenuItem, FormControl, InputLabel, Typography } from '@mui/material';
 import { useApi } from '@backstage/core-plugin-api';
 import { liteLlmApiRef } from '@acarmisc/backstage-plugin-litellm';
 import type { ModelInfo } from '@acarmisc/backstage-plugin-litellm';
@@ -18,6 +18,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
   const liteLlmApi = useApi(liteLlmApiRef);
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -39,13 +40,15 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
           onChange(def);
         }
       })
-      .catch(() => {})
+      .catch(err => {
+        if (alive) setError(err.message ?? 'Failed to load models');
+      })
       .finally(() => alive && setLoading(false));
     return () => { alive = false; };
   }, []);
 
   return (
-    <FormControl size="small" sx={{ minWidth: 200 }}>
+    <FormControl size="small" error={!!error} sx={{ minWidth: 200 }}>
       <InputLabel>Model</InputLabel>
       <Select
         value={value}
@@ -59,6 +62,11 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
           </MenuItem>
         ))}
       </Select>
+      {error && (
+        <Typography variant="caption" color="error" sx={{ mt: 0.5 }}>
+          {error}
+        </Typography>
+      )}
     </FormControl>
   );
 };

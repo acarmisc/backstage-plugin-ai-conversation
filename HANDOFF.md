@@ -45,10 +45,11 @@ Browser → /api/litellm-chat/chat/stream → LiteLLM /v1/chat/completions (+ ve
 | Route | Method | Purpose |
 |---|---|---|
 | `/api/litellm-chat/health` | GET | Health check |
-| `/api/litellm-chat/config` | GET | Chat defaults (defaultModel, defaultVectorStoreId, maxRequestBudget) |
+| `/api/litellm-chat/config` | GET | Chat defaults (defaultModel, defaultVectorStoreIds, maxRequestBudget) |
 | `/api/litellm-chat/vector_stores` | GET | List LiteLLM vector stores (normalized) |
 | `/api/litellm-chat/chat/key` | POST | Mint dedicated chat key (returns real sk-) |
 | `/api/litellm-chat/chat/key` | DELETE | Delete chat key |
+| `/api/litellm-chat/chat/key/:alias/spend` | GET | Current spend/max_budget for a chat key, by alias |
 | `/api/litellm-chat/chat/stream` | POST | SSE streaming chat (RAG or plain) |
 | `/api/litellm-chat/chat/completions` | POST | Non-streaming chat |
 
@@ -61,7 +62,7 @@ litellm:
   userIdDomain: example.com  # optional
   chat:
     defaultModel: claude-3-5-sonnet        # optional
-    defaultVectorStoreId:                   # optional
+    defaultVectorStoreIds: []               # optional, list of vector store ids
     maxRequestBudget:                       # optional, advisory
 ```
 

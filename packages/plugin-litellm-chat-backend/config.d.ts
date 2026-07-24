@@ -31,9 +31,9 @@ export interface Config {
       defaultModel?: string;
 
       /**
-       * Vector store ID pre-selected in the KB picker on first load.
+       * Vector store IDs pre-selected in the KB picker on first load.
        */
-      defaultVectorStoreId?: string;
+      defaultVectorStoreIds?: string[];
 
       /**
        * Soft USD guard surfaced to the UI. Real enforcement is per-key

@@ -86,7 +86,7 @@ The chat plugin reuses all of this by **importing from the govai package**, not 
 {
   "model": "claude-3-5-sonnet",
   "messages": [{ "role": "user", "content": "..." }],
-  "vector_store_id": "vs_pgvec_xxx",
+  "vector_store_ids": ["vs_pgvec_xxx"],
   "top_k": 5,
   "user_key": "sk-..."
 }
@@ -117,7 +117,7 @@ Reads the same `litellm.baseUrl` / `litellm.masterKey` / `litellm.userIdDomain` 
 litellm:
   chat:
     defaultModel: claude-3-5-sonnet        # optional, pre-selected in UI
-    defaultVectorStoreId:                   # optional, pre-selected in UI
+    defaultVectorStoreIds: []               # optional, pre-selected in UI
     maxRequestBudget:                       # optional, USD guard (real enforcement is per-key in LiteLLM)
 ```
 
@@ -156,9 +156,9 @@ New `LiteLlmChatApi` + `liteLlmChatApiRef`. Reuses the existing `liteLlmApiRef` 
 
 ```typescript
 interface VectorStore { id: string; name: string; file_count?: number; status?: string; }
-interface ChatRequest { model: string; messages: Message[]; vector_store_id?: string; top_k?: number; user_key: string; }
+interface ChatRequest { model: string; messages: Message[]; vector_store_ids?: string[]; top_k?: number; user_key: string; }
 interface Message { role: 'user' | 'assistant' | 'system'; content: string; }
-interface ChatStreamChunk { delta?: string; error?: string; search_results?: SearchResult[]; }
+interface ChatStreamChunk { delta?: string; error?: string; search_results?: SearchResult[]; usage?: UsageInfo; }
 interface SearchResult { filename: string; score: number; text: string; }
 interface Citation { filename: string; score: number; snippet: string; }
 interface ChatResult { content: string; citations: Citation[]; }
@@ -167,7 +167,7 @@ interface ChatResult { content: string; citations: Citation[]; }
 ### State management (`src/hooks/useChat.ts`)
 
 - `threads: Thread[]` in `useState`, persisted to `localStorage` under `litellm-chat:threads:<userId>`.
-- `Thread = { id, title, messages: Message[], model, vectorStoreId, keyAlias, createdAt, updatedAt }`.
+- `Thread = { id, title, messages: Message[], model, vectorStoreIds, keyAlias, createdAt, updatedAt, totalTokens, lastTurnUsage }`.
 - `useChat` exposes: `threads`, `activeThread`, `newThread()`, `selectThread(id)`, `deleteThread(id)`, `sendMessage(text)`, `stopGeneration()`.
 
 ### Components
@@ -177,10 +177,11 @@ interface ChatResult { content: string; citations: Citation[]; }
 | `ChatPage` | Page shell at `/ai-chat`. Left thread sidebar, main chat area. |
 | `ChatComposer` | Textarea + send button + stop button. Pickers row above it. |
 | `ModelPicker` | Dropdown from `liteLlmApiRef.listModels()`. Preselects `config.chat.defaultModel`. |
-| `VectorStorePicker` | Dropdown from `listVectorStores()`. "None (no grounding)" option. Preselects `config.chat.defaultVectorStoreId`. |
+| `VectorStorePicker` | Multi-select from `listVectorStores()`. Empty selection = no grounding. Preselects `config.chat.defaultVectorStoreIds`. |
 | `KeyPicker` | Dropdown from `liteLlmApiRef.listKeys()`. Shows `key_alias` (fallback: masked `key_name`). Required before first send. Empty state: link to `/litellm`. |
-| `MessageList` | User messages right-aligned, assistant left. Assistant body as markdown. Citations panel below each assistant message. |
-| `CitationsPanel` | Collapsible. Shows source filename + relevance score. Expandable to show retrieved snippet. |
+| `MessageList` | User messages right-aligned, assistant left. Assistant body as markdown. |
+| `SourcesPanel` | Right-rail, always-visible list of the latest turn's citations (filename + relevance score + snippet). |
+| `UsagePanel` | Right-rail. Per-turn and session token counts, plus the thread's chat key spend/budget. |
 | `StreamingIndicator` | Pulsing cursor while tokens arrive. |
 | `ErrorBanner` | SSE error or fetch failure (e.g. 401 from LiteLLM — key out of budget). |
 

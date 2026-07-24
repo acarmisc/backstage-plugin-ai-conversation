@@ -25,8 +25,8 @@ function readChatConfig(config: Config): LiteLLMChatConfig {
   return {
     baseUrl: config.getString('litellm.baseUrl'),
     defaultModel: config.getOptionalString('litellm.chat.defaultModel'),
-    defaultVectorStoreId: config.getOptionalString(
-      'litellm.chat.defaultVectorStoreId',
+    defaultVectorStoreIds: config.getOptionalStringArray(
+      'litellm.chat.defaultVectorStoreIds',
     ),
     maxRequestBudget: config.getOptionalNumber('litellm.chat.maxRequestBudget'),
   };
@@ -53,7 +53,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
   router.get('/config', (_req: Request, res: Response) => {
     res.json({
       defaultModel: chatConfig.defaultModel ?? null,
-      defaultVectorStoreId: chatConfig.defaultVectorStoreId ?? null,
+      defaultVectorStoreIds: chatConfig.defaultVectorStoreIds ?? null,
       maxRequestBudget: chatConfig.maxRequestBudget ?? null,
     });
   });
@@ -147,6 +147,31 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
     }
   });
 
+  // Current spend/budget for a chat key, looked up by its alias (the token
+  // itself is never sent back to the server after mint — only the alias,
+  // which the client already has from the mint response).
+  router.get('/chat/key/:alias/spend', async (req: Request, res: Response) => {
+    try {
+      const tokenEntityRef = await resolveUserId(req, auth);
+      if (!tokenEntityRef) {
+        res.status(401).json({ error: 'unauthenticated' });
+        return;
+      }
+      const userId = toLiteLLMUserId(tokenEntityRef, userIdDomain);
+      const client = new LiteLLMClient({ baseUrl: chatConfig.baseUrl, masterKey });
+      const keys = await client.listKeys(userId);
+      const match = keys.find(k => k.key_alias === req.params.alias);
+      if (!match) {
+        res.status(404).json({ error: 'key not found' });
+        return;
+      }
+      res.json({ spend: match.spend, max_budget: match.max_budget ?? null });
+    } catch (err: any) {
+      logger.error('Failed to fetch chat key spend', err);
+      res.status(502).json({ error: err.message });
+    }
+  });
+
   router.post('/chat/completions', async (req: Request, res: Response) => {
     try {
       const body = req.body as ChatCompletionsRequest;
@@ -171,8 +196,8 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
         messages: body.messages,
         stream: false,
       };
-      if (body.vector_store_id) {
-        payload.vector_store_ids = [body.vector_store_id];
+      if (body.vector_store_ids?.length) {
+        payload.vector_store_ids = body.vector_store_ids;
         payload.top_k = body.top_k ?? 5;
       }
 
@@ -226,9 +251,10 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
         model: body.model,
         messages: body.messages,
         stream: true,
+        stream_options: { include_usage: true },
       };
-      if (body.vector_store_id) {
-        chatBody.vector_store_ids = [body.vector_store_id];
+      if (body.vector_store_ids?.length) {
+        chatBody.vector_store_ids = body.vector_store_ids;
       }
       await proxySSE({
         upstreamUrl: `${base}/v1/chat/completions`,
