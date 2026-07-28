@@ -1,5 +1,5 @@
 import { FetchApi } from '@backstage/core-plugin-api';
-import type { VectorStore, Persona, ChatRequest, ChatStreamChunk, ChatResult, ChatConfig, KeySpend } from './types';
+import type { VectorStore, Persona, ChatRequest, ChatFeedbackRequest, ChatStreamChunk, ChatResult, ChatConfig, KeySpend } from './types';
 export interface LiteLlmChatApiInterface {
     listVectorStores(): Promise<VectorStore[]>;
     listPersonas(): Promise<Persona[]>;
@@ -14,6 +14,9 @@ export interface LiteLlmChatApiInterface {
         success: boolean;
     }>;
     getKeySpend(alias: string): Promise<KeySpend | null>;
+    sendFeedback(req: ChatFeedbackRequest): Promise<{
+        success: boolean;
+    }>;
 }
 export interface ChatKey {
     key: string;
@@ -38,4 +41,7 @@ export declare class LiteLlmChatApi implements LiteLlmChatApiInterface {
         success: boolean;
     }>;
     getKeySpend(alias: string): Promise<KeySpend | null>;
+    sendFeedback(req: ChatFeedbackRequest): Promise<{
+        success: boolean;
+    }>;
 }

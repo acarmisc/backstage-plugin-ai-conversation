@@ -20,8 +20,21 @@ export interface Persona {
     tags?: string[];
 }
 export interface ChatMessage {
+    id: string;
     role: 'user' | 'assistant' | 'system';
     content: string;
+    feedback?: 'up' | 'down';
+}
+export interface ChatFeedbackRequest {
+    threadId: string;
+    messageId: string;
+    vote: 'up' | 'down';
+    comment?: string;
+    question: string;
+    answer: string;
+    model: string;
+    personaId?: string;
+    vectorStoreIds?: string[];
 }
 export interface ChatRequest {
     model: string;

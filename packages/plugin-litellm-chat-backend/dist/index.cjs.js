@@ -34396,11 +34396,12 @@ __export(index_exports, {
 module.exports = __toCommonJS(index_exports);
 
 // src/plugin.ts
-var import_backend_plugin_api = require("@backstage/backend-plugin-api");
+var import_backend_plugin_api2 = require("@backstage/backend-plugin-api");
 var import_plugin_catalog_node = __toESM(require_index_cjs4());
 
 // src/router.ts
 var import_express = __toESM(require("express"));
+var import_backend_plugin_api = require("@backstage/backend-plugin-api");
 var import_backstage_plugin_litellm_backend = require("@acarmisc/backstage-plugin-litellm-backend");
 
 // src/stream.ts
@@ -34505,10 +34506,19 @@ function readChatConfig(config) {
   };
 }
 async function createRouter(options) {
-  const { config, logger, auth, catalog } = options;
+  const { config, logger, auth, catalog, database } = options;
   const chatConfig = readChatConfig(config);
   const userIdDomain = config.getOptionalString("litellm.userIdDomain");
   const masterKey = config.getString("litellm.masterKey");
+  const dbClient = await database.getClient();
+  if (!database.migrations?.skip) {
+    await dbClient.migrate.latest({
+      directory: (0, import_backend_plugin_api.resolvePackagePath)(
+        "@acarmisc/backstage-plugin-litellm-chat-backend",
+        "migrations"
+      )
+    });
+  }
   async function applyPersona(personaId, messages) {
     if (!personaId) return messages;
     const credentials = await auth.getOwnServiceCredentials();
@@ -34520,7 +34530,7 @@ async function createRouter(options) {
     if (!systemPrompt) {
       throw Object.assign(new Error("persona has no system prompt"), { status: 400 });
     }
-    return [{ role: "system", content: systemPrompt }, ...messages];
+    return [{ id: "persona-system", role: "system", content: systemPrompt }, ...messages];
   }
   async function fetchVectorStores() {
     const upstream = await fetch(`${chatConfig.baseUrl}/v1/vector_store/list`, {
@@ -34658,6 +34668,38 @@ async function createRouter(options) {
       res.status(502).json({ error: err.message });
     }
   });
+  router.post("/feedback", async (req, res) => {
+    try {
+      const tokenEntityRef = await (0, import_backstage_plugin_litellm_backend.resolveUserId)(req, auth);
+      if (!tokenEntityRef) {
+        res.status(401).json({ error: "unauthenticated" });
+        return;
+      }
+      const body = req.body;
+      if (!body?.threadId || !body?.messageId || body.vote !== "up" && body.vote !== "down") {
+        res.status(400).json({
+          error: "threadId, messageId, vote (up|down) required"
+        });
+        return;
+      }
+      await dbClient("chat_message_feedback").insert({
+        thread_id: body.threadId,
+        message_id: body.messageId,
+        user_ref: tokenEntityRef,
+        vote: body.vote,
+        comment: body.comment ?? null,
+        question: body.question ?? "",
+        answer: body.answer ?? "",
+        model: body.model ?? "",
+        persona_id: body.personaId ?? null,
+        vector_store_ids: body.vectorStoreIds ? JSON.stringify(body.vectorStoreIds) : null
+      }).onConflict(["thread_id", "message_id", "user_ref"]).merge({ vote: body.vote, comment: body.comment ?? null });
+      res.json({ success: true });
+    } catch (err) {
+      logger.error("Failed to record chat feedback", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
   router.post("/chat/completions", async (req, res) => {
     try {
       const body = req.body;
@@ -34749,20 +34791,21 @@ async function createRouter(options) {
 }
 
 // src/plugin.ts
-var litellmChatPlugin = (0, import_backend_plugin_api.createBackendPlugin)({
+var litellmChatPlugin = (0, import_backend_plugin_api2.createBackendPlugin)({
   pluginId: "litellm-chat",
   register(reg) {
     reg.registerInit({
       deps: {
-        httpRouter: import_backend_plugin_api.coreServices.httpRouter,
-        config: import_backend_plugin_api.coreServices.rootConfig,
-        logger: import_backend_plugin_api.coreServices.logger,
-        auth: import_backend_plugin_api.coreServices.auth,
-        discovery: import_backend_plugin_api.coreServices.discovery,
-        catalog: import_plugin_catalog_node.catalogServiceRef
+        httpRouter: import_backend_plugin_api2.coreServices.httpRouter,
+        config: import_backend_plugin_api2.coreServices.rootConfig,
+        logger: import_backend_plugin_api2.coreServices.logger,
+        auth: import_backend_plugin_api2.coreServices.auth,
+        discovery: import_backend_plugin_api2.coreServices.discovery,
+        catalog: import_plugin_catalog_node.catalogServiceRef,
+        database: import_backend_plugin_api2.coreServices.database
       },
-      async init({ httpRouter, config, logger, auth, discovery, catalog }) {
-        const router = await createRouter({ config, logger, auth, discovery, catalog });
+      async init({ httpRouter, config, logger, auth, discovery, catalog, database }) {
+        const router = await createRouter({ config, logger, auth, discovery, catalog, database });
         httpRouter.use(router);
       }
     });

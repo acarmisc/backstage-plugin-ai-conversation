@@ -16,6 +16,7 @@ export interface UseChatResult {
     deleteThread: (id: string) => void;
     sendMessage: (text: string) => void;
     stopGeneration: () => void;
+    submitFeedback: (messageId: string, vote: 'up' | 'down') => void;
     isStreaming: boolean;
     error: string | null;
     citations: Citation[];

@@ -170,6 +170,18 @@ var init_api = __esm({
         if (!res.ok) return null;
         return res.json();
       }
+      async sendFeedback(req) {
+        const res = await this.fetchApi.fetch(`${BASE_PATH}/feedback`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(req)
+        });
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          throw new Error(`feedback ${res.status}: ${text}`);
+        }
+        return res.json();
+      }
     };
   }
 });
@@ -193,6 +205,11 @@ function saveThreads(userId, threads) {
 }
 function genId() {
   return `t_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+function findQuestionFor(messages, messageId) {
+  const idx = messages.findIndex((m) => m.id === messageId);
+  if (idx <= 0) return void 0;
+  return messages[idx - 1];
 }
 function useChat(opts) {
   const { userId, model, vectorStoreIds, personaId, keyAlias, keyToken, topK } = opts;
@@ -283,8 +300,8 @@ function useChat(opts) {
       if (!text.trim() || !activeThread || !keyToken) return;
       setError(null);
       setCitations([]);
-      const userMsg = { role: "user", content: text };
-      const assistantMsg = { role: "assistant", content: "" };
+      const userMsg = { id: genId(), role: "user", content: text };
+      const assistantMsg = { id: genId(), role: "assistant", content: "" };
       const threadId = activeThread.id;
       const updatedMessages = [...activeThread.messages, userMsg, assistantMsg];
       const currentKeyAlias = keyAlias;
@@ -373,6 +390,36 @@ function useChat(opts) {
     },
     [activeThread, api, keyToken, model, vectorStoreIds, personaId, keyAlias, topK]
   );
+  const submitFeedback = useCallback(
+    (messageId, vote) => {
+      if (!activeThread) return;
+      const message = activeThread.messages.find((m) => m.id === messageId);
+      if (!message) return;
+      const question = findQuestionFor(activeThread.messages, messageId);
+      const threadId = activeThread.id;
+      setThreads(
+        (prev) => prev.map(
+          (t) => t.id !== threadId ? t : {
+            ...t,
+            messages: t.messages.map(
+              (m) => m.id === messageId ? { ...m, feedback: vote } : m
+            )
+          }
+        )
+      );
+      api.sendFeedback({
+        threadId,
+        messageId,
+        vote,
+        question: question?.content ?? "",
+        answer: message.content,
+        model: activeThread.model,
+        personaId: activeThread.personaId || void 0,
+        vectorStoreIds: activeThread.vectorStoreIds
+      }).catch((err) => setError(err.message));
+    },
+    [activeThread, api]
+  );
   return {
     threads,
     activeThread,
@@ -381,6 +428,7 @@ function useChat(opts) {
     deleteThread,
     sendMessage,
     stopGeneration,
+    submitFeedback,
     isStreaming,
     error,
     citations,
@@ -632,7 +680,11 @@ var init_KeyPicker = __esm({
 
 // src/components/MessageList.tsx
 import React5 from "react";
-import { Box as Box3, Typography as Typography5 } from "@mui/material";
+import { Box as Box3, IconButton as IconButton2, Typography as Typography5 } from "@mui/material";
+import ThumbUpIcon from "@mui/icons-material/ThumbUp";
+import ThumbUpOutlinedIcon from "@mui/icons-material/ThumbUpOutlined";
+import ThumbDownIcon from "@mui/icons-material/ThumbDown";
+import ThumbDownOutlinedIcon from "@mui/icons-material/ThumbDownOutlined";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 var blink, MessageList;
@@ -647,7 +699,8 @@ var init_MessageList = __esm({
     };
     MessageList = ({
       messages,
-      isStreaming
+      isStreaming,
+      onFeedback
     }) => {
       return /* @__PURE__ */ React5.createElement(
         Box3,
@@ -677,10 +730,11 @@ var init_MessageList = __esm({
         messages.map((msg, i) => {
           const isUser = msg.role === "user";
           const isLast = i === messages.length - 1;
+          const showFeedback = !isUser && !!msg.content && !(isStreaming && isLast) && !!onFeedback;
           return /* @__PURE__ */ React5.createElement(
             Box3,
             {
-              key: i,
+              key: msg.id,
               sx: {
                 alignSelf: isUser ? "flex-end" : "flex-start",
                 maxWidth: "80%"
@@ -725,7 +779,26 @@ var init_MessageList = __esm({
                   }
                 }
               ) : null
-            )
+            ),
+            showFeedback && /* @__PURE__ */ React5.createElement(Box3, { sx: { display: "flex", gap: 0.5, mt: 0.25 } }, /* @__PURE__ */ React5.createElement(
+              IconButton2,
+              {
+                size: "small",
+                "aria-label": "Good response",
+                color: msg.feedback === "up" ? "primary" : "default",
+                onClick: () => onFeedback(msg.id, "up")
+              },
+              msg.feedback === "up" ? /* @__PURE__ */ React5.createElement(ThumbUpIcon, { fontSize: "small" }) : /* @__PURE__ */ React5.createElement(ThumbUpOutlinedIcon, { fontSize: "small" })
+            ), /* @__PURE__ */ React5.createElement(
+              IconButton2,
+              {
+                size: "small",
+                "aria-label": "Bad response",
+                color: msg.feedback === "down" ? "primary" : "default",
+                onClick: () => onFeedback(msg.id, "down")
+              },
+              msg.feedback === "down" ? /* @__PURE__ */ React5.createElement(ThumbDownIcon, { fontSize: "small" }) : /* @__PURE__ */ React5.createElement(ThumbDownOutlinedIcon, { fontSize: "small" })
+            ))
           );
         })
       );
@@ -818,7 +891,7 @@ import {
   ListItem,
   ListItemButton,
   ListItemText,
-  IconButton as IconButton2,
+  IconButton as IconButton3,
   Divider as Divider2,
   Typography as Typography8,
   Collapse,
@@ -1012,7 +1085,7 @@ var init_ChatPage = __esm({
             key: t.id,
             disablePadding: true,
             secondaryAction: /* @__PURE__ */ React9.createElement(
-              IconButton2,
+              IconButton3,
               {
                 edge: "end",
                 size: "small",
@@ -1091,7 +1164,14 @@ var init_ChatPage = __esm({
                 minHeight: 0
               }
             },
-            /* @__PURE__ */ React9.createElement(MessageList, { messages, isStreaming }),
+            /* @__PURE__ */ React9.createElement(
+              MessageList,
+              {
+                messages,
+                isStreaming,
+                onFeedback: chat.submitFeedback
+              }
+            ),
             /* @__PURE__ */ React9.createElement("div", { ref: messagesEndRef })
           ),
           /* @__PURE__ */ React9.createElement(
@@ -1130,8 +1210,8 @@ var init_ChatPage = __esm({
                 }
               }
             ),
-            isStreaming ? /* @__PURE__ */ React9.createElement(Tooltip2, { title: "Stop" }, /* @__PURE__ */ React9.createElement(IconButton2, { color: "error", onClick: chat.stopGeneration }, /* @__PURE__ */ React9.createElement(StopIcon, null))) : /* @__PURE__ */ React9.createElement(Tooltip2, { title: "Send" }, /* @__PURE__ */ React9.createElement(
-              IconButton2,
+            isStreaming ? /* @__PURE__ */ React9.createElement(Tooltip2, { title: "Stop" }, /* @__PURE__ */ React9.createElement(IconButton3, { color: "error", onClick: chat.stopGeneration }, /* @__PURE__ */ React9.createElement(StopIcon, null))) : /* @__PURE__ */ React9.createElement(Tooltip2, { title: "Send" }, /* @__PURE__ */ React9.createElement(
+              IconButton3,
               {
                 color: "primary",
                 onClick: handleSend,

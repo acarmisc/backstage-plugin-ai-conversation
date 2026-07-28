@@ -35,6 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createRouter = createRouter;
 const express_1 = __importStar(require("express"));
+const backend_plugin_api_1 = require("@backstage/backend-plugin-api");
 const backstage_plugin_litellm_backend_1 = require("@acarmisc/backstage-plugin-litellm-backend");
 const stream_1 = require("./stream");
 const persona_1 = require("./persona");
@@ -48,10 +49,16 @@ function readChatConfig(config) {
     };
 }
 async function createRouter(options) {
-    const { config, logger, auth, catalog } = options;
+    const { config, logger, auth, catalog, database } = options;
     const chatConfig = readChatConfig(config);
     const userIdDomain = config.getOptionalString('litellm.userIdDomain');
     const masterKey = config.getString('litellm.masterKey');
+    const dbClient = await database.getClient();
+    if (!database.migrations?.skip) {
+        await dbClient.migrate.latest({
+            directory: (0, backend_plugin_api_1.resolvePackagePath)('@acarmisc/backstage-plugin-litellm-chat-backend', 'migrations'),
+        });
+    }
     // Prepends the persona's system prompt to `messages` if `personaId` is
     // set. Resolved server-side by entity ref so the prompt text never has
     // to round-trip through the browser (see PersonaSummary in types.ts).
@@ -69,7 +76,7 @@ async function createRouter(options) {
         if (!systemPrompt) {
             throw Object.assign(new Error('persona has no system prompt'), { status: 400 });
         }
-        return [{ role: 'system', content: systemPrompt }, ...messages];
+        return [{ id: 'persona-system', role: 'system', content: systemPrompt }, ...messages];
     }
     // LiteLLM-native endpoint (not OpenAI passthrough /v1/vector_stores).
     async function fetchVectorStores() {
@@ -222,6 +229,51 @@ async function createRouter(options) {
         catch (err) {
             logger.error('Failed to fetch chat key spend', err);
             res.status(502).json({ error: err.message });
+        }
+    });
+    // Records a thumbs-up/down vote on an assistant message. Threads/messages
+    // are never persisted server-side (see AGENTS.md), so the request carries
+    // a snapshot of the Q&A and context — this is the only durable trace of a
+    // chat exchange this plugin keeps. Upserts on (thread_id, message_id,
+    // user_ref) so re-voting updates in place instead of accumulating rows.
+    router.post('/feedback', async (req, res) => {
+        try {
+            const tokenEntityRef = await (0, backstage_plugin_litellm_backend_1.resolveUserId)(req, auth);
+            if (!tokenEntityRef) {
+                res.status(401).json({ error: 'unauthenticated' });
+                return;
+            }
+            const body = req.body;
+            if (!body?.threadId ||
+                !body?.messageId ||
+                (body.vote !== 'up' && body.vote !== 'down')) {
+                res.status(400).json({
+                    error: 'threadId, messageId, vote (up|down) required',
+                });
+                return;
+            }
+            await dbClient('chat_message_feedback')
+                .insert({
+                thread_id: body.threadId,
+                message_id: body.messageId,
+                user_ref: tokenEntityRef,
+                vote: body.vote,
+                comment: body.comment ?? null,
+                question: body.question ?? '',
+                answer: body.answer ?? '',
+                model: body.model ?? '',
+                persona_id: body.personaId ?? null,
+                vector_store_ids: body.vectorStoreIds
+                    ? JSON.stringify(body.vectorStoreIds)
+                    : null,
+            })
+                .onConflict(['thread_id', 'message_id', 'user_ref'])
+                .merge({ vote: body.vote, comment: body.comment ?? null });
+            res.json({ success: true });
+        }
+        catch (err) {
+            logger.error('Failed to record chat feedback', err);
+            res.status(500).json({ error: err.message });
         }
     });
     router.post('/chat/completions', async (req, res) => {
