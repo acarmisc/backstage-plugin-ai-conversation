@@ -32,6 +32,12 @@ function genId(): string {
   return `t_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function findQuestionFor(messages: ChatMessage[], messageId: string): ChatMessage | undefined {
+  const idx = messages.findIndex(m => m.id === messageId);
+  if (idx <= 0) return undefined;
+  return messages[idx - 1];
+}
+
 const SAVE_DEBOUNCE_MS = 400;
 
 export interface UseChatOptions {
@@ -52,6 +58,7 @@ export interface UseChatResult {
   deleteThread: (id: string) => void;
   sendMessage: (text: string) => void;
   stopGeneration: () => void;
+  submitFeedback: (messageId: string, vote: 'up' | 'down') => void;
   isStreaming: boolean;
   error: string | null;
   citations: Citation[];
@@ -165,8 +172,8 @@ export function useChat(opts: UseChatOptions): UseChatResult {
       setError(null);
       setCitations([]);
 
-      const userMsg: ChatMessage = { role: 'user', content: text };
-      const assistantMsg: ChatMessage = { role: 'assistant', content: '' };
+      const userMsg: ChatMessage = { id: genId(), role: 'user', content: text };
+      const assistantMsg: ChatMessage = { id: genId(), role: 'assistant', content: '' };
 
       const threadId = activeThread.id;
       const updatedMessages = [...activeThread.messages, userMsg, assistantMsg];
@@ -265,6 +272,43 @@ export function useChat(opts: UseChatOptions): UseChatResult {
     [activeThread, api, keyToken, model, vectorStoreIds, personaId, keyAlias, topK],
   );
 
+  const submitFeedback = useCallback(
+    (messageId: string, vote: 'up' | 'down') => {
+      if (!activeThread) return;
+      const message = activeThread.messages.find(m => m.id === messageId);
+      if (!message) return;
+      const question = findQuestionFor(activeThread.messages, messageId);
+
+      const threadId = activeThread.id;
+      setThreads(prev =>
+        prev.map(t =>
+          t.id !== threadId
+            ? t
+            : {
+                ...t,
+                messages: t.messages.map(m =>
+                  m.id === messageId ? { ...m, feedback: vote } : m,
+                ),
+              },
+        ),
+      );
+
+      api
+        .sendFeedback({
+          threadId,
+          messageId,
+          vote,
+          question: question?.content ?? '',
+          answer: message.content,
+          model: activeThread.model,
+          personaId: activeThread.personaId || undefined,
+          vectorStoreIds: activeThread.vectorStoreIds,
+        })
+        .catch((err: Error) => setError(err.message));
+    },
+    [activeThread, api],
+  );
+
   return {
     threads,
     activeThread,
@@ -273,6 +317,7 @@ export function useChat(opts: UseChatOptions): UseChatResult {
     deleteThread,
     sendMessage,
     stopGeneration,
+    submitFeedback,
     isStreaming,
     error,
     citations,

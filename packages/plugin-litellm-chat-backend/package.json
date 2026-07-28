@@ -23,7 +23,8 @@
   "types": "dist/index.d.ts",
   "files": [
     "dist",
-    "config.d.ts"
+    "config.d.ts",
+    "migrations"
   ],
   "scripts": {
     "build": "node build.js && tsc -p tsconfig.json",

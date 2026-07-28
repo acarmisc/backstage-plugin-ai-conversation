@@ -27,7 +27,7 @@ The chat plugin reuses all of this by **importing from the govai package**, not 
 | Decision | Choice | Rationale |
 |---|---|---|
 | Packaging | Separate plugin pair (`plugin-litellm-chat` + `plugin-litellm-chat-backend`) | Independently versionable; keeps governance and chat concerns decoupled; matches govai's monorepo pattern. |
-| Thread persistence | Client-side ephemeral (React state + localStorage) | LiteLLM is stateless — each turn resends full history anyway. Zero backend schema. Add DB persistence later if users ask. |
+| Thread persistence | Client-side ephemeral (React state + localStorage) | LiteLLM is stateless — each turn resends full history anyway. No backend schema for threads themselves. Add DB persistence later if users ask. Exception: message feedback (thumbs up/down) is persisted server-side in a `chat_message_feedback` table (via `coreServices.database`), as a snapshotted event, not full thread history — see `plugin-litellm-chat-backend/migrations/`. |
 | RAG endpoint | `/v1/rag/query` primary, `/v1/chat/completions` + `vector_store_ids` fallback | `/v1/rag/query` is model-agnostic (prepend-context, not provider-native tool). Fallback handles LiteLLM versions where `/rag/query` isn't mounted. |
 | Chat key strategy | User picks a key in the UI (dropdown from their existing keys) | Spend attribution to the user's chosen key; per-key budget/limits enforced natively by LiteLLM; no surprise auto-minted keys. |
 | UI surfaces | Full chat page at `/ai-chat` | v1 ships the page. Sidebar modal and home widget are future work. |
@@ -271,7 +271,7 @@ backstage-plugin-litellm-rag-ai/
 
 ## Things NOT in v1
 
-- **DB-backed threads** — client-side ephemeral only. Revisit if users ask.
+- **DB-backed threads** — client-side ephemeral only. Revisit if users ask. (Message feedback is the one exception — see the Thread persistence row above.)
 - **Bridge/CLI auth for chat** — chat is browser-only. The govai Keycloak bridge is for key minting by the Abby CLI.
 - **Custom chunking/reranker/hybrid search** — LiteLLM's `retrieval_config` gives `top_k` and optional rerank. If fine-grained retrieval control is needed later, build a dedicated retrieval service.
 - **File upload** — pgvector ingests files via its own admin API. Backstage chat is query-side only.

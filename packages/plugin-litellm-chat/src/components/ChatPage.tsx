@@ -313,7 +313,11 @@ export const ChatPage: React.FC = () => {
               minHeight: 0,
             }}
           >
-            <MessageList messages={messages} isStreaming={isStreaming} />
+            <MessageList
+              messages={messages}
+              isStreaming={isStreaming}
+              onFeedback={chat.submitFeedback}
+            />
             <div ref={messagesEndRef} />
           </Box>
 

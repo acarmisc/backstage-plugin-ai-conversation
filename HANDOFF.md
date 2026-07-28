@@ -146,7 +146,7 @@ GitLab CI (`.gitlab-ci.yml`) on push to `main`:
 
 4. **Thread persistence is localStorage only**: threads lost on browser data clear. Key stored in thread too — if localStorage cleared, orphaned `sk-` keys remain in LiteLLM (24h expiry mitigates).
 
-5. **No DB-backed threads**: AGENTS.md decision — v1 is ephemeral. Revisit if users ask.
+5. **No DB-backed threads**: AGENTS.md decision — v1 is ephemeral. Revisit if users ask. Exception: message thumbs-up/down feedback is persisted in a new `chat_message_feedback` table (first DB schema this plugin has ever had — see `plugin-litellm-chat-backend/migrations/`), storing a snapshot of the Q&A rather than the full thread.
 
 6. **CSP still references `abssrv.it`**: `connect-src` has both domains now, but Keycloak auth endpoint is `auth.ces.abssrv.it`. If Keycloak moves to `abstractstaging.it`, CSP needs update.
 

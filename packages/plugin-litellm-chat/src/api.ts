@@ -3,6 +3,7 @@ import type {
   VectorStore,
   Persona,
   ChatRequest,
+  ChatFeedbackRequest,
   ChatStreamChunk,
   SearchResult,
   ChatResult,
@@ -24,6 +25,7 @@ export interface LiteLlmChatApiInterface {
   mintChatKey(opts?: { models?: string[]; max_budget?: number }): Promise<ChatKey>;
   deleteChatKey(key: string): Promise<{ success: boolean }>;
   getKeySpend(alias: string): Promise<KeySpend | null>;
+  sendFeedback(req: ChatFeedbackRequest): Promise<{ success: boolean }>;
 }
 
 export interface ChatKey {
@@ -216,6 +218,19 @@ export class LiteLlmChatApi implements LiteLlmChatApiInterface {
       `${BASE_PATH}/chat/key/${encodeURIComponent(alias)}/spend`,
     );
     if (!res.ok) return null;
+    return res.json();
+  }
+
+  async sendFeedback(req: ChatFeedbackRequest): Promise<{ success: boolean }> {
+    const res = await this.fetchApi.fetch(`${BASE_PATH}/feedback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`feedback ${res.status}: ${text}`);
+    }
     return res.json();
   }
 }

@@ -1,5 +1,9 @@
 import React from 'react';
-import { Box, Typography } from '@mui/material';
+import { Box, IconButton, Typography } from '@mui/material';
+import ThumbUpIcon from '@mui/icons-material/ThumbUp';
+import ThumbUpOutlinedIcon from '@mui/icons-material/ThumbUpOutlined';
+import ThumbDownIcon from '@mui/icons-material/ThumbDown';
+import ThumbDownOutlinedIcon from '@mui/icons-material/ThumbDownOutlined';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { ChatMessage } from '../types';
@@ -7,6 +11,7 @@ import type { ChatMessage } from '../types';
 export interface MessageListProps {
   messages: ChatMessage[];
   isStreaming: boolean;
+  onFeedback?: (messageId: string, vote: 'up' | 'down') => void;
 }
 
 const blink = {
@@ -19,6 +24,7 @@ const blink = {
 export const MessageList: React.FC<MessageListProps> = ({
   messages,
   isStreaming,
+  onFeedback,
 }) => {
   return (
     <Box
@@ -49,10 +55,12 @@ export const MessageList: React.FC<MessageListProps> = ({
       {messages.map((msg, i) => {
         const isUser = msg.role === 'user';
         const isLast = i === messages.length - 1;
+        const showFeedback =
+          !isUser && !!msg.content && !(isStreaming && isLast) && !!onFeedback;
 
         return (
           <Box
-            key={i}
+            key={msg.id}
             sx={{
               alignSelf: isUser ? 'flex-end' : 'flex-start',
               maxWidth: '80%',
@@ -101,6 +109,34 @@ export const MessageList: React.FC<MessageListProps> = ({
                 />
               ) : null}
             </Box>
+            {showFeedback && (
+              <Box sx={{ display: 'flex', gap: 0.5, mt: 0.25 }}>
+                <IconButton
+                  size="small"
+                  aria-label="Good response"
+                  color={msg.feedback === 'up' ? 'primary' : 'default'}
+                  onClick={() => onFeedback!(msg.id, 'up')}
+                >
+                  {msg.feedback === 'up' ? (
+                    <ThumbUpIcon fontSize="small" />
+                  ) : (
+                    <ThumbUpOutlinedIcon fontSize="small" />
+                  )}
+                </IconButton>
+                <IconButton
+                  size="small"
+                  aria-label="Bad response"
+                  color={msg.feedback === 'down' ? 'primary' : 'default'}
+                  onClick={() => onFeedback!(msg.id, 'down')}
+                >
+                  {msg.feedback === 'down' ? (
+                    <ThumbDownIcon fontSize="small" />
+                  ) : (
+                    <ThumbDownOutlinedIcon fontSize="small" />
+                  )}
+                </IconButton>
+              </Box>
+            )}
           </Box>
         );
       })}
