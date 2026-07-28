@@ -1,6 +1,7 @@
 import { createApiRef, FetchApi } from '@backstage/core-plugin-api';
 import type {
   VectorStore,
+  Persona,
   ChatRequest,
   ChatStreamChunk,
   SearchResult,
@@ -11,6 +12,7 @@ import type {
 
 export interface LiteLlmChatApiInterface {
   listVectorStores(): Promise<VectorStore[]>;
+  listPersonas(): Promise<Persona[]>;
   getChatConfig(): Promise<ChatConfig>;
   chatStream(
     req: ChatRequest,
@@ -79,6 +81,12 @@ export class LiteLlmChatApi implements LiteLlmChatApiInterface {
   async listVectorStores(): Promise<VectorStore[]> {
     const res = await this.fetchApi.fetch(`${BASE_PATH}/vector_stores`);
     if (!res.ok) throw new Error(`vector_stores ${res.status}`);
+    return res.json();
+  }
+
+  async listPersonas(): Promise<Persona[]> {
+    const res = await this.fetchApi.fetch(`${BASE_PATH}/personas`);
+    if (!res.ok) throw new Error(`personas ${res.status}`);
     return res.json();
   }
 

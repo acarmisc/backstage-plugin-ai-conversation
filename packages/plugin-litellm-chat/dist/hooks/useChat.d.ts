@@ -3,6 +3,7 @@ export interface UseChatOptions {
     userId: string;
     model: string;
     vectorStoreIds: string[];
+    personaId: string;
     keyAlias: string;
     keyToken: string;
     topK?: number;

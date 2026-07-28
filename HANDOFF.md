@@ -7,8 +7,8 @@ Two npm packages + wired into target Backstage on GKE:
 | Package | Version | npm |
 |---|---|---|
 | `@acarmisc/backstage-plugin-litellm-backend` (govai) | 0.3.4 | New exports: `resolveUserId`, `toLiteLLMUserId`, `getOrProvisionUser`, `ProvisioningError` |
-| `@acarmisc/backstage-plugin-litellm-chat` (frontend) | 0.3.0 | ChatGPT-style UI, SSE reader, thread localStorage |
-| `@acarmisc/backstage-plugin-litellm-chat-backend` (backend) | 0.2.0 | SSE proxy, vector store listing, chat key mint/delete |
+| `@acarmisc/backstage-plugin-litellm-chat` (frontend) | 0.5.0 | ChatGPT-style UI, SSE reader, thread localStorage, persona picker |
+| `@acarmisc/backstage-plugin-litellm-chat-backend` (backend) | 0.4.0 | SSE proxy, vector store listing, chat key mint/delete, catalog-backed personas |
 
 **Live at:** https://backstage.ces.abstractstaging.it/ai-chat
 
@@ -40,6 +40,19 @@ Browser → /api/litellm-chat/chat/stream → LiteLLM /v1/chat/completions (+ ve
 
 6. **Domain**: Added `backstage.ces.abstractstaging.it` to ingress (was only `abssrv.it`). Switched `APP_BASE_URL`. Keycloak OIDC client `backstage` has wildcard redirect URIs — no Keycloak config change needed. CSP updated to include `*.ces.abstractstaging.it`.
 
+## Personas (new)
+
+Personas are `chat-persona` catalog Components (not app-config) — self-service, ownable, discoverable. Source: `git@gitlab.az.abssrv.it:innovation/ces-ai-personas.git`, auto-discovered by the existing `gitlab` catalog provider (`app-config.production.yaml`, group `innovation`, `projectPattern: '[\s\S]*'`, 30 min schedule) — no app-config change needed in the host Backstage.
+
+- **Backend** (`persona.ts`, `router.ts`): `GET /personas` queries the catalog for `spec.type: chat-persona`, returns `PersonaSummary[]` (id/title/description/defaultModel/defaultVectorStoreIds/tags) — **no system prompt**. `applyPersona()` in `router.ts` resolves the full entity by `persona_id` server-side and prepends `chat-persona.acarmisc.org/system-prompt` as a system message before calling LiteLLM, for both `/chat/stream` and `/chat/completions`. The prompt text never round-trips through the browser.
+- **Vector store name resolution**: persona authors write human-friendly store names (`oo-kb`, `general`) in `chat-persona.acarmisc.org/default-vector-stores`, not raw `vector_store_id`s. `/personas` resolves them against a live `fetchVectorStores()` call (same LiteLLM endpoint `/vector_stores` uses) before returning — best-effort, drops unresolvable names rather than sending bogus ids upstream.
+- **Frontend**: `PersonaPicker` (new, `Select`-based like `ModelPicker`) sits above `ModelPicker`/`VectorStorePicker` in Settings. Selecting a persona prefills model + KB pickers from its defaults but doesn't lock them — user can still override. `personaId` persists per-thread (same pattern as `model`/`vectorStoreIds`/`keyAlias`) and restores when switching threads.
+- **New dependency**: backend now depends on `@backstage/plugin-catalog-node` (`catalogServiceRef`) + `@backstage/catalog-model`, resolved to `1.20.1`/`1.16.0`-compatible versions already aligned with the installed `@backstage/catalog-client@1.9.2`/`backend-plugin-api@1.9.1`.
+
+**Known gap**: the `oo-business-analyst` persona in `ces-ai-personas` sets `default-model: claude-3-5-sonnet`, but `ModelPicker.tsx` filters out all `claude-*` models (comment: "require a per-user Anthropic Max OAuth token... Backstage only forwards a LiteLLM virtual key"). Selecting that persona will prefill a model the picker doesn't actually list — the `Select` will show blank until the user manually picks a real available model. Not fixed here since it requires knowing which non-Claude model is actually meant as the default; needs a decision + a follow-up edit to the persona's `default-model` annotation in `ces-ai-personas`.
+
+**Not yet done**: end-to-end browser verification of persona selection → system prompt actually applied → RAG grounding from the resolved KB.
+
 ## Routes
 
 | Route | Method | Purpose |
@@ -47,6 +60,7 @@ Browser → /api/litellm-chat/chat/stream → LiteLLM /v1/chat/completions (+ ve
 | `/api/litellm-chat/health` | GET | Health check |
 | `/api/litellm-chat/config` | GET | Chat defaults (defaultModel, defaultVectorStoreIds, maxRequestBudget) |
 | `/api/litellm-chat/vector_stores` | GET | List LiteLLM vector stores (normalized) |
+| `/api/litellm-chat/personas` | GET | List `chat-persona` catalog entities (metadata only, no system prompt) |
 | `/api/litellm-chat/chat/key` | POST | Mint dedicated chat key (returns real sk-) |
 | `/api/litellm-chat/chat/key` | DELETE | Delete chat key |
 | `/api/litellm-chat/chat/key/:alias/spend` | GET | Current spend/max_budget for a chat key, by alias |

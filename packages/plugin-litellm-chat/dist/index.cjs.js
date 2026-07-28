@@ -79,6 +79,11 @@ var init_api = __esm({
         if (!res.ok) throw new Error(`vector_stores ${res.status}`);
         return res.json();
       }
+      async listPersonas() {
+        const res = await this.fetchApi.fetch(`${BASE_PATH}/personas`);
+        if (!res.ok) throw new Error(`personas ${res.status}`);
+        return res.json();
+      }
       async getChatConfig() {
         const res = await this.fetchApi.fetch(`${BASE_PATH}/config`);
         if (!res.ok) {
@@ -210,7 +215,7 @@ function genId() {
   return `t_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 function useChat(opts) {
-  const { userId, model, vectorStoreIds, keyAlias, keyToken, topK } = opts;
+  const { userId, model, vectorStoreIds, personaId, keyAlias, keyToken, topK } = opts;
   const api = (0, import_core_plugin_api2.useApi)(liteLlmChatApiRef);
   const [threads, setThreads] = (0, import_react.useState)(() => loadThreads(userId));
   const [activeId, setActiveId] = (0, import_react.useState)(
@@ -253,6 +258,7 @@ function useChat(opts) {
       messages: [],
       model,
       vectorStoreIds,
+      personaId,
       keyAlias,
       keyToken,
       createdAt: Date.now(),
@@ -265,7 +271,7 @@ function useChat(opts) {
     setError(null);
     setCitations([]);
     setKeySpend(null);
-  }, [model, vectorStoreIds, keyAlias, keyToken]);
+  }, [model, vectorStoreIds, personaId, keyAlias, keyToken]);
   const selectThread = (0, import_react.useCallback)((id) => {
     setActiveId(id);
     setError(null);
@@ -310,6 +316,7 @@ function useChat(opts) {
             title: t.messages.length === 0 ? text.slice(0, 40) : t.title,
             model,
             vectorStoreIds,
+            personaId,
             keyAlias,
             keyToken,
             updatedAt: Date.now()
@@ -323,6 +330,7 @@ function useChat(opts) {
           model,
           messages: reqMessages,
           vector_store_ids: vectorStoreIds.length ? vectorStoreIds : void 0,
+          persona_id: personaId || void 0,
           top_k: topK,
           user_key: keyToken
         },
@@ -383,7 +391,7 @@ function useChat(opts) {
       );
       abortRef.current = controller;
     },
-    [activeThread, api, keyToken, model, vectorStoreIds, keyAlias, topK]
+    [activeThread, api, keyToken, model, vectorStoreIds, personaId, keyAlias, topK]
   );
   return {
     threads,
@@ -546,21 +554,65 @@ var init_VectorStorePicker = __esm({
   }
 });
 
-// src/components/KeyPicker.tsx
-var import_react4, import_material3, import_VpnKey, import_Delete, import_core_plugin_api5, KeyPicker;
-var init_KeyPicker = __esm({
-  "src/components/KeyPicker.tsx"() {
+// src/components/PersonaPicker.tsx
+var import_react4, import_material3, import_core_plugin_api5, PersonaPicker;
+var init_PersonaPicker = __esm({
+  "src/components/PersonaPicker.tsx"() {
     "use strict";
     import_react4 = __toESM(require("react"));
     import_material3 = require("@mui/material");
-    import_VpnKey = __toESM(require("@mui/icons-material/VpnKey"));
-    import_Delete = __toESM(require("@mui/icons-material/Delete"));
     import_core_plugin_api5 = require("@backstage/core-plugin-api");
     init_api();
-    KeyPicker = ({ value, onChange, onDelete }) => {
+    PersonaPicker = ({ value, onChange }) => {
       const chatApi = (0, import_core_plugin_api5.useApi)(liteLlmChatApiRef);
-      const [loading, setLoading] = (0, import_react4.useState)(false);
+      const [personas, setPersonas] = (0, import_react4.useState)([]);
+      const [loading, setLoading] = (0, import_react4.useState)(true);
       const [error, setError] = (0, import_react4.useState)(null);
+      (0, import_react4.useEffect)(() => {
+        let alive = true;
+        chatApi.listPersonas().then((p) => {
+          if (alive) setPersonas(p);
+        }).catch((err) => {
+          if (alive) setError(err.message ?? "Failed to load personas");
+        }).finally(() => alive && setLoading(false));
+        return () => {
+          alive = false;
+        };
+      }, [chatApi]);
+      return /* @__PURE__ */ import_react4.default.createElement(import_material3.FormControl, { size: "small", error: !!error, sx: { minWidth: 200 } }, /* @__PURE__ */ import_react4.default.createElement(import_material3.InputLabel, null, "Persona"), /* @__PURE__ */ import_react4.default.createElement(
+        import_material3.Select,
+        {
+          value,
+          label: "Persona",
+          displayEmpty: true,
+          onChange: (e) => {
+            const id = e.target.value;
+            onChange(id, personas.find((p) => p.id === id));
+          },
+          disabled: loading
+        },
+        /* @__PURE__ */ import_react4.default.createElement(import_material3.MenuItem, { value: "" }, /* @__PURE__ */ import_react4.default.createElement("em", null, "None")),
+        personas.map((p) => /* @__PURE__ */ import_react4.default.createElement(import_material3.MenuItem, { key: p.id, value: p.id }, p.title))
+      ), error && /* @__PURE__ */ import_react4.default.createElement(import_material3.Typography, { variant: "caption", color: "error", sx: { mt: 0.5 } }, error));
+    };
+  }
+});
+
+// src/components/KeyPicker.tsx
+var import_react5, import_material4, import_VpnKey, import_Delete, import_core_plugin_api6, KeyPicker;
+var init_KeyPicker = __esm({
+  "src/components/KeyPicker.tsx"() {
+    "use strict";
+    import_react5 = __toESM(require("react"));
+    import_material4 = require("@mui/material");
+    import_VpnKey = __toESM(require("@mui/icons-material/VpnKey"));
+    import_Delete = __toESM(require("@mui/icons-material/Delete"));
+    import_core_plugin_api6 = require("@backstage/core-plugin-api");
+    init_api();
+    KeyPicker = ({ value, onChange, onDelete }) => {
+      const chatApi = (0, import_core_plugin_api6.useApi)(liteLlmChatApiRef);
+      const [loading, setLoading] = (0, import_react5.useState)(false);
+      const [error, setError] = (0, import_react5.useState)(null);
       const handleGenerate = async () => {
         setLoading(true);
         setError(null);
@@ -583,30 +635,30 @@ var init_KeyPicker = __esm({
         onChange({ alias: "", token: "" });
       };
       if (value.token) {
-        return /* @__PURE__ */ import_react4.default.createElement(import_material3.Box, { sx: { display: "flex", alignItems: "center", gap: 1, minWidth: 200 } }, /* @__PURE__ */ import_react4.default.createElement(import_VpnKey.default, { fontSize: "small", color: "success" }), /* @__PURE__ */ import_react4.default.createElement(import_material3.Typography, { variant: "body2", sx: { flex: 1, overflow: "hidden", textOverflow: "ellipsis" } }, value.alias || "chat key"), /* @__PURE__ */ import_react4.default.createElement(import_material3.Tooltip, { title: "Delete chat key" }, /* @__PURE__ */ import_react4.default.createElement(import_material3.IconButton, { edge: "end", size: "small", onClick: handleDelete }, /* @__PURE__ */ import_react4.default.createElement(import_Delete.default, { fontSize: "small" }))));
+        return /* @__PURE__ */ import_react5.default.createElement(import_material4.Box, { sx: { display: "flex", alignItems: "center", gap: 1, minWidth: 200 } }, /* @__PURE__ */ import_react5.default.createElement(import_VpnKey.default, { fontSize: "small", color: "success" }), /* @__PURE__ */ import_react5.default.createElement(import_material4.Typography, { variant: "body2", sx: { flex: 1, overflow: "hidden", textOverflow: "ellipsis" } }, value.alias || "chat key"), /* @__PURE__ */ import_react5.default.createElement(import_material4.Tooltip, { title: "Delete chat key" }, /* @__PURE__ */ import_react5.default.createElement(import_material4.IconButton, { edge: "end", size: "small", onClick: handleDelete }, /* @__PURE__ */ import_react5.default.createElement(import_Delete.default, { fontSize: "small" }))));
       }
-      return /* @__PURE__ */ import_react4.default.createElement(import_material3.Box, { sx: { minWidth: 200 } }, /* @__PURE__ */ import_react4.default.createElement(
-        import_material3.Button,
+      return /* @__PURE__ */ import_react5.default.createElement(import_material4.Box, { sx: { minWidth: 200 } }, /* @__PURE__ */ import_react5.default.createElement(
+        import_material4.Button,
         {
           size: "small",
           variant: "outlined",
-          startIcon: loading ? /* @__PURE__ */ import_react4.default.createElement(import_material3.CircularProgress, { size: 16 }) : /* @__PURE__ */ import_react4.default.createElement(import_VpnKey.default, null),
+          startIcon: loading ? /* @__PURE__ */ import_react5.default.createElement(import_material4.CircularProgress, { size: 16 }) : /* @__PURE__ */ import_react5.default.createElement(import_VpnKey.default, null),
           onClick: handleGenerate,
           disabled: loading
         },
         loading ? "Minting\u2026" : "Generate chat key"
-      ), error && /* @__PURE__ */ import_react4.default.createElement(import_material3.Typography, { variant: "caption", color: "error", sx: { display: "block", mt: 0.5 } }, error));
+      ), error && /* @__PURE__ */ import_react5.default.createElement(import_material4.Typography, { variant: "caption", color: "error", sx: { display: "block", mt: 0.5 } }, error));
     };
   }
 });
 
 // src/components/MessageList.tsx
-var import_react5, import_material4, import_react_markdown, import_remark_gfm, blink, MessageList;
+var import_react6, import_material5, import_react_markdown, import_remark_gfm, blink, MessageList;
 var init_MessageList = __esm({
   "src/components/MessageList.tsx"() {
     "use strict";
-    import_react5 = __toESM(require("react"));
-    import_material4 = require("@mui/material");
+    import_react6 = __toESM(require("react"));
+    import_material5 = require("@mui/material");
     import_react_markdown = __toESM(require("react-markdown"));
     import_remark_gfm = __toESM(require("remark-gfm"));
     blink = {
@@ -619,8 +671,8 @@ var init_MessageList = __esm({
       messages,
       isStreaming
     }) => {
-      return /* @__PURE__ */ import_react5.default.createElement(
-        import_material4.Box,
+      return /* @__PURE__ */ import_react6.default.createElement(
+        import_material5.Box,
         {
           sx: {
             flex: 1,
@@ -632,8 +684,8 @@ var init_MessageList = __esm({
             gap: 1.5
           }
         },
-        messages.length === 0 && /* @__PURE__ */ import_react5.default.createElement(
-          import_material4.Box,
+        messages.length === 0 && /* @__PURE__ */ import_react6.default.createElement(
+          import_material5.Box,
           {
             sx: {
               flex: 1,
@@ -642,13 +694,13 @@ var init_MessageList = __esm({
               justifyContent: "center"
             }
           },
-          /* @__PURE__ */ import_react5.default.createElement(import_material4.Typography, { color: "text.secondary" }, "Start a conversation\u2026")
+          /* @__PURE__ */ import_react6.default.createElement(import_material5.Typography, { color: "text.secondary" }, "Start a conversation\u2026")
         ),
         messages.map((msg, i) => {
           const isUser = msg.role === "user";
           const isLast = i === messages.length - 1;
-          return /* @__PURE__ */ import_react5.default.createElement(
-            import_material4.Box,
+          return /* @__PURE__ */ import_react6.default.createElement(
+            import_material5.Box,
             {
               key: i,
               sx: {
@@ -656,8 +708,8 @@ var init_MessageList = __esm({
                 maxWidth: "80%"
               }
             },
-            /* @__PURE__ */ import_react5.default.createElement(
-              import_material4.Box,
+            /* @__PURE__ */ import_react6.default.createElement(
+              import_material5.Box,
               {
                 sx: {
                   bgcolor: isUser ? "primary.main" : "background.paper",
@@ -680,8 +732,8 @@ var init_MessageList = __esm({
                   "& pre code": { bgcolor: "transparent", px: 0 }
                 }
               },
-              isUser ? /* @__PURE__ */ import_react5.default.createElement(import_material4.Box, { sx: { whiteSpace: "pre-wrap" } }, msg.content) : msg.content ? /* @__PURE__ */ import_react5.default.createElement(import_react_markdown.default, { remarkPlugins: [import_remark_gfm.default] }, msg.content) : isStreaming && isLast ? /* @__PURE__ */ import_react5.default.createElement(
-                import_material4.Box,
+              isUser ? /* @__PURE__ */ import_react6.default.createElement(import_material5.Box, { sx: { whiteSpace: "pre-wrap" } }, msg.content) : msg.content ? /* @__PURE__ */ import_react6.default.createElement(import_react_markdown.default, { remarkPlugins: [import_remark_gfm.default] }, msg.content) : isStreaming && isLast ? /* @__PURE__ */ import_react6.default.createElement(
+                import_material5.Box,
                 {
                   component: "span",
                   sx: {
@@ -704,29 +756,29 @@ var init_MessageList = __esm({
 });
 
 // src/components/ErrorBanner.tsx
-var import_react6, import_material5, ErrorBanner;
+var import_react7, import_material6, ErrorBanner;
 var init_ErrorBanner = __esm({
   "src/components/ErrorBanner.tsx"() {
     "use strict";
-    import_react6 = __toESM(require("react"));
-    import_material5 = require("@mui/material");
+    import_react7 = __toESM(require("react"));
+    import_material6 = require("@mui/material");
     ErrorBanner = ({ error, onDismiss }) => {
       if (!error) return null;
-      return /* @__PURE__ */ import_react6.default.createElement(import_material5.Alert, { severity: "error", onClose: onDismiss, sx: { mb: 1 } }, /* @__PURE__ */ import_react6.default.createElement(import_material5.AlertTitle, null, "Chat error"), error);
+      return /* @__PURE__ */ import_react7.default.createElement(import_material6.Alert, { severity: "error", onClose: onDismiss, sx: { mb: 1 } }, /* @__PURE__ */ import_react7.default.createElement(import_material6.AlertTitle, null, "Chat error"), error);
     };
   }
 });
 
 // src/components/SourcesPanel.tsx
-var import_react7, import_material6, SourcesPanel;
+var import_react8, import_material7, SourcesPanel;
 var init_SourcesPanel = __esm({
   "src/components/SourcesPanel.tsx"() {
     "use strict";
-    import_react7 = __toESM(require("react"));
-    import_material6 = require("@mui/material");
+    import_react8 = __toESM(require("react"));
+    import_material7 = require("@mui/material");
     SourcesPanel = ({ citations }) => {
-      return /* @__PURE__ */ import_react7.default.createElement(import_material6.Box, { sx: { p: 1.5 } }, /* @__PURE__ */ import_react7.default.createElement(import_material6.Typography, { variant: "overline", color: "text.secondary" }, "Sources"), citations.length === 0 ? /* @__PURE__ */ import_react7.default.createElement(import_material6.Typography, { variant: "body2", color: "text.secondary", sx: { mt: 0.5 } }, "No sources for the latest reply yet.") : citations.map((c, i) => /* @__PURE__ */ import_react7.default.createElement(import_material6.Box, { key: i, sx: { mt: 1.5 } }, /* @__PURE__ */ import_react7.default.createElement(import_material6.Box, { sx: { display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" } }, /* @__PURE__ */ import_react7.default.createElement(import_material6.Typography, { variant: "body2", fontWeight: 500 }, c.filename), /* @__PURE__ */ import_react7.default.createElement(import_material6.Chip, { size: "small", label: c.score.toFixed(3), color: "primary", variant: "outlined" })), /* @__PURE__ */ import_react7.default.createElement(
-        import_material6.Typography,
+      return /* @__PURE__ */ import_react8.default.createElement(import_material7.Box, { sx: { p: 1.5 } }, /* @__PURE__ */ import_react8.default.createElement(import_material7.Typography, { variant: "overline", color: "text.secondary" }, "Sources"), citations.length === 0 ? /* @__PURE__ */ import_react8.default.createElement(import_material7.Typography, { variant: "body2", color: "text.secondary", sx: { mt: 0.5 } }, "No sources for the latest reply yet.") : citations.map((c, i) => /* @__PURE__ */ import_react8.default.createElement(import_material7.Box, { key: i, sx: { mt: 1.5 } }, /* @__PURE__ */ import_react8.default.createElement(import_material7.Box, { sx: { display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" } }, /* @__PURE__ */ import_react8.default.createElement(import_material7.Typography, { variant: "body2", fontWeight: 500 }, c.filename), /* @__PURE__ */ import_react8.default.createElement(import_material7.Chip, { size: "small", label: c.score.toFixed(3), color: "primary", variant: "outlined" })), /* @__PURE__ */ import_react8.default.createElement(
+        import_material7.Typography,
         {
           variant: "body2",
           color: "text.secondary",
@@ -749,21 +801,21 @@ var init_SourcesPanel = __esm({
 function formatUsd(n) {
   return `$${n.toFixed(4)}`;
 }
-var import_react8, import_material7, Stat, UsagePanel;
+var import_react9, import_material8, Stat, UsagePanel;
 var init_UsagePanel = __esm({
   "src/components/UsagePanel.tsx"() {
     "use strict";
-    import_react8 = __toESM(require("react"));
-    import_material7 = require("@mui/material");
-    Stat = ({ label, value }) => /* @__PURE__ */ import_react8.default.createElement(import_material7.Box, { sx: { display: "flex", justifyContent: "space-between", py: 0.25 } }, /* @__PURE__ */ import_react8.default.createElement(import_material7.Typography, { variant: "body2", color: "text.secondary" }, label), /* @__PURE__ */ import_react8.default.createElement(import_material7.Typography, { variant: "body2", fontWeight: 500 }, value));
+    import_react9 = __toESM(require("react"));
+    import_material8 = require("@mui/material");
+    Stat = ({ label, value }) => /* @__PURE__ */ import_react9.default.createElement(import_material8.Box, { sx: { display: "flex", justifyContent: "space-between", py: 0.25 } }, /* @__PURE__ */ import_react9.default.createElement(import_material8.Typography, { variant: "body2", color: "text.secondary" }, label), /* @__PURE__ */ import_react9.default.createElement(import_material8.Typography, { variant: "body2", fontWeight: 500 }, value));
     UsagePanel = ({
       lastTurnUsage,
       totalTokens,
       keySpend
     }) => {
       const budgetPct = keySpend?.max_budget && keySpend.max_budget > 0 ? Math.min(100, keySpend.spend / keySpend.max_budget * 100) : null;
-      return /* @__PURE__ */ import_react8.default.createElement(import_material7.Box, { sx: { p: 1.5 } }, /* @__PURE__ */ import_react8.default.createElement(import_material7.Typography, { variant: "overline", color: "text.secondary" }, "Usage"), !lastTurnUsage && !keySpend ? /* @__PURE__ */ import_react8.default.createElement(import_material7.Typography, { variant: "body2", color: "text.secondary", sx: { mt: 0.5 } }, "Send a message to see token and budget usage.") : /* @__PURE__ */ import_react8.default.createElement(import_material7.Box, { sx: { mt: 0.5 } }, lastTurnUsage && /* @__PURE__ */ import_react8.default.createElement(import_react8.default.Fragment, null, /* @__PURE__ */ import_react8.default.createElement(Stat, { label: "This turn", value: `${lastTurnUsage.total_tokens.toLocaleString()} tokens` }), /* @__PURE__ */ import_react8.default.createElement(Stat, { label: "Prompt / completion", value: `${lastTurnUsage.prompt_tokens.toLocaleString()} / ${lastTurnUsage.completion_tokens.toLocaleString()}` }), /* @__PURE__ */ import_react8.default.createElement(Stat, { label: "Session total", value: `${totalTokens.toLocaleString()} tokens` })), keySpend && /* @__PURE__ */ import_react8.default.createElement(import_react8.default.Fragment, null, /* @__PURE__ */ import_react8.default.createElement(import_material7.Divider, { sx: { my: 1 } }), /* @__PURE__ */ import_react8.default.createElement(Stat, { label: "Spent", value: formatUsd(keySpend.spend) }), keySpend.max_budget != null && /* @__PURE__ */ import_react8.default.createElement(import_react8.default.Fragment, null, /* @__PURE__ */ import_react8.default.createElement(Stat, { label: "Budget", value: `${formatUsd(keySpend.spend)} / ${formatUsd(keySpend.max_budget)}` }), /* @__PURE__ */ import_react8.default.createElement(
-        import_material7.LinearProgress,
+      return /* @__PURE__ */ import_react9.default.createElement(import_material8.Box, { sx: { p: 1.5 } }, /* @__PURE__ */ import_react9.default.createElement(import_material8.Typography, { variant: "overline", color: "text.secondary" }, "Usage"), !lastTurnUsage && !keySpend ? /* @__PURE__ */ import_react9.default.createElement(import_material8.Typography, { variant: "body2", color: "text.secondary", sx: { mt: 0.5 } }, "Send a message to see token and budget usage.") : /* @__PURE__ */ import_react9.default.createElement(import_material8.Box, { sx: { mt: 0.5 } }, lastTurnUsage && /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement(Stat, { label: "This turn", value: `${lastTurnUsage.total_tokens.toLocaleString()} tokens` }), /* @__PURE__ */ import_react9.default.createElement(Stat, { label: "Prompt / completion", value: `${lastTurnUsage.prompt_tokens.toLocaleString()} / ${lastTurnUsage.completion_tokens.toLocaleString()}` }), /* @__PURE__ */ import_react9.default.createElement(Stat, { label: "Session total", value: `${totalTokens.toLocaleString()} tokens` })), keySpend && /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement(import_material8.Divider, { sx: { my: 1 } }), /* @__PURE__ */ import_react9.default.createElement(Stat, { label: "Spent", value: formatUsd(keySpend.spend) }), keySpend.max_budget != null && /* @__PURE__ */ import_react9.default.createElement(import_react9.default.Fragment, null, /* @__PURE__ */ import_react9.default.createElement(Stat, { label: "Budget", value: `${formatUsd(keySpend.spend)} / ${formatUsd(keySpend.max_budget)}` }), /* @__PURE__ */ import_react9.default.createElement(
+        import_material8.LinearProgress,
         {
           variant: "determinate",
           value: budgetPct ?? 0,
@@ -780,12 +832,12 @@ var ChatPage_exports = {};
 __export(ChatPage_exports, {
   ChatPage: () => ChatPage
 });
-var import_react9, import_material8, import_Add, import_Delete2, import_Settings, import_ExpandMore, import_Chat, import_Send, import_Stop, import_core_plugin_api6, SIDEBAR_WIDTH, RIGHT_RAIL_WIDTH, CHAT_MAX_WIDTH, ChatPage;
+var import_react10, import_material9, import_Add, import_Delete2, import_Settings, import_ExpandMore, import_Chat, import_Send, import_Stop, import_core_plugin_api7, SIDEBAR_WIDTH, RIGHT_RAIL_WIDTH, CHAT_MAX_WIDTH, ChatPage;
 var init_ChatPage = __esm({
   "src/components/ChatPage.tsx"() {
     "use strict";
-    import_react9 = __toESM(require("react"));
-    import_material8 = require("@mui/material");
+    import_react10 = __toESM(require("react"));
+    import_material9 = require("@mui/material");
     import_Add = __toESM(require("@mui/icons-material/Add"));
     import_Delete2 = __toESM(require("@mui/icons-material/Delete"));
     import_Settings = __toESM(require("@mui/icons-material/Settings"));
@@ -793,11 +845,12 @@ var init_ChatPage = __esm({
     import_Chat = __toESM(require("@mui/icons-material/Chat"));
     import_Send = __toESM(require("@mui/icons-material/Send"));
     import_Stop = __toESM(require("@mui/icons-material/Stop"));
-    import_core_plugin_api6 = require("@backstage/core-plugin-api");
+    import_core_plugin_api7 = require("@backstage/core-plugin-api");
     init_api();
     init_useChat();
     init_ModelPicker();
     init_VectorStorePicker();
+    init_PersonaPicker();
     init_KeyPicker();
     init_MessageList();
     init_ErrorBanner();
@@ -807,26 +860,27 @@ var init_ChatPage = __esm({
     RIGHT_RAIL_WIDTH = 300;
     CHAT_MAX_WIDTH = 900;
     ChatPage = () => {
-      const chatApi = (0, import_core_plugin_api6.useApi)(liteLlmChatApiRef);
-      const identityApi = (0, import_core_plugin_api6.useApi)(import_core_plugin_api6.identityApiRef);
-      const [userId, setUserId] = (0, import_react9.useState)("default");
-      const [config, setConfig] = (0, import_react9.useState)({
+      const chatApi = (0, import_core_plugin_api7.useApi)(liteLlmChatApiRef);
+      const identityApi = (0, import_core_plugin_api7.useApi)(import_core_plugin_api7.identityApiRef);
+      const [userId, setUserId] = (0, import_react10.useState)("default");
+      const [config, setConfig] = (0, import_react10.useState)({
         defaultModel: null,
         defaultVectorStoreIds: null,
         maxRequestBudget: null
       });
-      const [model, setModel] = (0, import_react9.useState)("");
-      const [vectorStoreIds, setVectorStoreIds] = (0, import_react9.useState)([]);
-      const [keyVal, setKeyVal] = (0, import_react9.useState)({
+      const [model, setModel] = (0, import_react10.useState)("");
+      const [vectorStoreIds, setVectorStoreIds] = (0, import_react10.useState)([]);
+      const [personaId, setPersonaId] = (0, import_react10.useState)("");
+      const [keyVal, setKeyVal] = (0, import_react10.useState)({
         alias: "",
         token: ""
       });
-      const [showSettings, setShowSettings] = (0, import_react9.useState)(true);
-      const [input, setInput] = (0, import_react9.useState)("");
-      const [configError, setConfigError] = (0, import_react9.useState)(null);
-      const messagesEndRef = (0, import_react9.useRef)(null);
-      const messagesContainerRef = (0, import_react9.useRef)(null);
-      (0, import_react9.useEffect)(() => {
+      const [showSettings, setShowSettings] = (0, import_react10.useState)(true);
+      const [input, setInput] = (0, import_react10.useState)("");
+      const [configError, setConfigError] = (0, import_react10.useState)(null);
+      const messagesEndRef = (0, import_react10.useRef)(null);
+      const messagesContainerRef = (0, import_react10.useRef)(null);
+      (0, import_react10.useEffect)(() => {
         chatApi.getChatConfig().then(setConfig).catch((err) => setConfigError(err.message ?? "Failed to reach the chat backend"));
         identityApi.getCredentials().then((c) => setUserId(c.token ? "oidc" : "default")).catch(() => {
         });
@@ -835,20 +889,22 @@ var init_ChatPage = __esm({
         userId,
         model,
         vectorStoreIds,
+        personaId,
         keyAlias: keyVal.alias,
         keyToken: keyVal.token,
         topK: 5
       });
       const activeThreadId = chat.activeThread?.id ?? null;
-      (0, import_react9.useEffect)(() => {
+      (0, import_react10.useEffect)(() => {
         if (!chat.activeThread) return;
         setModel(chat.activeThread.model);
         setVectorStoreIds(chat.activeThread.vectorStoreIds);
+        setPersonaId(chat.activeThread.personaId ?? "");
         setKeyVal({ alias: chat.activeThread.keyAlias, token: chat.activeThread.keyToken });
       }, [activeThreadId]);
       const messages = chat.activeThread?.messages ?? [];
       const isStreaming = chat.isStreaming;
-      (0, import_react9.useEffect)(() => {
+      (0, import_react10.useEffect)(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
       }, [messages, isStreaming]);
       const handleSend = () => {
@@ -877,8 +933,8 @@ var init_ChatPage = __esm({
           statusParts.push(`$${chat.keySpend.spend.toFixed(2)} / $${chat.keySpend.max_budget.toFixed(2)} budget`);
         }
       }
-      return /* @__PURE__ */ import_react9.default.createElement(import_material8.Box, { sx: { display: "flex", height: "100dvh", overflow: "hidden" } }, /* @__PURE__ */ import_react9.default.createElement(
-        import_material8.Box,
+      return /* @__PURE__ */ import_react10.default.createElement(import_material9.Box, { sx: { display: "flex", height: "100dvh", overflow: "hidden" } }, /* @__PURE__ */ import_react10.default.createElement(
+        import_material9.Box,
         {
           sx: {
             width: SIDEBAR_WIDTH,
@@ -890,8 +946,8 @@ var init_ChatPage = __esm({
             overflow: "hidden"
           }
         },
-        /* @__PURE__ */ import_react9.default.createElement(import_material8.Box, { sx: { flexShrink: 0 } }, /* @__PURE__ */ import_react9.default.createElement(
-          import_material8.Box,
+        /* @__PURE__ */ import_react10.default.createElement(import_material9.Box, { sx: { flexShrink: 0 } }, /* @__PURE__ */ import_react10.default.createElement(
+          import_material9.Box,
           {
             sx: {
               display: "flex",
@@ -903,9 +959,9 @@ var init_ChatPage = __esm({
             },
             onClick: () => setShowSettings((v) => !v)
           },
-          /* @__PURE__ */ import_react9.default.createElement(import_Settings.default, { fontSize: "small", sx: { mr: 1 } }),
-          /* @__PURE__ */ import_react9.default.createElement(import_material8.Typography, { variant: "overline", sx: { flex: 1 } }, "Settings"),
-          /* @__PURE__ */ import_react9.default.createElement(
+          /* @__PURE__ */ import_react10.default.createElement(import_Settings.default, { fontSize: "small", sx: { mr: 1 } }),
+          /* @__PURE__ */ import_react10.default.createElement(import_material9.Typography, { variant: "overline", sx: { flex: 1 } }, "Settings"),
+          /* @__PURE__ */ import_react10.default.createElement(
             import_ExpandMore.default,
             {
               fontSize: "small",
@@ -915,14 +971,26 @@ var init_ChatPage = __esm({
               }
             }
           )
-        ), /* @__PURE__ */ import_react9.default.createElement(import_material8.Collapse, { in: showSettings }, /* @__PURE__ */ import_react9.default.createElement(import_material8.Box, { sx: { p: 1.5, display: "flex", flexDirection: "column", gap: 1.5 } }, configError && /* @__PURE__ */ import_react9.default.createElement(import_material8.Typography, { variant: "caption", color: "error" }, "Couldn't load chat defaults: ", configError), /* @__PURE__ */ import_react9.default.createElement(ModelPicker, { value: model, onChange: setModel, defaultModel: config.defaultModel }), /* @__PURE__ */ import_react9.default.createElement(
+        ), /* @__PURE__ */ import_react10.default.createElement(import_material9.Collapse, { in: showSettings }, /* @__PURE__ */ import_react10.default.createElement(import_material9.Box, { sx: { p: 1.5, display: "flex", flexDirection: "column", gap: 1.5 } }, configError && /* @__PURE__ */ import_react10.default.createElement(import_material9.Typography, { variant: "caption", color: "error" }, "Couldn't load chat defaults: ", configError), /* @__PURE__ */ import_react10.default.createElement(
+          PersonaPicker,
+          {
+            value: personaId,
+            onChange: (id, persona) => {
+              setPersonaId(id);
+              if (persona?.defaultModel) setModel(persona.defaultModel);
+              if (persona?.defaultVectorStoreIds) {
+                setVectorStoreIds(persona.defaultVectorStoreIds);
+              }
+            }
+          }
+        ), /* @__PURE__ */ import_react10.default.createElement(ModelPicker, { value: model, onChange: setModel, defaultModel: config.defaultModel }), /* @__PURE__ */ import_react10.default.createElement(
           VectorStorePicker,
           {
             value: vectorStoreIds,
             onChange: setVectorStoreIds,
             defaultVectorStoreIds: config.defaultVectorStoreIds
           }
-        ), /* @__PURE__ */ import_react9.default.createElement(
+        ), /* @__PURE__ */ import_react10.default.createElement(
           KeyPicker,
           {
             value: keyVal,
@@ -935,25 +1003,25 @@ var init_ChatPage = __esm({
             }
           }
         )))),
-        /* @__PURE__ */ import_react9.default.createElement(import_material8.Divider, null),
-        /* @__PURE__ */ import_react9.default.createElement(import_material8.Box, { sx: { p: 1.5 } }, /* @__PURE__ */ import_react9.default.createElement(
-          import_material8.Button,
+        /* @__PURE__ */ import_react10.default.createElement(import_material9.Divider, null),
+        /* @__PURE__ */ import_react10.default.createElement(import_material9.Box, { sx: { p: 1.5 } }, /* @__PURE__ */ import_react10.default.createElement(
+          import_material9.Button,
           {
             fullWidth: true,
             variant: "outlined",
-            startIcon: /* @__PURE__ */ import_react9.default.createElement(import_Add.default, null),
+            startIcon: /* @__PURE__ */ import_react10.default.createElement(import_Add.default, null),
             onClick: chat.newThread,
             size: "small"
           },
           "New chat"
         )),
-        /* @__PURE__ */ import_react9.default.createElement(import_material8.Box, { sx: { flex: 1, overflowY: "auto", minHeight: 0 } }, /* @__PURE__ */ import_react9.default.createElement(import_material8.List, { dense: true }, chat.threads.map((t) => /* @__PURE__ */ import_react9.default.createElement(
-          import_material8.ListItem,
+        /* @__PURE__ */ import_react10.default.createElement(import_material9.Box, { sx: { flex: 1, overflowY: "auto", minHeight: 0 } }, /* @__PURE__ */ import_react10.default.createElement(import_material9.List, { dense: true }, chat.threads.map((t) => /* @__PURE__ */ import_react10.default.createElement(
+          import_material9.ListItem,
           {
             key: t.id,
             disablePadding: true,
-            secondaryAction: /* @__PURE__ */ import_react9.default.createElement(
-              import_material8.IconButton,
+            secondaryAction: /* @__PURE__ */ import_react10.default.createElement(
+              import_material9.IconButton,
               {
                 edge: "end",
                 size: "small",
@@ -962,18 +1030,18 @@ var init_ChatPage = __esm({
                   chat.deleteThread(t.id);
                 }
               },
-              /* @__PURE__ */ import_react9.default.createElement(import_Delete2.default, { fontSize: "small" })
+              /* @__PURE__ */ import_react10.default.createElement(import_Delete2.default, { fontSize: "small" })
             )
           },
-          /* @__PURE__ */ import_react9.default.createElement(
-            import_material8.ListItemButton,
+          /* @__PURE__ */ import_react10.default.createElement(
+            import_material9.ListItemButton,
             {
               selected: chat.activeThread?.id === t.id,
               onClick: () => chat.selectThread(t.id),
               sx: { pr: 6 }
             },
-            /* @__PURE__ */ import_react9.default.createElement(
-              import_material8.ListItemText,
+            /* @__PURE__ */ import_react10.default.createElement(
+              import_material9.ListItemText,
               {
                 primary: t.title,
                 primaryTypographyProps: { noWrap: true, variant: "body2" },
@@ -982,8 +1050,8 @@ var init_ChatPage = __esm({
             )
           )
         ))))
-      ), /* @__PURE__ */ import_react9.default.createElement(
-        import_material8.Box,
+      ), /* @__PURE__ */ import_react10.default.createElement(
+        import_material9.Box,
         {
           sx: {
             flex: 3,
@@ -992,8 +1060,8 @@ var init_ChatPage = __esm({
             overflow: "hidden"
           }
         },
-        /* @__PURE__ */ import_react9.default.createElement(
-          import_material8.Box,
+        /* @__PURE__ */ import_react10.default.createElement(
+          import_material9.Box,
           {
             sx: {
               width: "100%",
@@ -1003,8 +1071,8 @@ var init_ChatPage = __esm({
               overflow: "hidden"
             }
           },
-          /* @__PURE__ */ import_react9.default.createElement(
-            import_material8.Box,
+          /* @__PURE__ */ import_react10.default.createElement(
+            import_material9.Box,
             {
               sx: {
                 flexShrink: 0,
@@ -1017,13 +1085,13 @@ var init_ChatPage = __esm({
                 gap: 1
               }
             },
-            /* @__PURE__ */ import_react9.default.createElement(import_Chat.default, { fontSize: "small", color: "action" }),
-            /* @__PURE__ */ import_react9.default.createElement(import_material8.Typography, { variant: "subtitle2", noWrap: true, sx: { flex: 1 } }, chat.activeThread?.title ?? "AI Chat")
+            /* @__PURE__ */ import_react10.default.createElement(import_Chat.default, { fontSize: "small", color: "action" }),
+            /* @__PURE__ */ import_react10.default.createElement(import_material9.Typography, { variant: "subtitle2", noWrap: true, sx: { flex: 1 } }, chat.activeThread?.title ?? "AI Chat")
           ),
-          chat.error && /* @__PURE__ */ import_react9.default.createElement(import_material8.Box, { sx: { px: 2, pt: 1 } }, /* @__PURE__ */ import_react9.default.createElement(ErrorBanner, { error: chat.error, onDismiss: () => {
+          chat.error && /* @__PURE__ */ import_react10.default.createElement(import_material9.Box, { sx: { px: 2, pt: 1 } }, /* @__PURE__ */ import_react10.default.createElement(ErrorBanner, { error: chat.error, onDismiss: () => {
           } })),
-          /* @__PURE__ */ import_react9.default.createElement(
-            import_material8.Box,
+          /* @__PURE__ */ import_react10.default.createElement(
+            import_material9.Box,
             {
               ref: messagesContainerRef,
               sx: {
@@ -1032,11 +1100,11 @@ var init_ChatPage = __esm({
                 minHeight: 0
               }
             },
-            /* @__PURE__ */ import_react9.default.createElement(MessageList, { messages, isStreaming }),
-            /* @__PURE__ */ import_react9.default.createElement("div", { ref: messagesEndRef })
+            /* @__PURE__ */ import_react10.default.createElement(MessageList, { messages, isStreaming }),
+            /* @__PURE__ */ import_react10.default.createElement("div", { ref: messagesEndRef })
           ),
-          /* @__PURE__ */ import_react9.default.createElement(
-            import_material8.Box,
+          /* @__PURE__ */ import_react10.default.createElement(
+            import_material9.Box,
             {
               sx: {
                 flexShrink: 0,
@@ -1049,8 +1117,8 @@ var init_ChatPage = __esm({
                 alignItems: "flex-end"
               }
             },
-            /* @__PURE__ */ import_react9.default.createElement(
-              import_material8.InputBase,
+            /* @__PURE__ */ import_react10.default.createElement(
+              import_material9.InputBase,
               {
                 multiline: true,
                 minRows: 1,
@@ -1071,20 +1139,20 @@ var init_ChatPage = __esm({
                 }
               }
             ),
-            isStreaming ? /* @__PURE__ */ import_react9.default.createElement(import_material8.Tooltip, { title: "Stop" }, /* @__PURE__ */ import_react9.default.createElement(import_material8.IconButton, { color: "error", onClick: chat.stopGeneration }, /* @__PURE__ */ import_react9.default.createElement(import_Stop.default, null))) : /* @__PURE__ */ import_react9.default.createElement(import_material8.Tooltip, { title: "Send" }, /* @__PURE__ */ import_react9.default.createElement(
-              import_material8.IconButton,
+            isStreaming ? /* @__PURE__ */ import_react10.default.createElement(import_material9.Tooltip, { title: "Stop" }, /* @__PURE__ */ import_react10.default.createElement(import_material9.IconButton, { color: "error", onClick: chat.stopGeneration }, /* @__PURE__ */ import_react10.default.createElement(import_Stop.default, null))) : /* @__PURE__ */ import_react10.default.createElement(import_material9.Tooltip, { title: "Send" }, /* @__PURE__ */ import_react10.default.createElement(
+              import_material9.IconButton,
               {
                 color: "primary",
                 onClick: handleSend,
                 disabled: !input.trim() || !keyVal.token
               },
-              /* @__PURE__ */ import_react9.default.createElement(import_Send.default, null)
+              /* @__PURE__ */ import_react10.default.createElement(import_Send.default, null)
             ))
           ),
-          statusParts.length > 0 && /* @__PURE__ */ import_react9.default.createElement(import_material8.Box, { sx: { px: 2, pb: 1 } }, /* @__PURE__ */ import_react9.default.createElement(import_material8.Typography, { variant: "caption", color: "text.secondary" }, statusParts.join(" \xB7 ")))
+          statusParts.length > 0 && /* @__PURE__ */ import_react10.default.createElement(import_material9.Box, { sx: { px: 2, pb: 1 } }, /* @__PURE__ */ import_react10.default.createElement(import_material9.Typography, { variant: "caption", color: "text.secondary" }, statusParts.join(" \xB7 ")))
         )
-      ), /* @__PURE__ */ import_react9.default.createElement(
-        import_material8.Box,
+      ), /* @__PURE__ */ import_react10.default.createElement(
+        import_material9.Box,
         {
           sx: {
             width: RIGHT_RAIL_WIDTH,
@@ -1096,9 +1164,9 @@ var init_ChatPage = __esm({
             overflowY: "auto"
           }
         },
-        /* @__PURE__ */ import_react9.default.createElement(SourcesPanel, { citations: chat.citations }),
-        /* @__PURE__ */ import_react9.default.createElement(import_material8.Divider, null),
-        /* @__PURE__ */ import_react9.default.createElement(
+        /* @__PURE__ */ import_react10.default.createElement(SourcesPanel, { citations: chat.citations }),
+        /* @__PURE__ */ import_react10.default.createElement(import_material9.Divider, null),
+        /* @__PURE__ */ import_react10.default.createElement(
           UsagePanel,
           {
             lastTurnUsage,
@@ -1122,7 +1190,7 @@ __export(index_exports, {
 module.exports = __toCommonJS(index_exports);
 
 // src/plugin.tsx
-var import_react10 = __toESM(require("react"));
+var import_react11 = __toESM(require("react"));
 var import_icons_material = require("@mui/icons-material");
 var import_frontend_plugin_api = require("@backstage/frontend-plugin-api");
 init_api();
@@ -1137,10 +1205,10 @@ var chatPage = import_frontend_plugin_api.PageBlueprint.make({
   params: {
     path: "/ai-chat",
     title: "AI Chat",
-    icon: /* @__PURE__ */ import_react10.default.createElement(import_icons_material.Chat, null),
+    icon: /* @__PURE__ */ import_react11.default.createElement(import_icons_material.Chat, null),
     loader: async () => {
       const { ChatPage: ChatPage2 } = await Promise.resolve().then(() => (init_ChatPage(), ChatPage_exports));
-      return /* @__PURE__ */ import_react10.default.createElement(ChatPage2, null);
+      return /* @__PURE__ */ import_react11.default.createElement(ChatPage2, null);
     }
   }
 });

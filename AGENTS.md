@@ -32,6 +32,8 @@ The chat plugin reuses all of this by **importing from the govai package**, not 
 | Chat key strategy | User picks a key in the UI (dropdown from their existing keys) | Spend attribution to the user's chosen key; per-key budget/limits enforced natively by LiteLLM; no surprise auto-minted keys. |
 | UI surfaces | Full chat page at `/ai-chat` | v1 ships the page. Sidebar modal and home widget are future work. |
 | Cross-package reuse | Import `LiteLLMClient`, `resolveUserId`, `toLiteLLMUserId`, `getOrProvisionUser`, `ProvisioningError`, types from govai backend; import `LiteLlmApi`, `liteLlmApiRef`, types from govai frontend | Govai is the single source of truth for identity, key management, and the LiteLLM client. Chat plugin adds only chat-specific routes and components. |
+| Persona source | Backstage catalog `Component` entities (`spec.type: chat-persona`), own type — not `app-config.yaml`, not the sibling `ai-agent` type | Self-service authoring (any team commits a `catalog-info.yaml`), ownership/RBAC/tags for free. `ai-agent` models externally-invocable, health-probed agents; a persona has no endpoint to probe and would pollute that inventory with permanent `unknown` status. Personas live in `git@gitlab.az.abssrv.it:innovation/ces-ai-personas.git`, auto-discovered by the existing GitLab catalog provider — no host app-config change needed. |
+| Persona system-prompt resolution | Server-side, by `persona_id` (catalog entity ref) | `/personas` returns picker metadata only (title/description/defaults) — never the system-prompt text. The backend resolves the full entity and prepends the prompt as a system message inside `/chat/stream` and `/chat/completions`, so the prompt never round-trips through the browser and can't be edited via localStorage tampering. |
 
 ## Target environment (GKE)
 
@@ -77,7 +79,8 @@ The chat plugin reuses all of this by **importing from the govai package**, not 
 |---|---|---|
 | `/health` | GET | `{ status: 'ok' }` |
 | `/vector_stores` | GET | Lists LiteLLM vector stores for the KB picker. Calls `GET /v1/vector_stores` on LiteLLM. |
-| `/chat/stream` | POST | Streaming chat proxy. The one new piece of engineering. |
+| `/personas` | GET | Lists `chat-persona` catalog entities (metadata only — id/title/description/defaultModel/defaultVectorStoreIds/tags). No system-prompt text. |
+| `/chat/stream` | POST | Streaming chat proxy. The one new piece of engineering. Accepts optional `persona_id`, resolved server-side and prepended as a system message. |
 | `/chat/completions` | POST | Non-streaming chat variant. |
 
 ### `/chat/stream` request body (from browser)
@@ -176,6 +179,7 @@ interface ChatResult { content: string; citations: Citation[]; }
 |---|---|
 | `ChatPage` | Page shell at `/ai-chat`. Left thread sidebar, main chat area. |
 | `ChatComposer` | Textarea + send button + stop button. Pickers row above it. |
+| `PersonaPicker` | Dropdown from `listPersonas()` (catalog `chat-persona` entities). Selecting one prefills `ModelPicker`/`VectorStorePicker` from its defaults (user can still override) and sends `persona_id` with the request. |
 | `ModelPicker` | Dropdown from `liteLlmApiRef.listModels()`. Preselects `config.chat.defaultModel`. |
 | `VectorStorePicker` | Multi-select from `listVectorStores()`. Empty selection = no grounding. Preselects `config.chat.defaultVectorStoreIds`. |
 | `KeyPicker` | Dropdown from `liteLlmApiRef.listKeys()`. Shows `key_alias` (fallback: masked `key_name`). Required before first send. Empty state: link to `/litellm`. |
@@ -263,6 +267,7 @@ backstage-plugin-litellm-rag-ai/
 6. **Frontend hooks** — `useChat` thread state, localStorage, `sendMessage`, `stopGeneration`.
 7. **Frontend UI** — all components, pickers, plugin registration, exports.
 8. **Integration** — wire into target Backstage, deploy to GKE, verify against live pgvector.
+9. **Personas** — `GET /personas` (catalog-backed, `chat-persona` entities), `applyPersona()` server-side system-prompt injection, `PersonaPicker` frontend component, vector-store name→id resolution. See `ces-ai-personas` repo for the persona catalog data.
 
 ## Things NOT in v1
 

@@ -38,6 +38,7 @@ export interface UseChatOptions {
   userId: string;
   model: string;
   vectorStoreIds: string[];
+  personaId: string;
   keyAlias: string;
   keyToken: string;
   topK?: number;
@@ -58,7 +59,7 @@ export interface UseChatResult {
 }
 
 export function useChat(opts: UseChatOptions): UseChatResult {
-  const { userId, model, vectorStoreIds, keyAlias, keyToken, topK } = opts;
+  const { userId, model, vectorStoreIds, personaId, keyAlias, keyToken, topK } = opts;
   const api = useApi(liteLlmChatApiRef) as InstanceType<typeof LiteLlmChatApi>;
 
   const [threads, setThreads] = useState<Thread[]>(() => loadThreads(userId));
@@ -113,6 +114,7 @@ export function useChat(opts: UseChatOptions): UseChatResult {
       messages: [],
       model,
       vectorStoreIds,
+      personaId,
       keyAlias,
       keyToken,
       createdAt: Date.now(),
@@ -125,7 +127,7 @@ export function useChat(opts: UseChatOptions): UseChatResult {
     setError(null);
     setCitations([]);
     setKeySpend(null);
-  }, [model, vectorStoreIds, keyAlias, keyToken]);
+  }, [model, vectorStoreIds, personaId, keyAlias, keyToken]);
 
   const selectThread = useCallback((id: string) => {
     setActiveId(id);
@@ -179,6 +181,7 @@ export function useChat(opts: UseChatOptions): UseChatResult {
                 title: t.messages.length === 0 ? text.slice(0, 40) : t.title,
                 model,
                 vectorStoreIds,
+                personaId,
                 keyAlias,
                 keyToken,
                 updatedAt: Date.now(),
@@ -196,6 +199,7 @@ export function useChat(opts: UseChatOptions): UseChatResult {
           model,
           messages: reqMessages,
           vector_store_ids: vectorStoreIds.length ? vectorStoreIds : undefined,
+          persona_id: personaId || undefined,
           top_k: topK,
           user_key: keyToken,
         },
@@ -258,7 +262,7 @@ export function useChat(opts: UseChatOptions): UseChatResult {
 
       abortRef.current = controller;
     },
-    [activeThread, api, keyToken, model, vectorStoreIds, keyAlias, topK],
+    [activeThread, api, keyToken, model, vectorStoreIds, personaId, keyAlias, topK],
   );
 
   return {

@@ -94,3 +94,18 @@
 (A) 2026-06-30 +phase8-integration Verify citations render from search metadata @integration
 (A) 2026-06-30 +phase8-integration Verify key picker enforces per-user budget and model ACLs @integration
 (B) 2026-06-30 +phase8-integration Verify no key empty state redirects to governance page @integration
+(A) 2026-07-28 +phase9-personas Add chat-persona catalog repo ces-ai-personas with symbolic + real personas @catalog
+(A) 2026-07-28 +phase9-personas Add backend deps plugin-catalog-node catalog-model @backend
+(A) 2026-07-28 +phase9-personas Implement entityToPersonaSummary and resolveSystemPrompt in persona.ts @backend
+(A) 2026-07-28 +phase9-personas Wire catalogServiceRef into plugin.ts and RouterOptions @backend
+(A) 2026-07-28 +phase9-personas Implement GET /personas metadata-only endpoint @backend
+(A) 2026-07-28 +phase9-personas Implement applyPersona server-side system-prompt injection @backend
+(A) 2026-07-28 +phase9-personas Resolve persona default-vector-stores names to real ids via fetchVectorStores @backend
+(A) 2026-07-28 +phase9-personas Add persona_id to ChatStreamRequest ChatCompletionsRequest types @backend
+(A) 2026-07-28 +phase9-personas Add listPersonas to frontend api.ts @frontend
+(A) 2026-07-28 +phase9-personas Implement PersonaPicker component @frontend
+(A) 2026-07-28 +phase9-personas Wire personaId into useChat thread state and sendMessage request @frontend
+(A) 2026-07-28 +phase9-personas Wire PersonaPicker into ChatPage settings with model/KB prefill @frontend
+(B) 2026-07-28 +phase9-personas Register ces-ai-personas catalog-info.yaml discovery end-to-end in Backstage UI @integration
+(B) 2026-07-28 +phase9-personas Fix oo-business-analyst default-model claude-3-5-sonnet filtered out by ModelPicker @integration
+(B) 2026-07-28 +phase9-personas Browser-verify persona selection applies system prompt and RAG grounding end-to-end @integration

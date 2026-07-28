@@ -1,24 +1,29 @@
 import express, { Router, Request, Response } from 'express';
 import { Config } from '@backstage/config';
 import { AuthService, DiscoveryService } from '@backstage/backend-plugin-api';
+import { CatalogService } from '@backstage/plugin-catalog-node';
 import {
   resolveUserId,
   toLiteLLMUserId,
   LiteLLMClient,
 } from '@acarmisc/backstage-plugin-litellm-backend';
 import { proxySSE } from './stream';
+import { entityToPersonaSummary, resolveSystemPrompt } from './persona';
 import type {
   VectorStore,
   ChatStreamRequest,
   ChatCompletionsRequest,
+  ChatMessage,
   LiteLLMChatConfig,
 } from './types';
+import { CHAT_PERSONA_TYPE } from './types';
 
 export interface RouterOptions {
   config: Config;
   logger: any;
   auth: AuthService;
   discovery: DiscoveryService;
+  catalog: CatalogService;
 }
 
 function readChatConfig(config: Config): LiteLLMChatConfig {
@@ -33,10 +38,51 @@ function readChatConfig(config: Config): LiteLLMChatConfig {
 }
 
 export async function createRouter(options: RouterOptions): Promise<Router> {
-  const { config, logger, auth } = options;
+  const { config, logger, auth, catalog } = options;
   const chatConfig = readChatConfig(config);
   const userIdDomain = config.getOptionalString('litellm.userIdDomain');
   const masterKey = config.getString('litellm.masterKey');
+
+  // Prepends the persona's system prompt to `messages` if `personaId` is
+  // set. Resolved server-side by entity ref so the prompt text never has
+  // to round-trip through the browser (see PersonaSummary in types.ts).
+  // Throws with a `status` field on invalid/missing personas so callers
+  // can respond with the right HTTP status.
+  async function applyPersona(
+    personaId: string | undefined,
+    messages: ChatMessage[],
+  ): Promise<ChatMessage[]> {
+    if (!personaId) return messages;
+    const credentials = await auth.getOwnServiceCredentials();
+    const entity = await catalog.getEntityByRef(personaId, { credentials });
+    if (!entity || entity.spec?.type !== CHAT_PERSONA_TYPE) {
+      throw Object.assign(new Error('invalid persona_id'), { status: 400 });
+    }
+    const systemPrompt = resolveSystemPrompt(entity);
+    if (!systemPrompt) {
+      throw Object.assign(new Error('persona has no system prompt'), { status: 400 });
+    }
+    return [{ role: 'system', content: systemPrompt }, ...messages];
+  }
+
+  // LiteLLM-native endpoint (not OpenAI passthrough /v1/vector_stores).
+  async function fetchVectorStores(): Promise<VectorStore[]> {
+    const upstream = await fetch(`${chatConfig.baseUrl}/v1/vector_store/list`, {
+      headers: { Authorization: `Bearer ${masterKey}` },
+    });
+    if (!upstream.ok) {
+      const text = await upstream.text().catch(() => '');
+      throw new Error(text || upstream.statusText);
+    }
+    const data = await upstream.json();
+    // LiteLLM returns { data: [{ vector_store_id, vector_store_name, ... }] }
+    const raw: any[] = Array.isArray(data) ? data : (data.data ?? []);
+    return raw.map(s => ({
+      id: s.vector_store_id ?? s.id,
+      name: s.vector_store_name ?? s.name,
+      status: s.custom_llm_provider ?? s.status,
+    }));
+  }
 
   const router = Router();
 
@@ -58,29 +104,38 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
     });
   });
 
+  router.get('/personas', async (_req: Request, res: Response) => {
+    try {
+      const credentials = await auth.getOwnServiceCredentials();
+      const [result, stores] = await Promise.all([
+        catalog.getEntities(
+          { filter: { kind: 'Component', 'spec.type': CHAT_PERSONA_TYPE } },
+          { credentials },
+        ),
+        // Persona authors write human-friendly store names (e.g. "oo-kb")
+        // in the catalog annotation — resolve them to the real
+        // vector_store_id the picker/request payload expects. Best-effort:
+        // if LiteLLM is unreachable, personas still list, just without
+        // resolved KB defaults.
+        fetchVectorStores().catch(() => [] as VectorStore[]),
+      ]);
+      const byNameOrId = new Map(stores.flatMap(s => [[s.id, s.id], [s.name, s.id]] as const));
+      const personas = result.items.map(entityToPersonaSummary).map(p => ({
+        ...p,
+        defaultVectorStoreIds: p.defaultVectorStoreIds
+          ?.map(v => byNameOrId.get(v))
+          .filter((v): v is string => !!v),
+      }));
+      res.json(personas);
+    } catch (err: any) {
+      logger.error('Failed to list personas', err);
+      res.status(502).json({ error: err.message });
+    }
+  });
+
   router.get('/vector_stores', async (_req: Request, res: Response) => {
     try {
-      // LiteLLM-native endpoint (not OpenAI passthrough /v1/vector_stores).
-      const upstream = await fetch(
-        `${chatConfig.baseUrl}/v1/vector_store/list`,
-        {
-          headers: { Authorization: `Bearer ${masterKey}` },
-        },
-      );
-      if (!upstream.ok) {
-        const text = await upstream.text().catch(() => '');
-        res.status(upstream.status).json({ error: text || upstream.statusText });
-        return;
-      }
-      const data = await upstream.json();
-      // LiteLLM returns { data: [{ vector_store_id, vector_store_name, ... }] }
-      const raw: any[] = Array.isArray(data) ? data : (data.data ?? []);
-      const stores: VectorStore[] = raw.map(s => ({
-        id: s.vector_store_id ?? s.id,
-        name: s.vector_store_name ?? s.name,
-        status: s.custom_llm_provider ?? s.status,
-      }));
-      res.json(stores);
+      res.json(await fetchVectorStores());
     } catch (err: any) {
       logger.error('Failed to list vector stores', err);
       res.status(502).json({ error: err.message });
@@ -191,9 +246,11 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       // resolving the user_id validates the Backstage token.
       toLiteLLMUserId(tokenEntityRef, userIdDomain);
 
+      const messages = await applyPersona(body.persona_id, body.messages);
+
       const payload: Record<string, unknown> = {
         model: body.model,
-        messages: body.messages,
+        messages,
         stream: false,
       };
       if (body.vector_store_ids?.length) {
@@ -220,7 +277,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       res.json(data);
     } catch (err: any) {
       logger.error('chat/completions failed', err);
-      res.status(500).json({ error: err.message });
+      res.status(err.status ?? 500).json({ error: err.message });
     }
   });
 
@@ -241,6 +298,8 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       }
       toLiteLLMUserId(tokenEntityRef, userIdDomain);
 
+      const messages = await applyPersona(body.persona_id, body.messages);
+
       const base = chatConfig.baseUrl;
 
       // /v1/chat/completions (+ vector_store_ids for RAG) — works on
@@ -249,7 +308,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       // only masks the real primary error from the client.
       const chatBody: Record<string, unknown> = {
         model: body.model,
-        messages: body.messages,
+        messages,
         stream: true,
         stream_options: { include_usage: true },
       };
@@ -266,7 +325,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
     } catch (err: any) {
       logger.error('chat/stream failed', err);
       if (!res.headersSent) {
-        res.status(500).json({ error: err.message });
+        res.status(err.status ?? 500).json({ error: err.message });
       }
     }
   });

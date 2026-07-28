@@ -1,7 +1,8 @@
 import { FetchApi } from '@backstage/core-plugin-api';
-import type { VectorStore, ChatRequest, ChatStreamChunk, ChatResult, ChatConfig, KeySpend } from './types';
+import type { VectorStore, Persona, ChatRequest, ChatStreamChunk, ChatResult, ChatConfig, KeySpend } from './types';
 export interface LiteLlmChatApiInterface {
     listVectorStores(): Promise<VectorStore[]>;
+    listPersonas(): Promise<Persona[]>;
     getChatConfig(): Promise<ChatConfig>;
     chatStream(req: ChatRequest, onToken: (chunk: ChatStreamChunk) => void, onDone: () => void, onError: (err: Error) => void): AbortController;
     chatCompletions(req: ChatRequest): Promise<ChatResult>;
@@ -25,6 +26,7 @@ export declare class LiteLlmChatApi implements LiteLlmChatApiInterface {
     private fetchApi;
     constructor(fetchApi: FetchApi);
     listVectorStores(): Promise<VectorStore[]>;
+    listPersonas(): Promise<Persona[]>;
     getChatConfig(): Promise<ChatConfig>;
     chatStream(req: ChatRequest, onToken: (chunk: ChatStreamChunk) => void, onDone: () => void, onError: (err: Error) => void): AbortController;
     chatCompletions(req: ChatRequest): Promise<ChatResult>;

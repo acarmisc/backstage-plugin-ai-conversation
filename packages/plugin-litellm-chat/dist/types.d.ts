@@ -4,6 +4,21 @@ export interface VectorStore {
     file_count?: number;
     status?: string;
 }
+/**
+ * Persona metadata for the picker, sourced from `chat-persona` catalog
+ * entities (see the `ces-ai-personas` repo). Deliberately excludes the
+ * system prompt text — the backend resolves it server-side from
+ * `persona_id` so it never round-trips through the browser.
+ */
+export interface Persona {
+    /** Catalog entity ref, e.g. "component:default/oo-business-analyst". */
+    id: string;
+    title: string;
+    description?: string;
+    defaultModel?: string;
+    defaultVectorStoreIds?: string[];
+    tags?: string[];
+}
 export interface ChatMessage {
     role: 'user' | 'assistant' | 'system';
     content: string;
@@ -14,6 +29,7 @@ export interface ChatRequest {
     vector_store_ids?: string[];
     top_k?: number;
     user_key: string;
+    persona_id?: string;
 }
 export interface SearchResult {
     filename: string;
@@ -61,6 +77,7 @@ export interface Thread {
     messages: ChatMessage[];
     model: string;
     vectorStoreIds: string[];
+    personaId: string;
     keyAlias: string;
     keyToken: string;
     createdAt: number;

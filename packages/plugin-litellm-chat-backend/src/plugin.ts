@@ -1,4 +1,5 @@
 import { coreServices, createBackendPlugin } from '@backstage/backend-plugin-api';
+import { catalogServiceRef } from '@backstage/plugin-catalog-node';
 import { createRouter } from './router';
 
 export const litellmChatPlugin = createBackendPlugin({
@@ -11,9 +12,10 @@ export const litellmChatPlugin = createBackendPlugin({
         logger: coreServices.logger,
         auth: coreServices.auth,
         discovery: coreServices.discovery,
+        catalog: catalogServiceRef,
       },
-      async init({ httpRouter, config, logger, auth, discovery }) {
-        const router = await createRouter({ config, logger, auth, discovery });
+      async init({ httpRouter, config, logger, auth, discovery, catalog }) {
+        const router = await createRouter({ config, logger, auth, discovery, catalog });
         httpRouter.use(router);
       },
     });

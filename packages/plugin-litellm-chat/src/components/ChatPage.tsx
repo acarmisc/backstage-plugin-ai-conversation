@@ -25,6 +25,7 @@ import { liteLlmChatApiRef } from '../api';
 import { useChat } from '../hooks/useChat';
 import { ModelPicker } from './ModelPicker';
 import { VectorStorePicker } from './VectorStorePicker';
+import { PersonaPicker } from './PersonaPicker';
 import { KeyPicker } from './KeyPicker';
 import { MessageList } from './MessageList';
 import { ErrorBanner } from './ErrorBanner';
@@ -49,6 +50,7 @@ export const ChatPage: React.FC = () => {
 
   const [model, setModel] = useState('');
   const [vectorStoreIds, setVectorStoreIds] = useState<string[]>([]);
+  const [personaId, setPersonaId] = useState('');
   const [keyVal, setKeyVal] = useState<{ alias: string; token: string }>({
     alias: '',
     token: '',
@@ -75,20 +77,22 @@ export const ChatPage: React.FC = () => {
     userId,
     model,
     vectorStoreIds,
+    personaId,
     keyAlias: keyVal.alias,
     keyToken: keyVal.token,
     topK: 5,
   });
 
-  // Restore the selected thread's own model/KBs/key into Settings whenever
-  // the active thread changes — otherwise sending a message in an older
-  // thread silently uses whatever is currently picked, not what that
+  // Restore the selected thread's own model/KBs/persona/key into Settings
+  // whenever the active thread changes — otherwise sending a message in an
+  // older thread silently uses whatever is currently picked, not what that
   // conversation was built with.
   const activeThreadId = chat.activeThread?.id ?? null;
   useEffect(() => {
     if (!chat.activeThread) return;
     setModel(chat.activeThread.model);
     setVectorStoreIds(chat.activeThread.vectorStoreIds);
+    setPersonaId(chat.activeThread.personaId ?? '');
     setKeyVal({ alias: chat.activeThread.keyAlias, token: chat.activeThread.keyToken });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeThreadId]);
@@ -175,6 +179,16 @@ export const ChatPage: React.FC = () => {
                   Couldn't load chat defaults: {configError}
                 </Typography>
               )}
+              <PersonaPicker
+                value={personaId}
+                onChange={(id, persona) => {
+                  setPersonaId(id);
+                  if (persona?.defaultModel) setModel(persona.defaultModel);
+                  if (persona?.defaultVectorStoreIds) {
+                    setVectorStoreIds(persona.defaultVectorStoreIds);
+                  }
+                }}
+              />
               <ModelPicker value={model} onChange={setModel} defaultModel={config.defaultModel} />
               <VectorStorePicker
                 value={vectorStoreIds}

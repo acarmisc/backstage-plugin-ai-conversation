@@ -4,6 +4,25 @@ export interface VectorStore {
     file_count?: number;
     status?: string;
 }
+/** Value of `spec.type` that marks a catalog Component as a chat persona. */
+export declare const CHAT_PERSONA_TYPE = "chat-persona";
+/** Annotation namespace for persona-specific fields on a catalog entity. */
+export declare const CHAT_PERSONA_ANNOTATION_PREFIX = "chat-persona.acarmisc.org";
+/**
+ * Public persona metadata returned to the frontend picker. Deliberately
+ * excludes the system prompt text — that's resolved server-side by
+ * `persona_id` when a chat request comes in, so it never has to round-trip
+ * through the browser and can't be tampered with client-side.
+ */
+export interface PersonaSummary {
+    /** Catalog entity ref, e.g. "component:default/oo-business-analyst". */
+    id: string;
+    title: string;
+    description?: string;
+    defaultModel?: string;
+    defaultVectorStoreIds?: string[];
+    tags?: string[];
+}
 export interface ChatMessage {
     role: 'user' | 'assistant' | 'system';
     content: string;
@@ -14,6 +33,8 @@ export interface ChatStreamRequest {
     vector_store_ids?: string[];
     top_k?: number;
     user_key: string;
+    /** Catalog entity ref of a chat-persona, e.g. "component:default/oo-business-analyst". */
+    persona_id?: string;
 }
 export interface ChatCompletionsRequest extends ChatStreamRequest {
     stream?: false;
