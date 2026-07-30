@@ -71,23 +71,15 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
     });
   }
 
-  // Prepends the persona's system prompt to `messages` if `personaId` is
-  // set. Resolved server-side by entity ref so the prompt text never has
-  // to round-trip through the browser (see PersonaSummary in types.ts).
-  // Throws with a `status` field on invalid/missing personas so callers
-  // can respond with the right HTTP status.
-  async function applyPersona(
-    personaId: string | undefined,
-    messages: ChatMessage[],
-  ): Promise<ChatMessage[]> {
-    if (!personaId) return messages;
-
+  // Resolves and caches a persona's system prompt by entity ref. Resolved
+  // server-side so the prompt text never has to round-trip through the
+  // browser (see PersonaSummary in types.ts). Throws with a `status` field
+  // on invalid/missing personas so callers can respond with the right HTTP
+  // status.
+  async function resolvePersonaPrompt(personaId: string): Promise<string> {
     const cached = promptCache.get(personaId);
     if (cached && cached.expiresAt > Date.now()) {
-      return [
-        { id: 'persona-system', role: 'system', content: cached.prompt },
-        ...messages,
-      ];
+      return cached.prompt;
     }
 
     const credentials = await auth.getOwnServiceCredentials();
@@ -103,6 +95,23 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       prompt: systemPrompt,
       expiresAt: Date.now() + PERSONA_PROMPT_TTL_MS,
     });
+    return systemPrompt;
+  }
+
+  // Prepends a system message to `messages` combining the persona's system
+  // prompt (if `personaId` is set) with the user's free-text
+  // `customSystemPrompt` (if set) — persona first, then the custom prompt
+  // appended below it. If only one of the two is present, that one is used
+  // as-is; if neither is present, `messages` is returned unchanged.
+  async function applyPersona(
+    personaId: string | undefined,
+    customSystemPrompt: string | undefined,
+    messages: ChatMessage[],
+  ): Promise<ChatMessage[]> {
+    const personaPrompt = personaId ? await resolvePersonaPrompt(personaId) : undefined;
+    const trimmedCustom = customSystemPrompt?.trim() || undefined;
+    const systemPrompt = [personaPrompt, trimmedCustom].filter(Boolean).join('\n\n');
+    if (!systemPrompt) return messages;
     return [{ id: 'persona-system', role: 'system', content: systemPrompt }, ...messages];
   }
 
@@ -334,7 +343,11 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       // resolving the user_id validates the Backstage token.
       toLiteLLMUserId(tokenEntityRef, userIdDomain);
 
-      const messages = await applyPersona(body.persona_id, body.messages);
+      const messages = await applyPersona(
+        body.persona_id,
+        body.custom_system_prompt,
+        body.messages,
+      );
 
       const payload: Record<string, unknown> = {
         model: body.model,
@@ -386,7 +399,11 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       }
       toLiteLLMUserId(tokenEntityRef, userIdDomain);
 
-      const messages = await applyPersona(body.persona_id, body.messages);
+      const messages = await applyPersona(
+        body.persona_id,
+        body.custom_system_prompt,
+        body.messages,
+      );
 
       const base = chatConfig.baseUrl;
 

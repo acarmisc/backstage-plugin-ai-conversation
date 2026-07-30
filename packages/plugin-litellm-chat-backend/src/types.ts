@@ -53,6 +53,9 @@ export interface ChatStreamRequest {
   user_key: string;
   /** Catalog entity ref of a chat-persona, e.g. "component:default/oo-business-analyst". */
   persona_id?: string;
+  /** Free-text system prompt supplied by the user. Combined with the
+   * persona's system prompt (if any) rather than replacing it. */
+  custom_system_prompt?: string;
 }
 
 export interface ChatCompletionsRequest extends ChatStreamRequest {

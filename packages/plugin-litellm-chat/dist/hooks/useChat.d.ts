@@ -4,6 +4,7 @@ export interface UseChatOptions {
     model: string;
     vectorStoreIds: string[];
     personaId: string;
+    customSystemPrompt: string;
     keyAlias: string;
     keyToken: string;
     topK?: number;

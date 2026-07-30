@@ -232,7 +232,7 @@ function findQuestionFor(messages, messageId) {
   return messages[idx - 1];
 }
 function useChat(opts) {
-  const { userId, model, vectorStoreIds, personaId, keyAlias, keyToken, topK } = opts;
+  const { userId, model, vectorStoreIds, personaId, customSystemPrompt, keyAlias, keyToken, topK } = opts;
   const api = (0, import_core_plugin_api2.useApi)(liteLlmChatApiRef);
   const [threads, setThreads] = (0, import_react.useState)(() => loadThreads(userId));
   const [activeId, setActiveId] = (0, import_react.useState)(
@@ -276,6 +276,7 @@ function useChat(opts) {
       model,
       vectorStoreIds,
       personaId,
+      customSystemPrompt,
       keyAlias,
       keyToken,
       createdAt: Date.now(),
@@ -288,7 +289,7 @@ function useChat(opts) {
     setError(null);
     setCitations([]);
     setKeySpend(null);
-  }, [model, vectorStoreIds, personaId, keyAlias, keyToken]);
+  }, [model, vectorStoreIds, personaId, customSystemPrompt, keyAlias, keyToken]);
   const selectThread = (0, import_react.useCallback)((id) => {
     setActiveId(id);
     setError(null);
@@ -334,6 +335,7 @@ function useChat(opts) {
             model,
             vectorStoreIds,
             personaId,
+            customSystemPrompt,
             keyAlias,
             keyToken,
             updatedAt: Date.now()
@@ -348,6 +350,7 @@ function useChat(opts) {
           messages: reqMessages,
           vector_store_ids: vectorStoreIds.length ? vectorStoreIds : void 0,
           persona_id: personaId || void 0,
+          custom_system_prompt: customSystemPrompt || void 0,
           top_k: topK,
           user_key: keyToken
         },
@@ -408,7 +411,7 @@ function useChat(opts) {
       );
       abortRef.current = controller;
     },
-    [activeThread, api, keyToken, model, vectorStoreIds, personaId, keyAlias, topK]
+    [activeThread, api, keyToken, model, vectorStoreIds, personaId, customSystemPrompt, keyAlias, topK]
   );
   const submitFeedback = (0, import_react.useCallback)(
     (messageId, vote) => {
@@ -944,6 +947,7 @@ var init_ChatPage = __esm({
       const [model, setModel] = (0, import_react10.useState)("");
       const [vectorStoreIds, setVectorStoreIds] = (0, import_react10.useState)([]);
       const [personaId, setPersonaId] = (0, import_react10.useState)("");
+      const [customSystemPrompt, setCustomSystemPrompt] = (0, import_react10.useState)("");
       const [keyVal, setKeyVal] = (0, import_react10.useState)({
         alias: "",
         token: ""
@@ -963,6 +967,7 @@ var init_ChatPage = __esm({
         model,
         vectorStoreIds,
         personaId,
+        customSystemPrompt,
         keyAlias: keyVal.alias,
         keyToken: keyVal.token,
         topK: 5
@@ -973,6 +978,7 @@ var init_ChatPage = __esm({
         setModel(chat.activeThread.model);
         setVectorStoreIds(chat.activeThread.vectorStoreIds);
         setPersonaId(chat.activeThread.personaId ?? "");
+        setCustomSystemPrompt(chat.activeThread.customSystemPrompt ?? "");
         setKeyVal({ alias: chat.activeThread.keyAlias, token: chat.activeThread.keyToken });
       }, [activeThreadId]);
       const messages = chat.activeThread?.messages ?? [];
@@ -1055,6 +1061,19 @@ var init_ChatPage = __esm({
                 setVectorStoreIds(persona.defaultVectorStoreIds);
               }
             }
+          }
+        ), /* @__PURE__ */ import_react10.default.createElement(
+          import_material9.TextField,
+          {
+            label: "Custom system prompt",
+            placeholder: personaId ? "Appended after the persona system prompt\u2026" : "Used as the system prompt (no persona selected)\u2026",
+            value: customSystemPrompt,
+            onChange: (e) => setCustomSystemPrompt(e.target.value),
+            multiline: true,
+            minRows: 2,
+            maxRows: 6,
+            size: "small",
+            fullWidth: true
           }
         ), /* @__PURE__ */ import_react10.default.createElement(ModelPicker, { value: model, onChange: setModel, defaultModel: config.defaultModel }), /* @__PURE__ */ import_react10.default.createElement(
           import_material9.Accordion,

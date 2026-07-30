@@ -12,6 +12,7 @@ import {
   Collapse,
   Tooltip,
   InputBase,
+  TextField,
   Accordion,
   AccordionSummary,
   AccordionDetails,
@@ -54,6 +55,7 @@ export const ChatPage: React.FC = () => {
   const [model, setModel] = useState('');
   const [vectorStoreIds, setVectorStoreIds] = useState<string[]>([]);
   const [personaId, setPersonaId] = useState('');
+  const [customSystemPrompt, setCustomSystemPrompt] = useState('');
   const [keyVal, setKeyVal] = useState<{ alias: string; token: string }>({
     alias: '',
     token: '',
@@ -81,6 +83,7 @@ export const ChatPage: React.FC = () => {
     model,
     vectorStoreIds,
     personaId,
+    customSystemPrompt,
     keyAlias: keyVal.alias,
     keyToken: keyVal.token,
     topK: 5,
@@ -96,6 +99,7 @@ export const ChatPage: React.FC = () => {
     setModel(chat.activeThread.model);
     setVectorStoreIds(chat.activeThread.vectorStoreIds);
     setPersonaId(chat.activeThread.personaId ?? '');
+    setCustomSystemPrompt(chat.activeThread.customSystemPrompt ?? '');
     setKeyVal({ alias: chat.activeThread.keyAlias, token: chat.activeThread.keyToken });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeThreadId]);
@@ -191,6 +195,21 @@ export const ChatPage: React.FC = () => {
                     setVectorStoreIds(persona.defaultVectorStoreIds);
                   }
                 }}
+              />
+              <TextField
+                label="Custom system prompt"
+                placeholder={
+                  personaId
+                    ? 'Appended after the persona system prompt…'
+                    : 'Used as the system prompt (no persona selected)…'
+                }
+                value={customSystemPrompt}
+                onChange={e => setCustomSystemPrompt(e.target.value)}
+                multiline
+                minRows={2}
+                maxRows={6}
+                size="small"
+                fullWidth
               />
               <ModelPicker value={model} onChange={setModel} defaultModel={config.defaultModel} />
               <Accordion

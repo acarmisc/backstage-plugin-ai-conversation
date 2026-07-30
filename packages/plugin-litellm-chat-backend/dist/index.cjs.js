@@ -81403,14 +81403,10 @@ async function createRouter(options) {
       )
     });
   }
-  async function applyPersona(personaId, messages) {
-    if (!personaId) return messages;
+  async function resolvePersonaPrompt(personaId) {
     const cached = promptCache.get(personaId);
     if (cached && cached.expiresAt > Date.now()) {
-      return [
-        { id: "persona-system", role: "system", content: cached.prompt },
-        ...messages
-      ];
+      return cached.prompt;
     }
     const credentials = await auth.getOwnServiceCredentials();
     const entity = await catalog.getEntityByRef(personaId, { credentials });
@@ -81425,6 +81421,13 @@ async function createRouter(options) {
       prompt: systemPrompt,
       expiresAt: Date.now() + PERSONA_PROMPT_TTL_MS
     });
+    return systemPrompt;
+  }
+  async function applyPersona(personaId, customSystemPrompt, messages) {
+    const personaPrompt = personaId ? await resolvePersonaPrompt(personaId) : void 0;
+    const trimmedCustom = customSystemPrompt?.trim() || void 0;
+    const systemPrompt = [personaPrompt, trimmedCustom].filter(Boolean).join("\n\n");
+    if (!systemPrompt) return messages;
     return [{ id: "persona-system", role: "system", content: systemPrompt }, ...messages];
   }
   async function fetchVectorStores() {
@@ -81610,7 +81613,11 @@ async function createRouter(options) {
         return;
       }
       (0, import_backstage_plugin_litellm_backend.toLiteLLMUserId)(tokenEntityRef, userIdDomain);
-      const messages = await applyPersona(body.persona_id, body.messages);
+      const messages = await applyPersona(
+        body.persona_id,
+        body.custom_system_prompt,
+        body.messages
+      );
       const payload = {
         model: body.model,
         messages,
@@ -81657,7 +81664,11 @@ async function createRouter(options) {
         return;
       }
       (0, import_backstage_plugin_litellm_backend.toLiteLLMUserId)(tokenEntityRef, userIdDomain);
-      const messages = await applyPersona(body.persona_id, body.messages);
+      const messages = await applyPersona(
+        body.persona_id,
+        body.custom_system_prompt,
+        body.messages
+      );
       const base = chatConfig.baseUrl;
       const chatBody = {
         model: body.model,

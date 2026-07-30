@@ -67,20 +67,15 @@ async function createRouter(options) {
             directory: (0, backend_plugin_api_1.resolvePackagePath)('@acarmisc/backstage-plugin-litellm-chat-backend', 'migrations'),
         });
     }
-    // Prepends the persona's system prompt to `messages` if `personaId` is
-    // set. Resolved server-side by entity ref so the prompt text never has
-    // to round-trip through the browser (see PersonaSummary in types.ts).
-    // Throws with a `status` field on invalid/missing personas so callers
-    // can respond with the right HTTP status.
-    async function applyPersona(personaId, messages) {
-        if (!personaId)
-            return messages;
+    // Resolves and caches a persona's system prompt by entity ref. Resolved
+    // server-side so the prompt text never has to round-trip through the
+    // browser (see PersonaSummary in types.ts). Throws with a `status` field
+    // on invalid/missing personas so callers can respond with the right HTTP
+    // status.
+    async function resolvePersonaPrompt(personaId) {
         const cached = promptCache.get(personaId);
         if (cached && cached.expiresAt > Date.now()) {
-            return [
-                { id: 'persona-system', role: 'system', content: cached.prompt },
-                ...messages,
-            ];
+            return cached.prompt;
         }
         const credentials = await auth.getOwnServiceCredentials();
         const entity = await catalog.getEntityByRef(personaId, { credentials });
@@ -95,6 +90,19 @@ async function createRouter(options) {
             prompt: systemPrompt,
             expiresAt: Date.now() + PERSONA_PROMPT_TTL_MS,
         });
+        return systemPrompt;
+    }
+    // Prepends a system message to `messages` combining the persona's system
+    // prompt (if `personaId` is set) with the user's free-text
+    // `customSystemPrompt` (if set) — persona first, then the custom prompt
+    // appended below it. If only one of the two is present, that one is used
+    // as-is; if neither is present, `messages` is returned unchanged.
+    async function applyPersona(personaId, customSystemPrompt, messages) {
+        const personaPrompt = personaId ? await resolvePersonaPrompt(personaId) : undefined;
+        const trimmedCustom = customSystemPrompt?.trim() || undefined;
+        const systemPrompt = [personaPrompt, trimmedCustom].filter(Boolean).join('\n\n');
+        if (!systemPrompt)
+            return messages;
         return [{ id: 'persona-system', role: 'system', content: systemPrompt }, ...messages];
     }
     // LiteLLM-native endpoint (not OpenAI passthrough /v1/vector_stores).
@@ -312,7 +320,7 @@ async function createRouter(options) {
             // Resolve to confirm identity — LiteLLM auth uses the user_key, but
             // resolving the user_id validates the Backstage token.
             (0, backstage_plugin_litellm_backend_1.toLiteLLMUserId)(tokenEntityRef, userIdDomain);
-            const messages = await applyPersona(body.persona_id, body.messages);
+            const messages = await applyPersona(body.persona_id, body.custom_system_prompt, body.messages);
             const payload = {
                 model: body.model,
                 messages,
@@ -357,7 +365,7 @@ async function createRouter(options) {
                 return;
             }
             (0, backstage_plugin_litellm_backend_1.toLiteLLMUserId)(tokenEntityRef, userIdDomain);
-            const messages = await applyPersona(body.persona_id, body.messages);
+            const messages = await applyPersona(body.persona_id, body.custom_system_prompt, body.messages);
             const base = chatConfig.baseUrl;
             // /v1/chat/completions (+ vector_store_ids for RAG) — works on
             // LiteLLM v1.90.0 with DB-backed pgvector stores. No fallback: the

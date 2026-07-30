@@ -47,6 +47,9 @@ export interface ChatRequest {
   top_k?: number;
   user_key: string;
   persona_id?: string;
+  /** Free-text system prompt supplied by the user. Combined with the
+   * persona's system prompt (if any) rather than replacing it. */
+  custom_system_prompt?: string;
 }
 
 export interface SearchResult {
@@ -103,6 +106,7 @@ export interface Thread {
   model: string;
   vectorStoreIds: string[];
   personaId: string;
+  customSystemPrompt: string;
   keyAlias: string;
   keyToken: string;
   createdAt: number;

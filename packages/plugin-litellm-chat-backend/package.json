@@ -1,6 +1,6 @@
 {
   "name": "@acarmisc/backstage-plugin-litellm-chat-backend",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Backstage backend plugin for LiteLLM RAG chat — streaming proxy + vector store listing.",
   "backstage": {
     "role": "backend-plugin",

@@ -45,6 +45,7 @@ export interface UseChatOptions {
   model: string;
   vectorStoreIds: string[];
   personaId: string;
+  customSystemPrompt: string;
   keyAlias: string;
   keyToken: string;
   topK?: number;
@@ -66,7 +67,7 @@ export interface UseChatResult {
 }
 
 export function useChat(opts: UseChatOptions): UseChatResult {
-  const { userId, model, vectorStoreIds, personaId, keyAlias, keyToken, topK } = opts;
+  const { userId, model, vectorStoreIds, personaId, customSystemPrompt, keyAlias, keyToken, topK } = opts;
   const api = useApi(liteLlmChatApiRef) as InstanceType<typeof LiteLlmChatApi>;
 
   const [threads, setThreads] = useState<Thread[]>(() => loadThreads(userId));
@@ -122,6 +123,7 @@ export function useChat(opts: UseChatOptions): UseChatResult {
       model,
       vectorStoreIds,
       personaId,
+      customSystemPrompt,
       keyAlias,
       keyToken,
       createdAt: Date.now(),
@@ -134,7 +136,7 @@ export function useChat(opts: UseChatOptions): UseChatResult {
     setError(null);
     setCitations([]);
     setKeySpend(null);
-  }, [model, vectorStoreIds, personaId, keyAlias, keyToken]);
+  }, [model, vectorStoreIds, personaId, customSystemPrompt, keyAlias, keyToken]);
 
   const selectThread = useCallback((id: string) => {
     setActiveId(id);
@@ -189,6 +191,7 @@ export function useChat(opts: UseChatOptions): UseChatResult {
                 model,
                 vectorStoreIds,
                 personaId,
+                customSystemPrompt,
                 keyAlias,
                 keyToken,
                 updatedAt: Date.now(),
@@ -207,6 +210,7 @@ export function useChat(opts: UseChatOptions): UseChatResult {
           messages: reqMessages,
           vector_store_ids: vectorStoreIds.length ? vectorStoreIds : undefined,
           persona_id: personaId || undefined,
+          custom_system_prompt: customSystemPrompt || undefined,
           top_k: topK,
           user_key: keyToken,
         },
@@ -269,7 +273,7 @@ export function useChat(opts: UseChatOptions): UseChatResult {
 
       abortRef.current = controller;
     },
-    [activeThread, api, keyToken, model, vectorStoreIds, personaId, keyAlias, topK],
+    [activeThread, api, keyToken, model, vectorStoreIds, personaId, customSystemPrompt, keyAlias, topK],
   );
 
   const submitFeedback = useCallback(
