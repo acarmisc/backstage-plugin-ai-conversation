@@ -12,6 +12,9 @@ import {
   Collapse,
   Tooltip,
   InputBase,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -190,20 +193,33 @@ export const ChatPage: React.FC = () => {
                 }}
               />
               <ModelPicker value={model} onChange={setModel} defaultModel={config.defaultModel} />
-              <VectorStorePicker
-                value={vectorStoreIds}
-                onChange={setVectorStoreIds}
-                defaultVectorStoreIds={config.defaultVectorStoreIds}
-              />
-              <KeyPicker
-                value={keyVal}
-                onChange={setKeyVal}
-                onDelete={() => {
-                  if (chat.activeThread?.keyToken) {
-                    chatApi.deleteChatKey(chat.activeThread.keyToken).catch(() => {});
-                  }
-                }}
-              />
+              <Accordion
+                disableGutters
+                variant="outlined"
+                sx={{ '&:before': { display: 'none' } }}
+              >
+                <AccordionSummary expandIcon={<ExpandMoreIcon fontSize="small" />}>
+                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                    Advanced
+                  </Typography>
+                </AccordionSummary>
+                <AccordionDetails sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                  <VectorStorePicker
+                    value={vectorStoreIds}
+                    onChange={setVectorStoreIds}
+                    defaultVectorStoreIds={config.defaultVectorStoreIds}
+                  />
+                  <KeyPicker
+                    value={keyVal}
+                    onChange={setKeyVal}
+                    onDelete={() => {
+                      if (chat.activeThread?.keyToken) {
+                        chatApi.deleteChatKey(chat.activeThread.keyToken).catch(() => {});
+                      }
+                    }}
+                  />
+                </AccordionDetails>
+              </Accordion>
             </Box>
           </Collapse>
         </Box>

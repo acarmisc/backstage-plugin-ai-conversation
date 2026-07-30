@@ -35,7 +35,7 @@ export const PersonaPicker: React.FC<PersonaPickerProps> = ({ value, onChange })
 
   return (
     <FormControl size="small" error={!!error} sx={{ minWidth: 200 }}>
-      <InputLabel>Persona</InputLabel>
+      <InputLabel shrink>Persona</InputLabel>
       <Select
         value={value}
         label="Persona"
