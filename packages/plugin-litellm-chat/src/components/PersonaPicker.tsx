@@ -1,38 +1,24 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Select, MenuItem, FormControl, InputLabel, Typography } from '@mui/material';
-import { useApi } from '@backstage/core-plugin-api';
-import { liteLlmChatApiRef } from '../api';
 import type { Persona } from '../types';
 
 export interface PersonaPickerProps {
   value: string;
+  personas: Persona[];
+  loading: boolean;
+  error: string | null;
   /** Fires with the full Persona (or undefined for "None") so the parent
    * can prefill model/knowledge-base pickers from its defaults. */
   onChange: (personaId: string, persona: Persona | undefined) => void;
 }
 
-export const PersonaPicker: React.FC<PersonaPickerProps> = ({ value, onChange }) => {
-  const chatApi = useApi(liteLlmChatApiRef);
-  const [personas, setPersonas] = useState<Persona[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    chatApi
-      .listPersonas()
-      .then(p => {
-        if (alive) setPersonas(p);
-      })
-      .catch(err => {
-        if (alive) setError(err.message ?? 'Failed to load personas');
-      })
-      .finally(() => alive && setLoading(false));
-    return () => {
-      alive = false;
-    };
-  }, [chatApi]);
-
+export const PersonaPicker: React.FC<PersonaPickerProps> = ({
+  value,
+  personas,
+  loading,
+  error,
+  onChange,
+}) => {
   return (
     <FormControl size="small" error={!!error} sx={{ minWidth: 200 }}>
       <InputLabel shrink>Persona</InputLabel>

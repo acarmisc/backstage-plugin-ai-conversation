@@ -30,12 +30,13 @@ import { useChat } from '../hooks/useChat';
 import { ModelPicker } from './ModelPicker';
 import { VectorStorePicker } from './VectorStorePicker';
 import { PersonaPicker } from './PersonaPicker';
+import { PersonaHomepage } from './PersonaHomepage';
 import { KeyPicker } from './KeyPicker';
 import { MessageList } from './MessageList';
 import { ErrorBanner } from './ErrorBanner';
 import { SourcesPanel } from './SourcesPanel';
 import { UsagePanel } from './UsagePanel';
-import type { ChatConfig } from '../types';
+import type { ChatConfig, Persona } from '../types';
 
 const SIDEBAR_WIDTH = 280;
 const RIGHT_RAIL_WIDTH = 300;
@@ -63,6 +64,9 @@ export const ChatPage: React.FC = () => {
   const [showSettings, setShowSettings] = useState(true);
   const [input, setInput] = useState('');
   const [configError, setConfigError] = useState<string | null>(null);
+  const [personas, setPersonas] = useState<Persona[]>([]);
+  const [personasLoading, setPersonasLoading] = useState(true);
+  const [personasError, setPersonasError] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -72,6 +76,11 @@ export const ChatPage: React.FC = () => {
       .getChatConfig()
       .then(setConfig)
       .catch(err => setConfigError(err.message ?? 'Failed to reach the chat backend'));
+    chatApi
+      .listPersonas()
+      .then(setPersonas)
+      .catch(err => setPersonasError(err.message ?? 'Failed to load personas'))
+      .finally(() => setPersonasLoading(false));
     identityApi
       .getCredentials()
       .then(c => setUserId(c.token ? 'oidc' : 'default'))
@@ -110,6 +119,14 @@ export const ChatPage: React.FC = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isStreaming]);
+
+  const handlePersonaChange = (id: string, persona: Persona | undefined) => {
+    setPersonaId(id);
+    if (persona?.defaultModel) setModel(persona.defaultModel);
+    if (persona?.defaultVectorStoreIds) {
+      setVectorStoreIds(persona.defaultVectorStoreIds);
+    }
+  };
 
   const handleSend = () => {
     if (!input.trim() || !keyVal.token || isStreaming) return;
@@ -188,13 +205,10 @@ export const ChatPage: React.FC = () => {
               )}
               <PersonaPicker
                 value={personaId}
-                onChange={(id, persona) => {
-                  setPersonaId(id);
-                  if (persona?.defaultModel) setModel(persona.defaultModel);
-                  if (persona?.defaultVectorStoreIds) {
-                    setVectorStoreIds(persona.defaultVectorStoreIds);
-                  }
-                }}
+                personas={personas}
+                loading={personasLoading}
+                error={personasError}
+                onChange={handlePersonaChange}
               />
               <TextField
                 label="Custom system prompt"
@@ -348,11 +362,21 @@ export const ChatPage: React.FC = () => {
               minHeight: 0,
             }}
           >
-            <MessageList
-              messages={messages}
-              isStreaming={isStreaming}
-              onFeedback={chat.submitFeedback}
-            />
+            {messages.length === 0 ? (
+              <PersonaHomepage
+                personas={personas}
+                loading={personasLoading}
+                error={personasError}
+                selectedId={personaId}
+                onSelect={handlePersonaChange}
+              />
+            ) : (
+              <MessageList
+                messages={messages}
+                isStreaming={isStreaming}
+                onFeedback={chat.submitFeedback}
+              />
+            )}
             <div ref={messagesEndRef} />
           </Box>
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, IconButton, Typography } from '@mui/material';
+import { Box, IconButton } from '@mui/material';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ThumbUpOutlinedIcon from '@mui/icons-material/ThumbUpOutlined';
 import ThumbDownIcon from '@mui/icons-material/ThumbDown';
@@ -38,20 +38,6 @@ export const MessageList: React.FC<MessageListProps> = ({
         gap: 1.5,
       }}
     >
-      {messages.length === 0 && (
-        <Box
-          sx={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Typography color="text.secondary">
-            Start a conversation…
-          </Typography>
-        </Box>
-      )}
       {messages.map((msg, i) => {
         const isUser = msg.role === 'user';
         const isLast = i === messages.length - 1;
