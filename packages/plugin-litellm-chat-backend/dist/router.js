@@ -36,10 +36,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.createRouter = createRouter;
 const express_1 = __importStar(require("express"));
 const backend_plugin_api_1 = require("@backstage/backend-plugin-api");
+const integration_1 = require("@backstage/integration");
 const backstage_plugin_litellm_backend_1 = require("@acarmisc/backstage-plugin-litellm-backend");
 const stream_1 = require("./stream");
 const persona_1 = require("./persona");
 const types_1 = require("./types");
+/** How long a composed persona prompt is cached before it's re-fetched and
+ * re-expanded from source. Keeps message sends off the SCM hot path while
+ * still picking up prompt edits within a few minutes. */
+const PERSONA_PROMPT_TTL_MS = 5 * 60 * 1000;
 function readChatConfig(config) {
     return {
         baseUrl: config.getString('litellm.baseUrl'),
@@ -49,8 +54,11 @@ function readChatConfig(config) {
     };
 }
 async function createRouter(options) {
-    const { config, logger, auth, catalog, database } = options;
+    const { config, logger, auth, catalog, database, urlReader } = options;
     const chatConfig = readChatConfig(config);
+    const scm = integration_1.ScmIntegrations.fromConfig(config);
+    const promptDeps = { reader: urlReader, scm };
+    const promptCache = new Map();
     const userIdDomain = config.getOptionalString('litellm.userIdDomain');
     const masterKey = config.getString('litellm.masterKey');
     const dbClient = await database.getClient();
@@ -67,15 +75,26 @@ async function createRouter(options) {
     async function applyPersona(personaId, messages) {
         if (!personaId)
             return messages;
+        const cached = promptCache.get(personaId);
+        if (cached && cached.expiresAt > Date.now()) {
+            return [
+                { id: 'persona-system', role: 'system', content: cached.prompt },
+                ...messages,
+            ];
+        }
         const credentials = await auth.getOwnServiceCredentials();
         const entity = await catalog.getEntityByRef(personaId, { credentials });
         if (!entity || entity.spec?.type !== types_1.CHAT_PERSONA_TYPE) {
             throw Object.assign(new Error('invalid persona_id'), { status: 400 });
         }
-        const systemPrompt = (0, persona_1.resolveSystemPrompt)(entity);
+        const systemPrompt = await (0, persona_1.resolveSystemPrompt)(entity, promptDeps);
         if (!systemPrompt) {
             throw Object.assign(new Error('persona has no system prompt'), { status: 400 });
         }
+        promptCache.set(personaId, {
+            prompt: systemPrompt,
+            expiresAt: Date.now() + PERSONA_PROMPT_TTL_MS,
+        });
         return [{ id: 'persona-system', role: 'system', content: systemPrompt }, ...messages];
     }
     // LiteLLM-native endpoint (not OpenAI passthrough /v1/vector_stores).

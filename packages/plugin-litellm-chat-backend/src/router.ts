@@ -4,8 +4,10 @@ import {
   AuthService,
   DatabaseService,
   DiscoveryService,
+  UrlReaderService,
   resolvePackagePath,
 } from '@backstage/backend-plugin-api';
+import { ScmIntegrations } from '@backstage/integration';
 import { CatalogService } from '@backstage/plugin-catalog-node';
 import {
   resolveUserId,
@@ -31,7 +33,13 @@ export interface RouterOptions {
   discovery: DiscoveryService;
   catalog: CatalogService;
   database: DatabaseService;
+  urlReader: UrlReaderService;
 }
+
+/** How long a composed persona prompt is cached before it's re-fetched and
+ * re-expanded from source. Keeps message sends off the SCM hot path while
+ * still picking up prompt edits within a few minutes. */
+const PERSONA_PROMPT_TTL_MS = 5 * 60 * 1000;
 
 function readChatConfig(config: Config): LiteLLMChatConfig {
   return {
@@ -45,8 +53,11 @@ function readChatConfig(config: Config): LiteLLMChatConfig {
 }
 
 export async function createRouter(options: RouterOptions): Promise<Router> {
-  const { config, logger, auth, catalog, database } = options;
+  const { config, logger, auth, catalog, database, urlReader } = options;
   const chatConfig = readChatConfig(config);
+  const scm = ScmIntegrations.fromConfig(config);
+  const promptDeps = { reader: urlReader, scm };
+  const promptCache = new Map<string, { prompt: string; expiresAt: number }>();
   const userIdDomain = config.getOptionalString('litellm.userIdDomain');
   const masterKey = config.getString('litellm.masterKey');
 
@@ -70,15 +81,28 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
     messages: ChatMessage[],
   ): Promise<ChatMessage[]> {
     if (!personaId) return messages;
+
+    const cached = promptCache.get(personaId);
+    if (cached && cached.expiresAt > Date.now()) {
+      return [
+        { id: 'persona-system', role: 'system', content: cached.prompt },
+        ...messages,
+      ];
+    }
+
     const credentials = await auth.getOwnServiceCredentials();
     const entity = await catalog.getEntityByRef(personaId, { credentials });
     if (!entity || entity.spec?.type !== CHAT_PERSONA_TYPE) {
       throw Object.assign(new Error('invalid persona_id'), { status: 400 });
     }
-    const systemPrompt = resolveSystemPrompt(entity);
+    const systemPrompt = await resolveSystemPrompt(entity, promptDeps);
     if (!systemPrompt) {
       throw Object.assign(new Error('persona has no system prompt'), { status: 400 });
     }
+    promptCache.set(personaId, {
+      prompt: systemPrompt,
+      expiresAt: Date.now() + PERSONA_PROMPT_TTL_MS,
+    });
     return [{ id: 'persona-system', role: 'system', content: systemPrompt }, ...messages];
   }
 

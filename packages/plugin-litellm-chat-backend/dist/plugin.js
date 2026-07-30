@@ -16,9 +16,18 @@ exports.litellmChatPlugin = (0, backend_plugin_api_1.createBackendPlugin)({
                 discovery: backend_plugin_api_1.coreServices.discovery,
                 catalog: plugin_catalog_node_1.catalogServiceRef,
                 database: backend_plugin_api_1.coreServices.database,
+                urlReader: backend_plugin_api_1.coreServices.urlReader,
             },
-            async init({ httpRouter, config, logger, auth, discovery, catalog, database }) {
-                const router = await (0, router_1.createRouter)({ config, logger, auth, discovery, catalog, database });
+            async init({ httpRouter, config, logger, auth, discovery, catalog, database, urlReader }) {
+                const router = await (0, router_1.createRouter)({
+                    config,
+                    logger,
+                    auth,
+                    discovery,
+                    catalog,
+                    database,
+                    urlReader,
+                });
                 httpRouter.use(router);
             },
         });
