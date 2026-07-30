@@ -605,7 +605,7 @@ var init_PersonaPicker = __esm({
           alive = false;
         };
       }, [chatApi]);
-      return /* @__PURE__ */ React3.createElement(FormControl2, { size: "small", error: !!error, sx: { minWidth: 200 } }, /* @__PURE__ */ React3.createElement(InputLabel2, null, "Persona"), /* @__PURE__ */ React3.createElement(
+      return /* @__PURE__ */ React3.createElement(FormControl2, { size: "small", error: !!error, sx: { minWidth: 200 } }, /* @__PURE__ */ React3.createElement(InputLabel2, { shrink: true }, "Persona"), /* @__PURE__ */ React3.createElement(
         Select2,
         {
           value,
@@ -896,7 +896,10 @@ import {
   Typography as Typography8,
   Collapse,
   Tooltip as Tooltip2,
-  InputBase
+  InputBase,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon2 from "@mui/icons-material/Delete";
@@ -1048,24 +1051,33 @@ var init_ChatPage = __esm({
             }
           }
         ), /* @__PURE__ */ React9.createElement(ModelPicker, { value: model, onChange: setModel, defaultModel: config.defaultModel }), /* @__PURE__ */ React9.createElement(
-          VectorStorePicker,
+          Accordion,
           {
-            value: vectorStoreIds,
-            onChange: setVectorStoreIds,
-            defaultVectorStoreIds: config.defaultVectorStoreIds
-          }
-        ), /* @__PURE__ */ React9.createElement(
-          KeyPicker,
-          {
-            value: keyVal,
-            onChange: setKeyVal,
-            onDelete: () => {
-              if (chat.activeThread?.keyToken) {
-                chatApi.deleteChatKey(chat.activeThread.keyToken).catch(() => {
-                });
+            disableGutters: true,
+            variant: "outlined",
+            sx: { "&:before": { display: "none" } }
+          },
+          /* @__PURE__ */ React9.createElement(AccordionSummary, { expandIcon: /* @__PURE__ */ React9.createElement(ExpandMoreIcon, { fontSize: "small" }) }, /* @__PURE__ */ React9.createElement(Typography8, { variant: "body2", sx: { fontWeight: 500 } }, "Advanced")),
+          /* @__PURE__ */ React9.createElement(AccordionDetails, { sx: { display: "flex", flexDirection: "column", gap: 1.5 } }, /* @__PURE__ */ React9.createElement(
+            VectorStorePicker,
+            {
+              value: vectorStoreIds,
+              onChange: setVectorStoreIds,
+              defaultVectorStoreIds: config.defaultVectorStoreIds
+            }
+          ), /* @__PURE__ */ React9.createElement(
+            KeyPicker,
+            {
+              value: keyVal,
+              onChange: setKeyVal,
+              onDelete: () => {
+                if (chat.activeThread?.keyToken) {
+                  chatApi.deleteChatKey(chat.activeThread.keyToken).catch(() => {
+                  });
+                }
               }
             }
-          }
+          ))
         )))),
         /* @__PURE__ */ React9.createElement(Divider2, null),
         /* @__PURE__ */ React9.createElement(Box6, { sx: { p: 1.5 } }, /* @__PURE__ */ React9.createElement(
