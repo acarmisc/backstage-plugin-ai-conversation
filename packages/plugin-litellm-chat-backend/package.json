@@ -12,6 +12,11 @@
   "publishConfig": {
     "access": "public"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/acarmisc/plugin-litellm-chat"
+  },
+  "homepage": "https://github.com/acarmisc/plugin-litellm-chat#readme",
   "license": "Apache-2.0",
   "exports": {
     ".": {
