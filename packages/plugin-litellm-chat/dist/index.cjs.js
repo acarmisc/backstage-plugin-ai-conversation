@@ -185,14 +185,6 @@ var init_api = __esm({
         }
         return res.json();
       }
-      async listChatKeys() {
-        const res = await this.fetchApi.fetch(`${BASE_PATH}/chat/keys`);
-        if (!res.ok) {
-          const text = await res.text().catch(() => "");
-          throw new Error(`list keys ${res.status}: ${text}`);
-        }
-        return res.json();
-      }
       async getKeySpend(alias) {
         const res = await this.fetchApi.fetch(
           `${BASE_PATH}/chat/key/${encodeURIComponent(alias)}/spend`
@@ -781,48 +773,17 @@ var init_KeyPicker = __esm({
       const chatApi = (0, import_core_plugin_api5.useApi)(liteLlmChatApiRef);
       const [loading, setLoading] = (0, import_react6.useState)(false);
       const [error, setError] = (0, import_react6.useState)(null);
-      const [mode, setMode] = (0, import_react6.useState)("idle");
-      const [existingKeys, setExistingKeys] = (0, import_react6.useState)([]);
-      const [listLoading, setListLoading] = (0, import_react6.useState)(false);
-      const [listError, setListError] = (0, import_react6.useState)(null);
-      const [selectedAlias, setSelectedAlias] = (0, import_react6.useState)("");
-      const [pastedToken, setPastedToken] = (0, import_react6.useState)("");
       const handleGenerate = async () => {
         setLoading(true);
         setError(null);
         try {
           const keyInfo = await chatApi.mintChatKey();
           onChange({ alias: keyInfo.key_alias, token: keyInfo.key });
-          setMode("idle");
         } catch (err) {
           setError(err.message);
         } finally {
           setLoading(false);
         }
-      };
-      const loadExistingKeys = async () => {
-        setListLoading(true);
-        setListError(null);
-        try {
-          const keys = await chatApi.listChatKeys();
-          setExistingKeys(keys);
-        } catch (err) {
-          setListError(err.message);
-        } finally {
-          setListLoading(false);
-        }
-      };
-      (0, import_react6.useEffect)(() => {
-        if (mode === "existing") {
-          loadExistingKeys();
-        }
-      }, [mode]);
-      const handleUseExisting = () => {
-        if (!pastedToken.trim() || !selectedAlias) return;
-        onChange({ alias: selectedAlias, token: pastedToken.trim() });
-        setMode("idle");
-        setSelectedAlias("");
-        setPastedToken("");
       };
       const handleDelete = async () => {
         if (!value.token) return;
@@ -833,19 +794,10 @@ var init_KeyPicker = __esm({
         onDelete?.();
         onChange({ alias: "", token: "" });
       };
-      const formatExpiry = (expiresAt) => {
-        if (!expiresAt) return "no expiry";
-        const exp = new Date(expiresAt).getTime();
-        if (Number.isNaN(exp)) return "unknown";
-        const hours = Math.round((exp - Date.now()) / 36e5);
-        if (hours <= 0) return "expired";
-        if (hours < 24) return `${hours}h left`;
-        return `${Math.round(hours / 24)}d left`;
-      };
       if (value.token) {
         return /* @__PURE__ */ import_react6.default.createElement(import_material5.Box, { sx: { display: "flex", alignItems: "center", gap: 1, minWidth: 200 } }, /* @__PURE__ */ import_react6.default.createElement(import_VpnKey.default, { fontSize: "small", color: "success" }), /* @__PURE__ */ import_react6.default.createElement(import_material5.Typography, { variant: "body2", sx: { flex: 1, overflow: "hidden", textOverflow: "ellipsis" } }, value.alias || "chat key"), /* @__PURE__ */ import_react6.default.createElement(import_material5.Tooltip, { title: "Delete chat key" }, /* @__PURE__ */ import_react6.default.createElement(import_material5.IconButton, { edge: "end", size: "small", onClick: handleDelete }, /* @__PURE__ */ import_react6.default.createElement(import_Delete.default, { fontSize: "small" }))));
       }
-      return /* @__PURE__ */ import_react6.default.createElement(import_material5.Box, { sx: { minWidth: 200, display: "flex", flexDirection: "column", gap: 1 } }, mode === "idle" && /* @__PURE__ */ import_react6.default.createElement(import_material5.Box, { sx: { display: "flex", gap: 1, flexWrap: "wrap" } }, /* @__PURE__ */ import_react6.default.createElement(
+      return /* @__PURE__ */ import_react6.default.createElement(import_material5.Box, { sx: { minWidth: 200 } }, /* @__PURE__ */ import_react6.default.createElement(
         import_material5.Button,
         {
           size: "small",
@@ -854,52 +806,8 @@ var init_KeyPicker = __esm({
           onClick: handleGenerate,
           disabled: loading
         },
-        loading ? "Minting\u2026" : "Generate new key"
-      ), /* @__PURE__ */ import_react6.default.createElement(
-        import_material5.Button,
-        {
-          size: "small",
-          variant: "text",
-          onClick: () => setMode("existing")
-        },
-        "Use existing key"
-      )), mode === "existing" && /* @__PURE__ */ import_react6.default.createElement(import_material5.Box, { sx: { display: "flex", flexDirection: "column", gap: 1 } }, /* @__PURE__ */ import_react6.default.createElement(import_material5.Box, { sx: { display: "flex", alignItems: "center", gap: 0.5 } }, /* @__PURE__ */ import_react6.default.createElement(import_material5.Typography, { variant: "body2", sx: { flex: 1, fontWeight: 500 } }, "Use existing key"), /* @__PURE__ */ import_react6.default.createElement(import_material5.Button, { size: "small", onClick: () => setMode("idle"), sx: { minWidth: "auto" } }, "Back")), /* @__PURE__ */ import_react6.default.createElement(import_material5.Typography, { variant: "caption", color: "text.secondary" }, "Keys are stored hashed \u2014 paste the sk- token you saved when the key was created."), listLoading && /* @__PURE__ */ import_react6.default.createElement(import_material5.CircularProgress, { size: 16 }), listError && /* @__PURE__ */ import_react6.default.createElement(import_material5.Typography, { variant: "caption", color: "error" }, listError), !listLoading && !listError && existingKeys.length === 0 && /* @__PURE__ */ import_react6.default.createElement(import_material5.Typography, { variant: "caption", color: "text.secondary" }, "No non-expired chat keys found. Generate a new one instead."), existingKeys.length > 0 && /* @__PURE__ */ import_react6.default.createElement(import_react6.default.Fragment, null, /* @__PURE__ */ import_react6.default.createElement(import_material5.FormControl, { size: "small", fullWidth: true }, /* @__PURE__ */ import_react6.default.createElement(import_material5.InputLabel, null, "Select key"), /* @__PURE__ */ import_react6.default.createElement(
-        import_material5.Select,
-        {
-          value: selectedAlias,
-          label: "Select key",
-          onChange: (e) => setSelectedAlias(e.target.value)
-        },
-        existingKeys.map((k) => /* @__PURE__ */ import_react6.default.createElement(import_material5.MenuItem, { key: k.key_alias, value: k.key_alias }, /* @__PURE__ */ import_react6.default.createElement(import_material5.Box, { sx: { display: "flex", alignItems: "center", gap: 1, width: "100%" } }, /* @__PURE__ */ import_react6.default.createElement(import_material5.Typography, { variant: "body2", sx: { flex: 1, overflow: "hidden", textOverflow: "ellipsis" } }, k.key_alias), /* @__PURE__ */ import_react6.default.createElement(
-          import_material5.Chip,
-          {
-            size: "small",
-            label: formatExpiry(k.expires_at),
-            color: k.expires_at && new Date(k.expires_at).getTime() < Date.now() ? "error" : "default",
-            variant: "outlined"
-          }
-        ))))
-      )), /* @__PURE__ */ import_react6.default.createElement(
-        import_material5.TextField,
-        {
-          size: "small",
-          fullWidth: true,
-          label: "Paste sk- token",
-          placeholder: "sk-...",
-          value: pastedToken,
-          onChange: (e) => setPastedToken(e.target.value),
-          type: "password"
-        }
-      ), /* @__PURE__ */ import_react6.default.createElement(
-        import_material5.Button,
-        {
-          size: "small",
-          variant: "contained",
-          onClick: handleUseExisting,
-          disabled: !pastedToken.trim() || !selectedAlias
-        },
-        "Use this key"
-      ))), error && /* @__PURE__ */ import_react6.default.createElement(import_material5.Typography, { variant: "caption", color: "error" }, error));
+        loading ? "Minting\u2026" : "Generate chat key"
+      ), error && /* @__PURE__ */ import_react6.default.createElement(import_material5.Typography, { variant: "caption", color: "error", sx: { display: "block", mt: 0.5 } }, error));
     };
   }
 });

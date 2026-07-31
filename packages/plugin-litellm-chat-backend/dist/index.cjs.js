@@ -81492,37 +81492,6 @@ async function createRouter(options) {
       res.status(502).json({ error: err.message });
     }
   });
-  router.get("/chat/keys", async (req, res) => {
-    try {
-      const tokenEntityRef = await (0, import_backstage_plugin_litellm_backend.resolveUserId)(req, auth);
-      if (!tokenEntityRef) {
-        res.status(401).json({ error: "unauthenticated" });
-        return;
-      }
-      const userId = (0, import_backstage_plugin_litellm_backend.toLiteLLMUserId)(tokenEntityRef, userIdDomain);
-      const client = new import_backstage_plugin_litellm_backend.LiteLLMClient({ baseUrl: chatConfig.baseUrl, masterKey });
-      const allKeys = await client.listKeys(userId);
-      const now = Date.now();
-      const chatKeys = allKeys.filter((k) => {
-        if (!k.key_alias || !k.key_alias.startsWith("chat-")) return false;
-        if (k.expires_at) {
-          const exp = new Date(k.expires_at).getTime();
-          if (Number.isNaN(exp) || exp < now) return false;
-        }
-        return true;
-      }).map((k) => ({
-        key_alias: k.key_alias ?? "",
-        created_at: k.created_at,
-        expires_at: k.expires_at,
-        spend: k.spend,
-        max_budget: k.max_budget ?? null
-      }));
-      res.json(chatKeys);
-    } catch (err) {
-      logger.error("Failed to list chat keys", err);
-      res.status(502).json({ error: err.message });
-    }
-  });
   router.post("/chat/key", async (req, res) => {
     try {
       const tokenEntityRef = await (0, import_backstage_plugin_litellm_backend.resolveUserId)(req, auth);

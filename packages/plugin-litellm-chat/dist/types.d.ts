@@ -87,13 +87,6 @@ export interface KeySpend {
     spend: number;
     max_budget: number | null;
 }
-export interface ChatKeySummary {
-    key_alias: string;
-    created_at: string;
-    expires_at?: string;
-    spend: number;
-    max_budget: number | null;
-}
 export interface Thread {
     id: string;
     title: string;
