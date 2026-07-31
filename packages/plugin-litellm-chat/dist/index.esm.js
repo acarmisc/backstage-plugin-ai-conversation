@@ -163,6 +163,14 @@ var init_api = __esm({
         }
         return res.json();
       }
+      async listChatKeys() {
+        const res = await this.fetchApi.fetch(`${BASE_PATH}/chat/keys`);
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          throw new Error(`list keys ${res.status}: ${text}`);
+        }
+        return res.json();
+      }
       async getKeySpend(alias) {
         const res = await this.fetchApi.fetch(
           `${BASE_PATH}/chat/key/${encodeURIComponent(alias)}/spend`
@@ -248,6 +256,26 @@ function useChat(opts) {
     };
   }, [userId]);
   const activeThread = threads.find((t) => t.id === activeId) ?? null;
+  useEffect(() => {
+    if (!keyToken || activeId) return;
+    const thread = {
+      id: genId(),
+      title: "New chat",
+      messages: [],
+      model,
+      vectorStoreIds,
+      personaId,
+      customSystemPrompt,
+      keyAlias,
+      keyToken,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      totalTokens: 0,
+      lastTurnUsage: null
+    };
+    setThreads((prev) => [thread, ...prev]);
+    setActiveId(thread.id);
+  }, [keyToken, activeId]);
   const newThread = useCallback(() => {
     const thread = {
       id: genId(),
@@ -717,8 +745,21 @@ var init_PersonaHomepage = __esm({
 });
 
 // src/components/KeyPicker.tsx
-import React5, { useState as useState4 } from "react";
-import { Button, Box as Box3, Typography as Typography5, CircularProgress as CircularProgress2, Tooltip, IconButton } from "@mui/material";
+import React5, { useState as useState4, useEffect as useEffect4 } from "react";
+import {
+  Button,
+  Box as Box3,
+  Typography as Typography5,
+  CircularProgress as CircularProgress2,
+  Tooltip,
+  IconButton,
+  Select as Select3,
+  MenuItem as MenuItem3,
+  FormControl as FormControl3,
+  InputLabel as InputLabel3,
+  TextField as TextField2,
+  Chip as Chip3
+} from "@mui/material";
 import KeyIcon from "@mui/icons-material/VpnKey";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { useApi as useApi4 } from "@backstage/core-plugin-api";
@@ -731,17 +772,48 @@ var init_KeyPicker = __esm({
       const chatApi = useApi4(liteLlmChatApiRef);
       const [loading, setLoading] = useState4(false);
       const [error, setError] = useState4(null);
+      const [mode, setMode] = useState4("idle");
+      const [existingKeys, setExistingKeys] = useState4([]);
+      const [listLoading, setListLoading] = useState4(false);
+      const [listError, setListError] = useState4(null);
+      const [selectedAlias, setSelectedAlias] = useState4("");
+      const [pastedToken, setPastedToken] = useState4("");
       const handleGenerate = async () => {
         setLoading(true);
         setError(null);
         try {
           const keyInfo = await chatApi.mintChatKey();
           onChange({ alias: keyInfo.key_alias, token: keyInfo.key });
+          setMode("idle");
         } catch (err) {
           setError(err.message);
         } finally {
           setLoading(false);
         }
+      };
+      const loadExistingKeys = async () => {
+        setListLoading(true);
+        setListError(null);
+        try {
+          const keys = await chatApi.listChatKeys();
+          setExistingKeys(keys);
+        } catch (err) {
+          setListError(err.message);
+        } finally {
+          setListLoading(false);
+        }
+      };
+      useEffect4(() => {
+        if (mode === "existing") {
+          loadExistingKeys();
+        }
+      }, [mode]);
+      const handleUseExisting = () => {
+        if (!pastedToken.trim() || !selectedAlias) return;
+        onChange({ alias: selectedAlias, token: pastedToken.trim() });
+        setMode("idle");
+        setSelectedAlias("");
+        setPastedToken("");
       };
       const handleDelete = async () => {
         if (!value.token) return;
@@ -752,10 +824,19 @@ var init_KeyPicker = __esm({
         onDelete?.();
         onChange({ alias: "", token: "" });
       };
+      const formatExpiry = (expiresAt) => {
+        if (!expiresAt) return "no expiry";
+        const exp = new Date(expiresAt).getTime();
+        if (Number.isNaN(exp)) return "unknown";
+        const hours = Math.round((exp - Date.now()) / 36e5);
+        if (hours <= 0) return "expired";
+        if (hours < 24) return `${hours}h left`;
+        return `${Math.round(hours / 24)}d left`;
+      };
       if (value.token) {
         return /* @__PURE__ */ React5.createElement(Box3, { sx: { display: "flex", alignItems: "center", gap: 1, minWidth: 200 } }, /* @__PURE__ */ React5.createElement(KeyIcon, { fontSize: "small", color: "success" }), /* @__PURE__ */ React5.createElement(Typography5, { variant: "body2", sx: { flex: 1, overflow: "hidden", textOverflow: "ellipsis" } }, value.alias || "chat key"), /* @__PURE__ */ React5.createElement(Tooltip, { title: "Delete chat key" }, /* @__PURE__ */ React5.createElement(IconButton, { edge: "end", size: "small", onClick: handleDelete }, /* @__PURE__ */ React5.createElement(DeleteIcon, { fontSize: "small" }))));
       }
-      return /* @__PURE__ */ React5.createElement(Box3, { sx: { minWidth: 200 } }, /* @__PURE__ */ React5.createElement(
+      return /* @__PURE__ */ React5.createElement(Box3, { sx: { minWidth: 200, display: "flex", flexDirection: "column", gap: 1 } }, mode === "idle" && /* @__PURE__ */ React5.createElement(Box3, { sx: { display: "flex", gap: 1, flexWrap: "wrap" } }, /* @__PURE__ */ React5.createElement(
         Button,
         {
           size: "small",
@@ -764,8 +845,52 @@ var init_KeyPicker = __esm({
           onClick: handleGenerate,
           disabled: loading
         },
-        loading ? "Minting\u2026" : "Generate chat key"
-      ), error && /* @__PURE__ */ React5.createElement(Typography5, { variant: "caption", color: "error", sx: { display: "block", mt: 0.5 } }, error));
+        loading ? "Minting\u2026" : "Generate new key"
+      ), /* @__PURE__ */ React5.createElement(
+        Button,
+        {
+          size: "small",
+          variant: "text",
+          onClick: () => setMode("existing")
+        },
+        "Use existing key"
+      )), mode === "existing" && /* @__PURE__ */ React5.createElement(Box3, { sx: { display: "flex", flexDirection: "column", gap: 1 } }, /* @__PURE__ */ React5.createElement(Box3, { sx: { display: "flex", alignItems: "center", gap: 0.5 } }, /* @__PURE__ */ React5.createElement(Typography5, { variant: "body2", sx: { flex: 1, fontWeight: 500 } }, "Use existing key"), /* @__PURE__ */ React5.createElement(Button, { size: "small", onClick: () => setMode("idle"), sx: { minWidth: "auto" } }, "Back")), /* @__PURE__ */ React5.createElement(Typography5, { variant: "caption", color: "text.secondary" }, "Keys are stored hashed \u2014 paste the sk- token you saved when the key was created."), listLoading && /* @__PURE__ */ React5.createElement(CircularProgress2, { size: 16 }), listError && /* @__PURE__ */ React5.createElement(Typography5, { variant: "caption", color: "error" }, listError), !listLoading && !listError && existingKeys.length === 0 && /* @__PURE__ */ React5.createElement(Typography5, { variant: "caption", color: "text.secondary" }, "No non-expired chat keys found. Generate a new one instead."), existingKeys.length > 0 && /* @__PURE__ */ React5.createElement(React5.Fragment, null, /* @__PURE__ */ React5.createElement(FormControl3, { size: "small", fullWidth: true }, /* @__PURE__ */ React5.createElement(InputLabel3, null, "Select key"), /* @__PURE__ */ React5.createElement(
+        Select3,
+        {
+          value: selectedAlias,
+          label: "Select key",
+          onChange: (e) => setSelectedAlias(e.target.value)
+        },
+        existingKeys.map((k) => /* @__PURE__ */ React5.createElement(MenuItem3, { key: k.key_alias, value: k.key_alias }, /* @__PURE__ */ React5.createElement(Box3, { sx: { display: "flex", alignItems: "center", gap: 1, width: "100%" } }, /* @__PURE__ */ React5.createElement(Typography5, { variant: "body2", sx: { flex: 1, overflow: "hidden", textOverflow: "ellipsis" } }, k.key_alias), /* @__PURE__ */ React5.createElement(
+          Chip3,
+          {
+            size: "small",
+            label: formatExpiry(k.expires_at),
+            color: k.expires_at && new Date(k.expires_at).getTime() < Date.now() ? "error" : "default",
+            variant: "outlined"
+          }
+        ))))
+      )), /* @__PURE__ */ React5.createElement(
+        TextField2,
+        {
+          size: "small",
+          fullWidth: true,
+          label: "Paste sk- token",
+          placeholder: "sk-...",
+          value: pastedToken,
+          onChange: (e) => setPastedToken(e.target.value),
+          type: "password"
+        }
+      ), /* @__PURE__ */ React5.createElement(
+        Button,
+        {
+          size: "small",
+          variant: "contained",
+          onClick: handleUseExisting,
+          disabled: !pastedToken.trim() || !selectedAlias
+        },
+        "Use this key"
+      ))), error && /* @__PURE__ */ React5.createElement(Typography5, { variant: "caption", color: "error" }, error));
     };
   }
 });
@@ -902,13 +1027,13 @@ var init_ErrorBanner = __esm({
 
 // src/components/SourcesPanel.tsx
 import React8 from "react";
-import { Box as Box5, Chip as Chip3, Typography as Typography6 } from "@mui/material";
+import { Box as Box5, Chip as Chip4, Typography as Typography6 } from "@mui/material";
 var SourcesPanel;
 var init_SourcesPanel = __esm({
   "src/components/SourcesPanel.tsx"() {
     "use strict";
     SourcesPanel = ({ citations }) => {
-      return /* @__PURE__ */ React8.createElement(Box5, { sx: { p: 1.5 } }, /* @__PURE__ */ React8.createElement(Typography6, { variant: "overline", color: "text.secondary" }, "Sources"), citations.length === 0 ? /* @__PURE__ */ React8.createElement(Typography6, { variant: "body2", color: "text.secondary", sx: { mt: 0.5 } }, "No sources for the latest reply yet.") : citations.map((c, i) => /* @__PURE__ */ React8.createElement(Box5, { key: i, sx: { mt: 1.5 } }, /* @__PURE__ */ React8.createElement(Box5, { sx: { display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" } }, /* @__PURE__ */ React8.createElement(Typography6, { variant: "body2", fontWeight: 500 }, c.filename), /* @__PURE__ */ React8.createElement(Chip3, { size: "small", label: c.score.toFixed(3), color: "primary", variant: "outlined" })), /* @__PURE__ */ React8.createElement(
+      return /* @__PURE__ */ React8.createElement(Box5, { sx: { p: 1.5 } }, /* @__PURE__ */ React8.createElement(Typography6, { variant: "overline", color: "text.secondary" }, "Sources"), citations.length === 0 ? /* @__PURE__ */ React8.createElement(Typography6, { variant: "body2", color: "text.secondary", sx: { mt: 0.5 } }, "No sources for the latest reply yet.") : citations.map((c, i) => /* @__PURE__ */ React8.createElement(Box5, { key: i, sx: { mt: 1.5 } }, /* @__PURE__ */ React8.createElement(Box5, { sx: { display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" } }, /* @__PURE__ */ React8.createElement(Typography6, { variant: "body2", fontWeight: 500 }, c.filename), /* @__PURE__ */ React8.createElement(Chip4, { size: "small", label: c.score.toFixed(3), color: "primary", variant: "outlined" })), /* @__PURE__ */ React8.createElement(
         Typography6,
         {
           variant: "body2",
@@ -963,7 +1088,7 @@ var ChatPage_exports = {};
 __export(ChatPage_exports, {
   ChatPage: () => ChatPage
 });
-import React10, { useEffect as useEffect4, useState as useState5, useRef as useRef2 } from "react";
+import React10, { useEffect as useEffect5, useState as useState5, useRef as useRef2 } from "react";
 import {
   Box as Box7,
   Button as Button2,
@@ -977,7 +1102,7 @@ import {
   Collapse,
   Tooltip as Tooltip2,
   InputBase,
-  TextField as TextField2,
+  TextField as TextField3,
   Accordion,
   AccordionSummary,
   AccordionDetails
@@ -1033,7 +1158,7 @@ var init_ChatPage = __esm({
       const [personasError, setPersonasError] = useState5(null);
       const messagesEndRef = useRef2(null);
       const messagesContainerRef = useRef2(null);
-      useEffect4(() => {
+      useEffect5(() => {
         chatApi.getChatConfig().then(setConfig).catch((err) => setConfigError(err.message ?? "Failed to reach the chat backend"));
         chatApi.listPersonas().then(setPersonas).catch((err) => setPersonasError(err.message ?? "Failed to load personas")).finally(() => setPersonasLoading(false));
         identityApi.getCredentials().then((c) => setUserId(c.token ? "oidc" : "default")).catch(() => {
@@ -1050,7 +1175,7 @@ var init_ChatPage = __esm({
         topK: 5
       });
       const activeThreadId = chat.activeThread?.id ?? null;
-      useEffect4(() => {
+      useEffect5(() => {
         if (!chat.activeThread) return;
         setModel(chat.activeThread.model);
         setVectorStoreIds(chat.activeThread.vectorStoreIds);
@@ -1060,7 +1185,7 @@ var init_ChatPage = __esm({
       }, [activeThreadId]);
       const messages = chat.activeThread?.messages ?? [];
       const isStreaming = chat.isStreaming;
-      useEffect4(() => {
+      useEffect5(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
       }, [messages, isStreaming]);
       const handlePersonaChange = (id, persona) => {
@@ -1074,8 +1199,10 @@ var init_ChatPage = __esm({
         if (!input.trim() || !keyVal.token || isStreaming) return;
         if (!chat.activeThread) {
           chat.newThread();
+          requestAnimationFrame(() => chat.sendMessage(input.trim()));
+        } else {
+          chat.sendMessage(input.trim());
         }
-        chat.sendMessage(input.trim());
         setInput("");
       };
       const handleKeyDown = (e) => {
@@ -1144,7 +1271,7 @@ var init_ChatPage = __esm({
             onChange: handlePersonaChange
           }
         ), /* @__PURE__ */ React10.createElement(
-          TextField2,
+          TextField3,
           {
             label: "Custom system prompt",
             placeholder: personaId ? "Appended after the persona system prompt\u2026" : "Used as the system prompt (no persona selected)\u2026",

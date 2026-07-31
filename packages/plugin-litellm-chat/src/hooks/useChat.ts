@@ -115,6 +115,32 @@ export function useChat(opts: UseChatOptions): UseChatResult {
 
   const activeThread = threads.find(t => t.id === activeId) ?? null;
 
+  // Auto-create a ready-to-use thread when a key is available and no thread
+  // is active — so the user can start typing immediately without clicking
+  // "New chat". Fires on key generation, key selection, or after all threads
+  // are deleted.
+  useEffect(() => {
+    if (!keyToken || activeId) return;
+    const thread: Thread = {
+      id: genId(),
+      title: 'New chat',
+      messages: [],
+      model,
+      vectorStoreIds,
+      personaId,
+      customSystemPrompt,
+      keyAlias,
+      keyToken,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      totalTokens: 0,
+      lastTurnUsage: null,
+    };
+    setThreads(prev => [thread, ...prev]);
+    setActiveId(thread.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [keyToken, activeId]);
+
   const newThread = useCallback(() => {
     const thread: Thread = {
       id: genId(),

@@ -132,8 +132,12 @@ export const ChatPage: React.FC = () => {
     if (!input.trim() || !keyVal.token || isStreaming) return;
     if (!chat.activeThread) {
       chat.newThread();
+      // newThread() setState is async; defer sendMessage to the next tick
+      // so it sees the freshly created active thread.
+      requestAnimationFrame(() => chat.sendMessage(input.trim()));
+    } else {
+      chat.sendMessage(input.trim());
     }
-    chat.sendMessage(input.trim());
     setInput('');
   };
 

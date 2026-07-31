@@ -9,6 +9,7 @@ import type {
   ChatResult,
   ChatConfig,
   KeySpend,
+  ChatKeySummary,
 } from './types';
 
 export interface LiteLlmChatApiInterface {
@@ -23,6 +24,7 @@ export interface LiteLlmChatApiInterface {
   ): AbortController;
   chatCompletions(req: ChatRequest): Promise<ChatResult>;
   mintChatKey(opts?: { models?: string[]; max_budget?: number }): Promise<ChatKey>;
+  listChatKeys(): Promise<ChatKeySummary[]>;
   deleteChatKey(key: string): Promise<{ success: boolean }>;
   getKeySpend(alias: string): Promise<KeySpend | null>;
   sendFeedback(req: ChatFeedbackRequest): Promise<{ success: boolean }>;
@@ -209,6 +211,15 @@ export class LiteLlmChatApi implements LiteLlmChatApiInterface {
     if (!res.ok) {
       const text = await res.text().catch(() => '');
       throw new Error(`delete key ${res.status}: ${text}`);
+    }
+    return res.json();
+  }
+
+  async listChatKeys(): Promise<ChatKeySummary[]> {
+    const res = await this.fetchApi.fetch(`${BASE_PATH}/chat/keys`);
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`list keys ${res.status}: ${text}`);
     }
     return res.json();
   }
