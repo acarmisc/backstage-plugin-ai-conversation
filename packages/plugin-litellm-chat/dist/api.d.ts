@@ -1,10 +1,15 @@
 import { FetchApi } from '@backstage/core-plugin-api';
-import type { VectorStore, Persona, ChatRequest, ChatFeedbackRequest, ChatStreamChunk, ChatResult, ChatConfig, KeySpend, UrlContextPreview } from './types';
+import type { VectorStore, Persona, ChatRequest, ChatFeedbackRequest, ChatStreamChunk, ChatResult, ChatConfig, KeySpend, UrlContextPreview, FeedbackSummary, UsageSummaryRow } from './types';
 export interface LiteLlmChatApiInterface {
     listVectorStores(): Promise<VectorStore[]>;
     listPersonas(): Promise<Persona[]>;
     getChatConfig(): Promise<ChatConfig>;
     fetchUrlContext(url: string): Promise<UrlContextPreview>;
+    getFeedbackSummary(filters?: {
+        personaId?: string;
+        model?: string;
+    }): Promise<FeedbackSummary>;
+    getUsageSummary(groupBy: 'persona' | 'model', range?: string): Promise<UsageSummaryRow[]>;
     chatStream(req: ChatRequest, onToken: (chunk: ChatStreamChunk) => void, onDone: () => void, onError: (err: Error) => void): AbortController;
     chatCompletions(req: ChatRequest): Promise<ChatResult>;
     mintChatKey(opts?: {
@@ -33,6 +38,11 @@ export declare class LiteLlmChatApi implements LiteLlmChatApiInterface {
     listPersonas(): Promise<Persona[]>;
     getChatConfig(): Promise<ChatConfig>;
     fetchUrlContext(url: string): Promise<UrlContextPreview>;
+    getFeedbackSummary(filters?: {
+        personaId?: string;
+        model?: string;
+    }): Promise<FeedbackSummary>;
+    getUsageSummary(groupBy: 'persona' | 'model', range?: string): Promise<UsageSummaryRow[]>;
     chatStream(req: ChatRequest, onToken: (chunk: ChatStreamChunk) => void, onDone: () => void, onError: (err: Error) => void): AbortController;
     chatCompletions(req: ChatRequest): Promise<ChatResult>;
     mintChatKey(opts?: {

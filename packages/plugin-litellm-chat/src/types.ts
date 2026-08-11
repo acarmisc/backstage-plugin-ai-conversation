@@ -64,6 +64,10 @@ export interface ChatRequest {
   vector_store_ids?: string[];
   top_k?: number;
   user_key: string;
+  /** Thread id, logged server-side for usage analytics only (see
+   * chat_events / GET /usage/summary) — never used to reconstruct or
+   * persist message content. */
+  thread_id?: string;
   persona_id?: string;
   /** Free-text system prompt supplied by the user. Combined with the
    * persona's system prompt (if any) rather than replacing it. */
@@ -129,6 +133,16 @@ export interface ChatConfig {
 export interface KeySpend {
   spend: number;
   max_budget: number | null;
+}
+
+export interface FeedbackSummary {
+  up: number;
+  down: number;
+}
+
+export interface UsageSummaryRow {
+  key: string;
+  count: number;
 }
 
 export interface Thread {

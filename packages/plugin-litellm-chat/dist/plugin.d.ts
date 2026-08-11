@@ -49,4 +49,44 @@ export declare const litellmChatPlugin: import("@backstage/frontend-plugin-api")
             noHeader?: boolean;
         };
     }>;
+    "page:litellm-chat/analytics": import("@backstage/frontend-plugin-api").OverridableExtensionDefinition<{
+        kind: "page";
+        name: "analytics";
+        config: {
+            path: string | undefined;
+            title: string | undefined;
+        };
+        configInput: {
+            path?: string | undefined;
+            title?: string | undefined;
+        };
+        output: import("@backstage/frontend-plugin-api").ExtensionDataRef<string, "core.routing.path", {}> | import("@backstage/frontend-plugin-api").ExtensionDataRef<import("@backstage/frontend-plugin-api").RouteRef<import("@backstage/frontend-plugin-api").AnyRouteRefParams>, "core.routing.ref", {
+            optional: true;
+        }> | import("@backstage/frontend-plugin-api").ExtensionDataRef<React.JSX.Element, "core.reactElement", {}> | import("@backstage/frontend-plugin-api").ExtensionDataRef<string, "core.title", {
+            optional: true;
+        }> | import("@backstage/frontend-plugin-api").ExtensionDataRef<import("@backstage/frontend-plugin-api").IconElement, "core.icon", {
+            optional: true;
+        }>;
+        inputs: {
+            pages: import("@backstage/frontend-plugin-api").ExtensionInput<import("@backstage/frontend-plugin-api").ConfigurableExtensionDataRef<React.JSX.Element, "core.reactElement", {}> | import("@backstage/frontend-plugin-api").ConfigurableExtensionDataRef<string, "core.routing.path", {}> | import("@backstage/frontend-plugin-api").ConfigurableExtensionDataRef<import("@backstage/frontend-plugin-api").RouteRef<import("@backstage/frontend-plugin-api").AnyRouteRefParams>, "core.routing.ref", {
+                optional: true;
+            }> | import("@backstage/frontend-plugin-api").ConfigurableExtensionDataRef<string, "core.title", {
+                optional: true;
+            }> | import("@backstage/frontend-plugin-api").ConfigurableExtensionDataRef<import("@backstage/frontend-plugin-api").IconElement, "core.icon", {
+                optional: true;
+            }>, {
+                singleton: false;
+                optional: false;
+                internal: false;
+            }>;
+        };
+        params: {
+            path: string;
+            title?: string;
+            icon?: import("@backstage/frontend-plugin-api").IconElement;
+            loader?: () => Promise<React.JSX.Element>;
+            routeRef?: import("@backstage/frontend-plugin-api").RouteRef;
+            noHeader?: boolean;
+        };
+    }>;
 }>;

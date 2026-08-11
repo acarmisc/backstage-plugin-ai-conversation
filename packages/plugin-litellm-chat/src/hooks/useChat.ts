@@ -233,6 +233,7 @@ export function useChat(opts: UseChatOptions): UseChatResult {
         {
           model: reqModel,
           messages: reqMessages,
+          thread_id: threadId,
           vector_store_ids: vectorStoreIds.length ? vectorStoreIds : undefined,
           persona_id: personaId || undefined,
           custom_system_prompt: customSystemPrompt || undefined,

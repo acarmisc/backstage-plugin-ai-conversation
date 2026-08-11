@@ -107,6 +107,21 @@ var init_api = __esm({
         }
         return res.json();
       }
+      async getFeedbackSummary(filters) {
+        const params = new URLSearchParams();
+        if (filters?.personaId) params.set("personaId", filters.personaId);
+        if (filters?.model) params.set("model", filters.model);
+        const qs = params.toString();
+        const res = await this.fetchApi.fetch(`${BASE_PATH}/feedback/summary${qs ? `?${qs}` : ""}`);
+        if (!res.ok) throw new Error(`feedback/summary ${res.status}`);
+        return res.json();
+      }
+      async getUsageSummary(groupBy, range = "30d") {
+        const params = new URLSearchParams({ groupBy, range });
+        const res = await this.fetchApi.fetch(`${BASE_PATH}/usage/summary?${params.toString()}`);
+        if (!res.ok) throw new Error(`usage/summary ${res.status}`);
+        return res.json();
+      }
       chatStream(req, onToken, onDone, onError) {
         const controller = new AbortController();
         (async () => {
@@ -360,6 +375,7 @@ function useChat(opts) {
         {
           model: reqModel,
           messages: reqMessages,
+          thread_id: threadId,
           vector_store_ids: vectorStoreIds.length ? vectorStoreIds : void 0,
           persona_id: personaId || void 0,
           custom_system_prompt: customSystemPrompt || void 0,
@@ -2227,9 +2243,91 @@ var init_ChatPage = __esm({
   }
 });
 
+// src/components/BarList.tsx
+var import_react17, import_material16, BarList;
+var init_BarList = __esm({
+  "src/components/BarList.tsx"() {
+    "use strict";
+    import_react17 = __toESM(require("react"));
+    import_material16 = require("@mui/material");
+    BarList = ({ rows, emptyLabel = "No data yet." }) => {
+      if (rows.length === 0) {
+        return /* @__PURE__ */ import_react17.default.createElement(import_material16.Typography, { variant: "body2", color: "text.secondary" }, emptyLabel);
+      }
+      const max = Math.max(...rows.map((r) => r.count), 1);
+      return /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { display: "flex", flexDirection: "column", gap: 1 } }, rows.map((row) => /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { key: row.key, sx: { display: "flex", alignItems: "center", gap: 1 } }, /* @__PURE__ */ import_react17.default.createElement(import_material16.Typography, { variant: "body2", sx: { width: 180, flexShrink: 0 }, noWrap: true, title: row.key }, row.key), /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { flex: 1, bgcolor: "action.hover", borderRadius: 1, overflow: "hidden", height: 18 } }, /* @__PURE__ */ import_react17.default.createElement(
+        import_material16.Box,
+        {
+          sx: {
+            width: `${row.count / max * 100}%`,
+            height: "100%",
+            bgcolor: "primary.main",
+            borderRadius: 1
+          }
+        }
+      )), /* @__PURE__ */ import_react17.default.createElement(import_material16.Typography, { variant: "body2", sx: { width: 40, textAlign: "right", flexShrink: 0 } }, row.count))));
+    };
+  }
+});
+
+// src/components/AnalyticsPage.tsx
+var AnalyticsPage_exports = {};
+__export(AnalyticsPage_exports, {
+  AnalyticsPage: () => AnalyticsPage
+});
+var import_react18, import_material17, import_core_plugin_api8, RANGES, AnalyticsPage;
+var init_AnalyticsPage = __esm({
+  "src/components/AnalyticsPage.tsx"() {
+    "use strict";
+    import_react18 = __toESM(require("react"));
+    import_material17 = require("@mui/material");
+    import_core_plugin_api8 = require("@backstage/core-plugin-api");
+    init_api();
+    init_BarList();
+    RANGES = [
+      { value: "24h", label: "Last 24 hours" },
+      { value: "7d", label: "Last 7 days" },
+      { value: "30d", label: "Last 30 days" },
+      { value: "all", label: "All time" }
+    ];
+    AnalyticsPage = () => {
+      const chatApi = (0, import_core_plugin_api8.useApi)(liteLlmChatApiRef);
+      const [range, setRange] = (0, import_react18.useState)("30d");
+      const [byPersona, setByPersona] = (0, import_react18.useState)([]);
+      const [byModel, setByModel] = (0, import_react18.useState)([]);
+      const [feedback, setFeedback] = (0, import_react18.useState)(null);
+      const [error, setError] = (0, import_react18.useState)(null);
+      const [loading, setLoading] = (0, import_react18.useState)(true);
+      (0, import_react18.useEffect)(() => {
+        let alive = true;
+        setLoading(true);
+        setError(null);
+        Promise.all([
+          chatApi.getUsageSummary("persona", range),
+          chatApi.getUsageSummary("model", range),
+          chatApi.getFeedbackSummary()
+        ]).then(([persona, model, fb]) => {
+          if (!alive) return;
+          setByPersona(persona);
+          setByModel(model);
+          setFeedback(fb);
+        }).catch((err) => {
+          if (alive) setError(err.message ?? "Failed to load analytics");
+        }).finally(() => alive && setLoading(false));
+        return () => {
+          alive = false;
+        };
+      }, [chatApi, range]);
+      const feedbackRows = feedback ? [{ key: "\u{1F44D} up", count: feedback.up }, { key: "\u{1F44E} down", count: feedback.down }] : [];
+      return /* @__PURE__ */ import_react18.default.createElement(import_material17.Box, { sx: { p: 3, maxWidth: 900, mx: "auto" } }, /* @__PURE__ */ import_react18.default.createElement(import_material17.Box, { sx: { display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 } }, /* @__PURE__ */ import_react18.default.createElement(import_material17.Typography, { variant: "h5" }, "AI Chat analytics"), /* @__PURE__ */ import_react18.default.createElement(import_material17.Select, { size: "small", value: range, onChange: (e) => setRange(e.target.value) }, RANGES.map((r) => /* @__PURE__ */ import_react18.default.createElement(import_material17.MenuItem, { key: r.value, value: r.value }, r.label)))), error && /* @__PURE__ */ import_react18.default.createElement(import_material17.Alert, { severity: "error", sx: { mb: 2 } }, error), /* @__PURE__ */ import_react18.default.createElement(import_material17.Box, { sx: { display: "flex", flexDirection: "column", gap: 2 } }, /* @__PURE__ */ import_react18.default.createElement(import_material17.Paper, { variant: "outlined", sx: { p: 2 } }, /* @__PURE__ */ import_react18.default.createElement(import_material17.Typography, { variant: "subtitle1", sx: { mb: 1.5 } }, "Turns by persona"), /* @__PURE__ */ import_react18.default.createElement(BarList, { rows: byPersona, emptyLabel: loading ? "Loading\u2026" : "No chat turns in this range." })), /* @__PURE__ */ import_react18.default.createElement(import_material17.Paper, { variant: "outlined", sx: { p: 2 } }, /* @__PURE__ */ import_react18.default.createElement(import_material17.Typography, { variant: "subtitle1", sx: { mb: 1.5 } }, "Turns by model"), /* @__PURE__ */ import_react18.default.createElement(BarList, { rows: byModel, emptyLabel: loading ? "Loading\u2026" : "No chat turns in this range." })), /* @__PURE__ */ import_react18.default.createElement(import_material17.Paper, { variant: "outlined", sx: { p: 2 } }, /* @__PURE__ */ import_react18.default.createElement(import_material17.Typography, { variant: "subtitle1", sx: { mb: 1.5 } }, "Feedback (all time)"), /* @__PURE__ */ import_react18.default.createElement(BarList, { rows: feedbackRows, emptyLabel: loading ? "Loading\u2026" : "No feedback recorded yet." }))));
+    };
+  }
+});
+
 // src/index.ts
 var index_exports = {};
 __export(index_exports, {
+  AnalyticsPage: () => AnalyticsPage,
   ChatPage: () => ChatPage,
   LiteLlmChatApi: () => LiteLlmChatApi,
   liteLlmChatApiRef: () => liteLlmChatApiRef,
@@ -2238,7 +2336,7 @@ __export(index_exports, {
 module.exports = __toCommonJS(index_exports);
 
 // src/plugin.tsx
-var import_react17 = __toESM(require("react"));
+var import_react19 = __toESM(require("react"));
 var import_icons_material = require("@mui/icons-material");
 var import_frontend_plugin_api = require("@backstage/frontend-plugin-api");
 init_api();
@@ -2253,19 +2351,32 @@ var chatPage = import_frontend_plugin_api.PageBlueprint.make({
   params: {
     path: "/ai-chat",
     title: "AI Chat",
-    icon: /* @__PURE__ */ import_react17.default.createElement(import_icons_material.Chat, null),
+    icon: /* @__PURE__ */ import_react19.default.createElement(import_icons_material.Chat, null),
     loader: async () => {
       const { ChatPage: ChatPage2 } = await Promise.resolve().then(() => (init_ChatPage(), ChatPage_exports));
-      return /* @__PURE__ */ import_react17.default.createElement(ChatPage2, null);
+      return /* @__PURE__ */ import_react19.default.createElement(ChatPage2, null);
+    }
+  }
+});
+var analyticsPage = import_frontend_plugin_api.PageBlueprint.make({
+  name: "analytics",
+  params: {
+    path: "/ai-chat/analytics",
+    title: "AI Chat Analytics",
+    icon: /* @__PURE__ */ import_react19.default.createElement(import_icons_material.BarChart, null),
+    loader: async () => {
+      const { AnalyticsPage: AnalyticsPage2 } = await Promise.resolve().then(() => (init_AnalyticsPage(), AnalyticsPage_exports));
+      return /* @__PURE__ */ import_react19.default.createElement(AnalyticsPage2, null);
     }
   }
 });
 var litellmChatPlugin = (0, import_frontend_plugin_api.createFrontendPlugin)({
   pluginId: "litellm-chat",
-  extensions: [liteLlmChatApi, chatPage]
+  extensions: [liteLlmChatApi, chatPage, analyticsPage]
 });
 
 // src/index.ts
 init_ChatPage();
+init_AnalyticsPage();
 init_api();
 //# sourceMappingURL=index.cjs.js.map
