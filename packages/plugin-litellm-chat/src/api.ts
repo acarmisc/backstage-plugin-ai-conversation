@@ -10,6 +10,8 @@ import type {
   ChatConfig,
   KeySpend,
   UrlContextPreview,
+  FeedbackSummary,
+  UsageSummaryRow,
 } from './types';
 
 export interface LiteLlmChatApiInterface {
@@ -17,6 +19,8 @@ export interface LiteLlmChatApiInterface {
   listPersonas(): Promise<Persona[]>;
   getChatConfig(): Promise<ChatConfig>;
   fetchUrlContext(url: string): Promise<UrlContextPreview>;
+  getFeedbackSummary(filters?: { personaId?: string; model?: string }): Promise<FeedbackSummary>;
+  getUsageSummary(groupBy: 'persona' | 'model', range?: string): Promise<UsageSummaryRow[]>;
   chatStream(
     req: ChatRequest,
     onToken: (chunk: ChatStreamChunk) => void,
@@ -116,6 +120,23 @@ export class LiteLlmChatApi implements LiteLlmChatApiInterface {
       const data = await res.json().catch(() => ({}));
       throw new Error(data.error ?? `fetch-context ${res.status}`);
     }
+    return res.json();
+  }
+
+  async getFeedbackSummary(filters?: { personaId?: string; model?: string }): Promise<FeedbackSummary> {
+    const params = new URLSearchParams();
+    if (filters?.personaId) params.set('personaId', filters.personaId);
+    if (filters?.model) params.set('model', filters.model);
+    const qs = params.toString();
+    const res = await this.fetchApi.fetch(`${BASE_PATH}/feedback/summary${qs ? `?${qs}` : ''}`);
+    if (!res.ok) throw new Error(`feedback/summary ${res.status}`);
+    return res.json();
+  }
+
+  async getUsageSummary(groupBy: 'persona' | 'model', range = '30d'): Promise<UsageSummaryRow[]> {
+    const params = new URLSearchParams({ groupBy, range });
+    const res = await this.fetchApi.fetch(`${BASE_PATH}/usage/summary?${params.toString()}`);
+    if (!res.ok) throw new Error(`usage/summary ${res.status}`);
     return res.json();
   }
 

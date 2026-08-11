@@ -51,6 +51,10 @@ export interface ChatStreamRequest {
   vector_store_ids?: string[];
   top_k?: number;
   user_key: string;
+  /** Thread id, logged server-side for usage analytics only — see
+   * chat_events / GET /usage/summary. Never used to reconstruct or persist
+   * message content. */
+  thread_id?: string;
   /** Catalog entity ref of a chat-persona, e.g. "component:default/oo-business-analyst". */
   persona_id?: string;
   /** Free-text system prompt supplied by the user. Combined with the
@@ -104,6 +108,16 @@ export interface ChatStreamChunk {
 export interface ChatResult {
   content: string;
   citations: Array<{ filename: string; score: number; snippet: string }>;
+}
+
+export interface FeedbackSummary {
+  up: number;
+  down: number;
+}
+
+export interface UsageSummaryRow {
+  key: string;
+  count: number;
 }
 
 export interface LiteLLMChatConfig {

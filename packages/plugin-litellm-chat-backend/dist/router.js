@@ -55,6 +55,19 @@ function readChatConfig(config) {
         fetchContextMaxChars: config.getOptionalNumber('litellm.chat.fetchContext.maxChars'),
     };
 }
+/** Parses a `range` query param like "24h"/"7d"/"30d"/"all" into a cutoff
+ * Date, defaulting to 30d for anything unrecognized. `null` means no
+ * cutoff (all time). */
+function rangeToCutoff(range) {
+    if (range === 'all')
+        return null;
+    const match = /^(\d+)([hd])$/.exec(range);
+    if (!match)
+        return rangeToCutoff('30d');
+    const amount = Number(match[1]);
+    const ms = match[2] === 'h' ? amount * 3600000 : amount * 86400000;
+    return new Date(Date.now() - ms);
+}
 async function createRouter(options) {
     const { config, logger, auth, catalog, database, urlReader } = options;
     const chatConfig = readChatConfig(config);
@@ -145,6 +158,20 @@ async function createRouter(options) {
             fetched.text,
         ].join('\n');
         return [{ id: 'url-context', role: 'system', content }, ...messages];
+    }
+    // Best-effort usage log for the analytics dashboard (phase15) — one row
+    // per chat turn, not the message content itself. Never blocks or fails
+    // the chat request: a logging hiccup shouldn't break the user's turn.
+    function recordChatEvent(fields) {
+        dbClient('chat_events')
+            .insert({
+            thread_id: fields.threadId,
+            user_ref: fields.userRef,
+            model: fields.model,
+            persona_id: fields.personaId ?? null,
+            grounded: fields.grounded,
+        })
+            .catch(err => logger.debug(`Failed to record chat_events row: ${err.message}`));
     }
     // LiteLLM-native endpoint (not OpenAI passthrough /v1/vector_stores).
     async function fetchVectorStores() {
@@ -374,6 +401,68 @@ async function createRouter(options) {
             res.status(500).json({ error: err.message });
         }
     });
+    // Aggregate feedback counts for the analytics dashboard (phase15) — no
+    // per-user breakdown, just up/down totals, optionally filtered.
+    router.get('/feedback/summary', async (req, res) => {
+        try {
+            const tokenEntityRef = await (0, backstage_plugin_litellm_backend_1.resolveUserId)(req, auth);
+            if (!tokenEntityRef) {
+                res.status(401).json({ error: 'unauthenticated' });
+                return;
+            }
+            let query = dbClient('chat_message_feedback');
+            if (typeof req.query.personaId === 'string') {
+                query = query.where('persona_id', req.query.personaId);
+            }
+            if (typeof req.query.model === 'string') {
+                query = query.where('model', req.query.model);
+            }
+            const rows = await query
+                .select('vote')
+                .count({ count: '*' })
+                .groupBy('vote');
+            const summary = { up: 0, down: 0 };
+            rows.forEach(r => {
+                if (r.vote === 'up')
+                    summary.up = Number(r.count);
+                if (r.vote === 'down')
+                    summary.down = Number(r.count);
+            });
+            res.json(summary);
+        }
+        catch (err) {
+            logger.error('Failed to summarize feedback', err);
+            res.status(500).json({ error: err.message });
+        }
+    });
+    // Turn counts grouped by persona or model, from chat_events (phase15).
+    router.get('/usage/summary', async (req, res) => {
+        try {
+            const tokenEntityRef = await (0, backstage_plugin_litellm_backend_1.resolveUserId)(req, auth);
+            if (!tokenEntityRef) {
+                res.status(401).json({ error: 'unauthenticated' });
+                return;
+            }
+            const groupBy = req.query.groupBy === 'model' ? 'model' : 'persona_id';
+            const range = typeof req.query.range === 'string' ? req.query.range : '30d';
+            const cutoff = rangeToCutoff(range);
+            let query = dbClient('chat_events').select(groupBy).count({ count: '*' }).groupBy(groupBy);
+            if (cutoff)
+                query = query.where('created_at', '>=', cutoff);
+            const rows = await query;
+            const summary = rows
+                .map(r => ({
+                key: String(r[groupBy] ?? 'none'),
+                count: Number(r.count),
+            }))
+                .sort((a, b) => b.count - a.count);
+            res.json(summary);
+        }
+        catch (err) {
+            logger.error('Failed to summarize usage', err);
+            res.status(500).json({ error: err.message });
+        }
+    });
     router.post('/chat/completions', async (req, res) => {
         try {
             const body = req.body;
@@ -391,6 +480,13 @@ async function createRouter(options) {
             // Resolve to confirm identity — LiteLLM auth uses the user_key, but
             // resolving the user_id validates the Backstage token.
             (0, backstage_plugin_litellm_backend_1.toLiteLLMUserId)(tokenEntityRef, userIdDomain);
+            recordChatEvent({
+                threadId: body.thread_id ?? '',
+                userRef: tokenEntityRef,
+                model: body.model,
+                personaId: body.persona_id,
+                grounded: !!body.vector_store_ids?.length,
+            });
             let messages = await applyPersona(body.persona_id, body.custom_system_prompt, body.messages);
             messages = await applyUrlContext(body.context_url, messages);
             const payload = {
@@ -440,6 +536,13 @@ async function createRouter(options) {
                 return;
             }
             (0, backstage_plugin_litellm_backend_1.toLiteLLMUserId)(tokenEntityRef, userIdDomain);
+            recordChatEvent({
+                threadId: body.thread_id ?? '',
+                userRef: tokenEntityRef,
+                model: body.model,
+                personaId: body.persona_id,
+                grounded: !!body.vector_store_ids?.length,
+            });
             let messages = await applyPersona(body.persona_id, body.custom_system_prompt, body.messages);
             messages = await applyUrlContext(body.context_url, messages);
             const base = chatConfig.baseUrl;

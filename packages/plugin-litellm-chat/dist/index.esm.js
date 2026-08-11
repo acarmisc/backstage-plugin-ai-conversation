@@ -85,6 +85,21 @@ var init_api = __esm({
         }
         return res.json();
       }
+      async getFeedbackSummary(filters) {
+        const params = new URLSearchParams();
+        if (filters?.personaId) params.set("personaId", filters.personaId);
+        if (filters?.model) params.set("model", filters.model);
+        const qs = params.toString();
+        const res = await this.fetchApi.fetch(`${BASE_PATH}/feedback/summary${qs ? `?${qs}` : ""}`);
+        if (!res.ok) throw new Error(`feedback/summary ${res.status}`);
+        return res.json();
+      }
+      async getUsageSummary(groupBy, range = "30d") {
+        const params = new URLSearchParams({ groupBy, range });
+        const res = await this.fetchApi.fetch(`${BASE_PATH}/usage/summary?${params.toString()}`);
+        if (!res.ok) throw new Error(`usage/summary ${res.status}`);
+        return res.json();
+      }
       chatStream(req, onToken, onDone, onError) {
         const controller = new AbortController();
         (async () => {
@@ -340,6 +355,7 @@ function useChat(opts) {
         {
           model: reqModel,
           messages: reqMessages,
+          thread_id: threadId,
           vector_store_ids: vectorStoreIds.length ? vectorStoreIds : void 0,
           persona_id: personaId || void 0,
           custom_system_prompt: customSystemPrompt || void 0,
@@ -2228,10 +2244,91 @@ var init_ChatPage = __esm({
   }
 });
 
+// src/components/BarList.tsx
+import React16 from "react";
+import { Box as Box13, Typography as Typography11 } from "@mui/material";
+var BarList;
+var init_BarList = __esm({
+  "src/components/BarList.tsx"() {
+    "use strict";
+    BarList = ({ rows, emptyLabel = "No data yet." }) => {
+      if (rows.length === 0) {
+        return /* @__PURE__ */ React16.createElement(Typography11, { variant: "body2", color: "text.secondary" }, emptyLabel);
+      }
+      const max = Math.max(...rows.map((r) => r.count), 1);
+      return /* @__PURE__ */ React16.createElement(Box13, { sx: { display: "flex", flexDirection: "column", gap: 1 } }, rows.map((row) => /* @__PURE__ */ React16.createElement(Box13, { key: row.key, sx: { display: "flex", alignItems: "center", gap: 1 } }, /* @__PURE__ */ React16.createElement(Typography11, { variant: "body2", sx: { width: 180, flexShrink: 0 }, noWrap: true, title: row.key }, row.key), /* @__PURE__ */ React16.createElement(Box13, { sx: { flex: 1, bgcolor: "action.hover", borderRadius: 1, overflow: "hidden", height: 18 } }, /* @__PURE__ */ React16.createElement(
+        Box13,
+        {
+          sx: {
+            width: `${row.count / max * 100}%`,
+            height: "100%",
+            bgcolor: "primary.main",
+            borderRadius: 1
+          }
+        }
+      )), /* @__PURE__ */ React16.createElement(Typography11, { variant: "body2", sx: { width: 40, textAlign: "right", flexShrink: 0 } }, row.count))));
+    };
+  }
+});
+
+// src/components/AnalyticsPage.tsx
+var AnalyticsPage_exports = {};
+__export(AnalyticsPage_exports, {
+  AnalyticsPage: () => AnalyticsPage
+});
+import React17, { useEffect as useEffect6, useState as useState10 } from "react";
+import { Box as Box14, Paper, Select as Select3, MenuItem as MenuItem4, Typography as Typography12, Alert as Alert2 } from "@mui/material";
+import { useApi as useApi7 } from "@backstage/core-plugin-api";
+var RANGES, AnalyticsPage;
+var init_AnalyticsPage = __esm({
+  "src/components/AnalyticsPage.tsx"() {
+    "use strict";
+    init_api();
+    init_BarList();
+    RANGES = [
+      { value: "24h", label: "Last 24 hours" },
+      { value: "7d", label: "Last 7 days" },
+      { value: "30d", label: "Last 30 days" },
+      { value: "all", label: "All time" }
+    ];
+    AnalyticsPage = () => {
+      const chatApi = useApi7(liteLlmChatApiRef);
+      const [range, setRange] = useState10("30d");
+      const [byPersona, setByPersona] = useState10([]);
+      const [byModel, setByModel] = useState10([]);
+      const [feedback, setFeedback] = useState10(null);
+      const [error, setError] = useState10(null);
+      const [loading, setLoading] = useState10(true);
+      useEffect6(() => {
+        let alive = true;
+        setLoading(true);
+        setError(null);
+        Promise.all([
+          chatApi.getUsageSummary("persona", range),
+          chatApi.getUsageSummary("model", range),
+          chatApi.getFeedbackSummary()
+        ]).then(([persona, model, fb]) => {
+          if (!alive) return;
+          setByPersona(persona);
+          setByModel(model);
+          setFeedback(fb);
+        }).catch((err) => {
+          if (alive) setError(err.message ?? "Failed to load analytics");
+        }).finally(() => alive && setLoading(false));
+        return () => {
+          alive = false;
+        };
+      }, [chatApi, range]);
+      const feedbackRows = feedback ? [{ key: "\u{1F44D} up", count: feedback.up }, { key: "\u{1F44E} down", count: feedback.down }] : [];
+      return /* @__PURE__ */ React17.createElement(Box14, { sx: { p: 3, maxWidth: 900, mx: "auto" } }, /* @__PURE__ */ React17.createElement(Box14, { sx: { display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 } }, /* @__PURE__ */ React17.createElement(Typography12, { variant: "h5" }, "AI Chat analytics"), /* @__PURE__ */ React17.createElement(Select3, { size: "small", value: range, onChange: (e) => setRange(e.target.value) }, RANGES.map((r) => /* @__PURE__ */ React17.createElement(MenuItem4, { key: r.value, value: r.value }, r.label)))), error && /* @__PURE__ */ React17.createElement(Alert2, { severity: "error", sx: { mb: 2 } }, error), /* @__PURE__ */ React17.createElement(Box14, { sx: { display: "flex", flexDirection: "column", gap: 2 } }, /* @__PURE__ */ React17.createElement(Paper, { variant: "outlined", sx: { p: 2 } }, /* @__PURE__ */ React17.createElement(Typography12, { variant: "subtitle1", sx: { mb: 1.5 } }, "Turns by persona"), /* @__PURE__ */ React17.createElement(BarList, { rows: byPersona, emptyLabel: loading ? "Loading\u2026" : "No chat turns in this range." })), /* @__PURE__ */ React17.createElement(Paper, { variant: "outlined", sx: { p: 2 } }, /* @__PURE__ */ React17.createElement(Typography12, { variant: "subtitle1", sx: { mb: 1.5 } }, "Turns by model"), /* @__PURE__ */ React17.createElement(BarList, { rows: byModel, emptyLabel: loading ? "Loading\u2026" : "No chat turns in this range." })), /* @__PURE__ */ React17.createElement(Paper, { variant: "outlined", sx: { p: 2 } }, /* @__PURE__ */ React17.createElement(Typography12, { variant: "subtitle1", sx: { mb: 1.5 } }, "Feedback (all time)"), /* @__PURE__ */ React17.createElement(BarList, { rows: feedbackRows, emptyLabel: loading ? "Loading\u2026" : "No feedback recorded yet." }))));
+    };
+  }
+});
+
 // src/plugin.tsx
 init_api();
-import React16 from "react";
-import { Chat as ChatIcon2 } from "@mui/icons-material";
+import React18 from "react";
+import { Chat as ChatIcon2, BarChart as BarChartIcon } from "@mui/icons-material";
 import {
   createFrontendPlugin,
   ApiBlueprint,
@@ -2249,22 +2346,36 @@ var chatPage = PageBlueprint.make({
   params: {
     path: "/ai-chat",
     title: "AI Chat",
-    icon: /* @__PURE__ */ React16.createElement(ChatIcon2, null),
+    icon: /* @__PURE__ */ React18.createElement(ChatIcon2, null),
     loader: async () => {
       const { ChatPage: ChatPage2 } = await Promise.resolve().then(() => (init_ChatPage(), ChatPage_exports));
-      return /* @__PURE__ */ React16.createElement(ChatPage2, null);
+      return /* @__PURE__ */ React18.createElement(ChatPage2, null);
+    }
+  }
+});
+var analyticsPage = PageBlueprint.make({
+  name: "analytics",
+  params: {
+    path: "/ai-chat/analytics",
+    title: "AI Chat Analytics",
+    icon: /* @__PURE__ */ React18.createElement(BarChartIcon, null),
+    loader: async () => {
+      const { AnalyticsPage: AnalyticsPage2 } = await Promise.resolve().then(() => (init_AnalyticsPage(), AnalyticsPage_exports));
+      return /* @__PURE__ */ React18.createElement(AnalyticsPage2, null);
     }
   }
 });
 var litellmChatPlugin = createFrontendPlugin({
   pluginId: "litellm-chat",
-  extensions: [liteLlmChatApi, chatPage]
+  extensions: [liteLlmChatApi, chatPage, analyticsPage]
 });
 
 // src/index.ts
 init_ChatPage();
+init_AnalyticsPage();
 init_api();
 export {
+  AnalyticsPage,
   ChatPage,
   LiteLlmChatApi,
   liteLlmChatApiRef,

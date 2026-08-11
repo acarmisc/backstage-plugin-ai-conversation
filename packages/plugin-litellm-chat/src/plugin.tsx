@@ -1,5 +1,5 @@
 import React from 'react';
-import { Chat as ChatIcon } from '@mui/icons-material';
+import { Chat as ChatIcon, BarChart as BarChartIcon } from '@mui/icons-material';
 import {
   createFrontendPlugin,
   ApiBlueprint,
@@ -29,7 +29,20 @@ const chatPage = PageBlueprint.make({
   },
 });
 
+const analyticsPage = PageBlueprint.make({
+  name: 'analytics',
+  params: {
+    path: '/ai-chat/analytics',
+    title: 'AI Chat Analytics',
+    icon: <BarChartIcon />,
+    loader: async () => {
+      const { AnalyticsPage } = await import('./components/AnalyticsPage');
+      return <AnalyticsPage />;
+    },
+  },
+});
+
 export const litellmChatPlugin = createFrontendPlugin({
   pluginId: 'litellm-chat',
-  extensions: [liteLlmChatApi, chatPage],
+  extensions: [liteLlmChatApi, chatPage, analyticsPage],
 });
