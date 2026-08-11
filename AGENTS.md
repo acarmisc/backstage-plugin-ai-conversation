@@ -268,6 +268,12 @@ backstage-plugin-litellm-rag-ai/
 7. **Frontend UI** — all components, pickers, plugin registration, exports.
 8. **Integration** — wire into target Backstage, deploy to GKE, verify against live pgvector.
 9. **Personas** — `GET /personas` (catalog-backed, `chat-persona` entities), `applyPersona()` server-side system-prompt injection, `PersonaPicker` frontend component, vector-store name→id resolution. See `ces-ai-personas` repo for the persona catalog data.
+10. **Design system + message actions** — accent gradient (violet→cyan) streaming ring on the persona avatar (the one persistent animated element, tied to real streaming state, `prefers-reduced-motion`-aware), JetBrains Mono for code, `AssistantMessage`/`UserMessage` split (no-bubble sunken-surface treatment for user turns), collapsible sidebar/context-panel. Regenerate/edit-and-resend (`useChat.regenerateFrom`/`editAndResend`, both truncate-and-resend through a shared `runSend`), copy message/code-block.
+11. **Export/import + search/pin** — `useChat.exportThread`/`importThread` (portable JSON, deliberately excludes the live chat key), sidebar search (title + message content), `pinned` field with pinned-first sort.
+12. **LaTeX + `#url` context** — `remark-math`/`rehype-katex` in the markdown pipeline (KaTeX CSS loaded via runtime `<link>`, not bundled — the esbuild pipeline has no CSS loader). `#https://...` in the composer resolves via `POST /fetch-context` (SSRF-guarded: https-only, DNS-resolved private/loopback/link-local/metadata-address blocking re-checked on every redirect hop, timeout, response-size cap — see `urlContext.ts`); the fetched page is injected server-side as one-off context, never round-tripping the full text through the browser.
+13. **Multi-model compare** — per-thread `mode: 'single' | 'compare'`; compare mode streams the same prompt to several models in parallel (`runCompareSend`), each into its own message sharing a `turnId`, rendered as side-by-side columns. Required moving `useChat` off a single global `AbortController`/`isStreaming` flag onto a `Map<messageId, AbortController>` plus a `streamingMessageIds` set.
+14. **Web search toggle** — passes `web_search` through as LiteLLM's `web_search_options` alongside (not instead of) any selected knowledge bases; sources panel labels results Web vs Knowledge base by a `url`-field heuristic (LiteLLM doesn't tag result origin explicitly). Assumes the target LiteLLM deployment has a native web-search-capable model — **unverified against the live proxy**, see the "Known gaps" note below.
+15. **Analytics dashboard** — `chat_events` migration + best-effort per-turn logging (thread_id/user_ref/model/persona_id/grounded, not message content), `GET /feedback/summary` + `GET /usage/summary?groupBy=persona|model&range=`, `/ai-chat/analytics` page with hand-rolled bar charts (no new charting dependency). The summary endpoints return aggregate counts only, so they're reachable by any authenticated user — genuine admin-only *page* access requires a permission-policy in the target Backstage app, which this repo doesn't own (see "Known gaps").
 
 ## Things NOT in v1
 
@@ -276,6 +282,14 @@ backstage-plugin-litellm-rag-ai/
 - **Custom chunking/reranker/hybrid search** — LiteLLM's `retrieval_config` gives `top_k` and optional rerank. If fine-grained retrieval control is needed later, build a dedicated retrieval service.
 - **File upload** — pgvector ingests files via its own admin API. Backstage chat is query-side only.
 - **Sidebar modal / home widget** — v1 ships the `/ai-chat` page only.
+
+## Known gaps (phase10-15)
+
+- **`/ai-chat/analytics` is not actually admin-gated.** The endpoints it reads (`GET /feedback/summary`, `GET /usage/summary`) only ever return aggregate counts — no message content, no per-user breakdown — so the exposure is low, but nothing in this repo restricts the *page* to admins. That requires a permission-policy in the target Backstage app (same category of change as the sidebar nav entry / route registration already documented under "Files changed in target Backstage" in HANDOFF.md), which this repo doesn't own.
+- **`web_search` (phase14) assumes LiteLLM has a native web-search-capable model/tool** reachable via `web_search_options` on `/v1/chat/completions`. Unverified against the live proxy — if the target deployment doesn't have one, the flag is a silent no-op upstream rather than an error. If that turns out to be the case, the fallback plan (self-hosted SearXNG, integrated server-side with its own citations) is a materially bigger job — see the original feature plan's phase14 estimate split (~2 days vs ~1-1.5 weeks).
+- **`#url` extraction (phase12) is regex-based HTML stripping**, not a DOM parser — deliberately avoids adding `jsdom`/`@mozilla/readability` as new dependencies. Good enough for typical article/doc pages; will do worse than a real reader-mode extractor on heavily scripted or non-semantic-HTML pages.
+- **Compare mode (phase13) shares one `citations`/`lastTurnUsage` slot across all columns** — whichever model's stream reports search results or usage last "wins" in the sources/usage panels. A real per-column breakdown would need those to become keyed by message id, deferred since it's cosmetic, not a correctness issue.
+- **Web vs Knowledge base citation labeling (phase14) is a heuristic** (`url` field present ⇒ web), not something LiteLLM tags explicitly — verify against real web-search response shapes before trusting the label in the UI.
 
 ## Build and test
 
