@@ -60,7 +60,11 @@ export interface UseChatResult {
   newThread: () => void;
   selectThread: (id: string) => void;
   deleteThread: (id: string) => void;
-  sendMessage: (text: string, attachedUrl?: { url: string; title: string }) => void;
+  sendMessage: (
+    text: string,
+    attachedUrl?: { url: string; title: string },
+    compareModelsOverride?: string[],
+  ) => void;
   regenerateFrom: (messageId: string) => void;
   editAndResend: (messageId: string, newContent: string) => void;
   stopGeneration: () => void;
@@ -68,7 +72,11 @@ export interface UseChatResult {
   togglePin: (id: string) => void;
   exportThread: (id: string) => void;
   importThread: (file: File) => Promise<void>;
+  setCompareMode: (enabled: boolean, models?: string[]) => void;
   isStreaming: boolean;
+  /** IDs of assistant messages currently receiving tokens — in compare
+   * mode several are streaming at once, one per model column. */
+  streamingMessageIds: Set<string>;
   error: string | null;
   citations: Citation[];
   keySpend: KeySpend | null;
@@ -82,12 +90,16 @@ export function useChat(opts: UseChatOptions): UseChatResult {
   const [activeId, setActiveId] = useState<string | null>(
     () => threads[0]?.id ?? null,
   );
-  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamingIds, setStreamingIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [citations, setCitations] = useState<Citation[]>([]);
   const [keySpend, setKeySpend] = useState<KeySpend | null>(null);
+  const isStreaming = streamingIds.size > 0;
 
-  const abortRef = useRef<AbortController | null>(null);
+  // Keyed by assistant message id rather than one global controller — in
+  // compare mode several models stream in parallel into different
+  // messages, each independently abortable.
+  const abortMapRef = useRef<Map<string, AbortController>>(new Map());
 
   // Debounce localStorage writes — `threads` changes on every streamed
   // token, and writing the full (growing) history to localStorage on each
@@ -196,57 +208,29 @@ export function useChat(opts: UseChatOptions): UseChatResult {
   );
 
   const stopGeneration = useCallback(() => {
-    abortRef.current?.abort();
-    abortRef.current = null;
-    setIsStreaming(false);
+    abortMapRef.current.forEach(controller => controller.abort());
+    abortMapRef.current.clear();
+    setStreamingIds(new Set());
   }, []);
 
-  // Shared core for sendMessage/regenerateFrom/editAndResend: appends a user
-  // message + assistant placeholder onto `baseMessages` (not necessarily the
-  // thread's current messages — the two callers above pass a truncated
-  // slice) and streams into it. Any in-flight generation is aborted first so
-  // regenerating never races the previous response's tokens into the thread.
-  const runSend = useCallback(
-    (text: string, baseMessages: ChatMessage[], attachedUrl?: { url: string; title: string }) => {
-      if (!text.trim() || !activeThread || !keyToken) return;
-
-      abortRef.current?.abort();
-      setError(null);
-      setCitations([]);
-
-      const userMsg: ChatMessage = { id: genId(), role: 'user', content: text, attachedUrl };
-      const assistantMsg: ChatMessage = { id: genId(), role: 'assistant', content: '' };
-
-      const threadId = activeThread.id;
-      const updatedMessages = [...baseMessages, userMsg, assistantMsg];
-      const currentKeyAlias = keyAlias;
-
-      setThreads(prev =>
-        prev.map(t =>
-          t.id === threadId
-            ? {
-                ...t,
-                messages: updatedMessages,
-                title: t.messages.length === 0 ? text.slice(0, 40) : t.title,
-                model,
-                vectorStoreIds,
-                personaId,
-                customSystemPrompt,
-                keyAlias,
-                keyToken,
-                updatedAt: Date.now(),
-              }
-            : t,
-        ),
-      );
-
-      setIsStreaming(true);
-
-      const reqMessages = updatedMessages.slice(0, -1);
+  // Streams one model's reply into the assistant message `assistantMsgId`.
+  // Shared by single-send (one call) and compare mode (one call per model,
+  // running concurrently) — each call owns its own AbortController and its
+  // own entry in streamingIds, so columns finish independently.
+  const startStream = useCallback(
+    (
+      threadId: string,
+      assistantMsgId: string,
+      reqMessages: ChatMessage[],
+      reqModel: string,
+      attachedUrl: { url: string; title: string } | undefined,
+      onSettled: () => void,
+    ) => {
+      setStreamingIds(prev => new Set(prev).add(assistantMsgId));
 
       const controller = api.chatStream(
         {
-          model,
+          model: reqModel,
           messages: reqMessages,
           vector_store_ids: vectorStoreIds.length ? vectorStoreIds : undefined,
           persona_id: personaId || undefined,
@@ -287,67 +271,211 @@ export function useChat(opts: UseChatOptions): UseChatResult {
             setThreads(prev =>
               prev.map(t => {
                 if (t.id !== threadId) return t;
-                const msgs = [...t.messages];
-                const last = msgs[msgs.length - 1];
-                msgs[msgs.length - 1] = {
-                  ...last,
-                  content: last.content + chunk.delta,
-                };
+                const msgs = t.messages.map(m =>
+                  m.id === assistantMsgId ? { ...m, content: m.content + chunk.delta } : m,
+                );
                 return { ...t, messages: msgs, updatedAt: Date.now() };
               }),
             );
           }
         },
         () => {
-          setIsStreaming(false);
-          abortRef.current = null;
-          if (currentKeyAlias) {
-            api.getKeySpend(currentKeyAlias).then(setKeySpend).catch(() => {});
-          }
+          abortMapRef.current.delete(assistantMsgId);
+          setStreamingIds(prev => {
+            const next = new Set(prev);
+            next.delete(assistantMsgId);
+            return next;
+          });
+          onSettled();
         },
         (err: Error) => {
           setError(err.message);
-          setIsStreaming(false);
-          abortRef.current = null;
+          abortMapRef.current.delete(assistantMsgId);
+          setStreamingIds(prev => {
+            const next = new Set(prev);
+            next.delete(assistantMsgId);
+            return next;
+          });
+          onSettled();
         },
       );
 
-      abortRef.current = controller;
+      abortMapRef.current.set(assistantMsgId, controller);
     },
-    [activeThread, api, keyToken, model, vectorStoreIds, personaId, customSystemPrompt, keyAlias, topK],
+    [api, vectorStoreIds, personaId, customSystemPrompt, topK, keyToken],
+  );
+
+  // Shared core for sendMessage/regenerateFrom/editAndResend: appends a user
+  // message + assistant placeholder onto `baseMessages` (not necessarily the
+  // thread's current messages — the two callers above pass a truncated
+  // slice) and streams into it. Any in-flight generation is aborted first so
+  // regenerating never races the previous response's tokens into the thread.
+  const runSend = useCallback(
+    (text: string, baseMessages: ChatMessage[], attachedUrl?: { url: string; title: string }) => {
+      if (!text.trim() || !activeThread || !keyToken) return;
+
+      stopGeneration();
+      setError(null);
+      setCitations([]);
+
+      const turnId = genId();
+      const userMsg: ChatMessage = { id: genId(), role: 'user', content: text, attachedUrl, turnId };
+      const assistantMsg: ChatMessage = { id: genId(), role: 'assistant', content: '', turnId };
+
+      const threadId = activeThread.id;
+      const updatedMessages = [...baseMessages, userMsg, assistantMsg];
+      const currentKeyAlias = keyAlias;
+
+      setThreads(prev =>
+        prev.map(t =>
+          t.id === threadId
+            ? {
+                ...t,
+                messages: updatedMessages,
+                title: t.messages.length === 0 ? text.slice(0, 40) : t.title,
+                model,
+                vectorStoreIds,
+                personaId,
+                customSystemPrompt,
+                keyAlias,
+                keyToken,
+                mode: 'single',
+                updatedAt: Date.now(),
+              }
+            : t,
+        ),
+      );
+
+      const reqMessages = updatedMessages.slice(0, -1);
+      startStream(threadId, assistantMsg.id, reqMessages, model, attachedUrl, () => {
+        if (currentKeyAlias) {
+          api.getKeySpend(currentKeyAlias).then(setKeySpend).catch(() => {});
+        }
+      });
+    },
+    [activeThread, api, keyToken, model, vectorStoreIds, personaId, customSystemPrompt, keyAlias, startStream, stopGeneration],
+  );
+
+  // Compare mode: sends the same prompt to every model in `models` in
+  // parallel, each into its own assistant message sharing one turnId so the
+  // UI can render them as side-by-side columns.
+  const runCompareSend = useCallback(
+    (
+      text: string,
+      baseMessages: ChatMessage[],
+      models: string[],
+      attachedUrl?: { url: string; title: string },
+    ) => {
+      if (!text.trim() || !activeThread || !keyToken || models.length === 0) return;
+
+      stopGeneration();
+      setError(null);
+      setCitations([]);
+
+      const turnId = genId();
+      const userMsg: ChatMessage = { id: genId(), role: 'user', content: text, attachedUrl, turnId };
+      const assistantMsgs: ChatMessage[] = models.map(m => ({
+        id: genId(),
+        role: 'assistant',
+        content: '',
+        turnId,
+        compareModel: m,
+      }));
+
+      const threadId = activeThread.id;
+      const updatedMessages = [...baseMessages, userMsg, ...assistantMsgs];
+      const currentKeyAlias = keyAlias;
+      const reqMessagesBase = [...baseMessages, userMsg];
+
+      setThreads(prev =>
+        prev.map(t =>
+          t.id === threadId
+            ? {
+                ...t,
+                messages: updatedMessages,
+                title: t.messages.length === 0 ? text.slice(0, 40) : t.title,
+                vectorStoreIds,
+                personaId,
+                customSystemPrompt,
+                keyAlias,
+                keyToken,
+                mode: 'compare',
+                compareModels: models,
+                updatedAt: Date.now(),
+              }
+            : t,
+        ),
+      );
+
+      assistantMsgs.forEach(am => {
+        startStream(threadId, am.id, reqMessagesBase, am.compareModel as string, attachedUrl, () => {
+          if (currentKeyAlias) {
+            api.getKeySpend(currentKeyAlias).then(setKeySpend).catch(() => {});
+          }
+        });
+      });
+    },
+    [activeThread, api, keyToken, vectorStoreIds, personaId, customSystemPrompt, keyAlias, startStream, stopGeneration],
   );
 
   const sendMessage = useCallback(
-    (text: string, attachedUrl?: { url: string; title: string }) => {
+    (
+      text: string,
+      attachedUrl?: { url: string; title: string },
+      compareModelsOverride?: string[],
+    ) => {
       if (!activeThread) return;
-      runSend(text, activeThread.messages, attachedUrl);
+      const models =
+        compareModelsOverride ??
+        (activeThread.mode === 'compare' ? activeThread.compareModels : undefined);
+      if (models?.length) {
+        runCompareSend(text, activeThread.messages, models, attachedUrl);
+      } else {
+        runSend(text, activeThread.messages, attachedUrl);
+      }
     },
-    [activeThread, runSend],
+    [activeThread, runSend, runCompareSend],
   );
 
-  // Re-asks the question behind `messageId` and streams a fresh assistant
-  // reply. Truncates through the target (exclusive if it's the assistant
-  // reply being regenerated — that reply and anything after it is dropped
-  // and reproduced fresh; inclusive if it's a user message — that message
-  // and its old reply are dropped and re-sent).
+  // Re-asks the question behind `messageId` and streams a fresh reply (all
+  // columns, if the target belongs to a compare-mode turn). Truncates
+  // through the target (exclusive if it's an assistant reply being
+  // regenerated — that reply and anything after it is dropped and
+  // reproduced fresh; inclusive if it's a user message — that message and
+  // its old reply are dropped and re-sent).
   const regenerateFrom = useCallback(
     (messageId: string) => {
       if (!activeThread) return;
       const messages = activeThread.messages;
       const idx = messages.findIndex(m => m.id === messageId);
       if (idx === -1) return;
+      const target = messages[idx];
+      const compareModels = activeThread.compareModels;
+      const isCompare = activeThread.mode === 'compare' && !!compareModels?.length;
 
-      if (messages[idx].role === 'user') {
-        runSend(messages[idx].content, messages.slice(0, idx));
+      if (target.role === 'user') {
+        if (isCompare) runCompareSend(target.content, messages.slice(0, idx), compareModels!);
+        else runSend(target.content, messages.slice(0, idx));
         return;
       }
 
+      const turnId = target.turnId;
       let userIdx = idx - 1;
-      while (userIdx >= 0 && messages[userIdx].role !== 'user') userIdx -= 1;
+      while (
+        userIdx >= 0 &&
+        !(messages[userIdx].role === 'user' && (!turnId || messages[userIdx].turnId === turnId))
+      ) {
+        userIdx -= 1;
+      }
       if (userIdx < 0) return;
-      runSend(messages[userIdx].content, messages.slice(0, userIdx));
+
+      if (isCompare && target.compareModel) {
+        runCompareSend(messages[userIdx].content, messages.slice(0, userIdx), compareModels!);
+      } else {
+        runSend(messages[userIdx].content, messages.slice(0, userIdx));
+      }
     },
-    [activeThread, runSend],
+    [activeThread, runSend, runCompareSend],
   );
 
   // Replaces a past user message with `newContent` and re-sends it, dropping
@@ -360,9 +488,32 @@ export function useChat(opts: UseChatOptions): UseChatResult {
       const messages = activeThread.messages;
       const idx = messages.findIndex(m => m.id === messageId);
       if (idx === -1 || messages[idx].role !== 'user') return;
-      runSend(newContent, messages.slice(0, idx));
+      if (activeThread.mode === 'compare' && activeThread.compareModels?.length) {
+        runCompareSend(newContent, messages.slice(0, idx), activeThread.compareModels);
+      } else {
+        runSend(newContent, messages.slice(0, idx));
+      }
     },
-    [activeThread, runSend],
+    [activeThread, runSend, runCompareSend],
+  );
+
+  const setCompareMode = useCallback(
+    (enabled: boolean, models?: string[]) => {
+      if (!activeThread) return;
+      const threadId = activeThread.id;
+      setThreads(prev =>
+        prev.map(t =>
+          t.id === threadId
+            ? {
+                ...t,
+                mode: enabled ? 'compare' : 'single',
+                compareModels: enabled ? models ?? t.compareModels ?? [] : t.compareModels,
+              }
+            : t,
+        ),
+      );
+    },
+    [activeThread],
   );
 
   const togglePin = useCallback((id: string) => {
@@ -480,7 +631,9 @@ export function useChat(opts: UseChatOptions): UseChatResult {
     togglePin,
     exportThread,
     importThread,
+    setCompareMode,
     isStreaming,
+    streamingMessageIds: streamingIds,
     error,
     citations,
     keySpend,

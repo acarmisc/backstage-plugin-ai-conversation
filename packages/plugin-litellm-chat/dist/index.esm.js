@@ -230,11 +230,12 @@ function useChat(opts) {
   const [activeId, setActiveId] = useState(
     () => threads[0]?.id ?? null
   );
-  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamingIds, setStreamingIds] = useState(/* @__PURE__ */ new Set());
   const [error, setError] = useState(null);
   const [citations, setCitations] = useState([]);
   const [keySpend, setKeySpend] = useState(null);
-  const abortRef = useRef(null);
+  const isStreaming = streamingIds.size > 0;
+  const abortMapRef = useRef(/* @__PURE__ */ new Map());
   const threadsRef = useRef(threads);
   threadsRef.current = threads;
   const saveTimeoutRef = useRef(null);
@@ -324,42 +325,16 @@ function useChat(opts) {
     [activeId, threads, api]
   );
   const stopGeneration = useCallback(() => {
-    abortRef.current?.abort();
-    abortRef.current = null;
-    setIsStreaming(false);
+    abortMapRef.current.forEach((controller) => controller.abort());
+    abortMapRef.current.clear();
+    setStreamingIds(/* @__PURE__ */ new Set());
   }, []);
-  const runSend = useCallback(
-    (text, baseMessages, attachedUrl) => {
-      if (!text.trim() || !activeThread || !keyToken) return;
-      abortRef.current?.abort();
-      setError(null);
-      setCitations([]);
-      const userMsg = { id: genId(), role: "user", content: text, attachedUrl };
-      const assistantMsg = { id: genId(), role: "assistant", content: "" };
-      const threadId = activeThread.id;
-      const updatedMessages = [...baseMessages, userMsg, assistantMsg];
-      const currentKeyAlias = keyAlias;
-      setThreads(
-        (prev) => prev.map(
-          (t) => t.id === threadId ? {
-            ...t,
-            messages: updatedMessages,
-            title: t.messages.length === 0 ? text.slice(0, 40) : t.title,
-            model,
-            vectorStoreIds,
-            personaId,
-            customSystemPrompt,
-            keyAlias,
-            keyToken,
-            updatedAt: Date.now()
-          } : t
-        )
-      );
-      setIsStreaming(true);
-      const reqMessages = updatedMessages.slice(0, -1);
+  const startStream = useCallback(
+    (threadId, assistantMsgId, reqMessages, reqModel, attachedUrl, onSettled) => {
+      setStreamingIds((prev) => new Set(prev).add(assistantMsgId));
       const controller = api.chatStream(
         {
-          model,
+          model: reqModel,
           messages: reqMessages,
           vector_store_ids: vectorStoreIds.length ? vectorStoreIds : void 0,
           persona_id: personaId || void 0,
@@ -398,41 +373,135 @@ function useChat(opts) {
             setThreads(
               (prev) => prev.map((t) => {
                 if (t.id !== threadId) return t;
-                const msgs = [...t.messages];
-                const last = msgs[msgs.length - 1];
-                msgs[msgs.length - 1] = {
-                  ...last,
-                  content: last.content + chunk.delta
-                };
+                const msgs = t.messages.map(
+                  (m) => m.id === assistantMsgId ? { ...m, content: m.content + chunk.delta } : m
+                );
                 return { ...t, messages: msgs, updatedAt: Date.now() };
               })
             );
           }
         },
         () => {
-          setIsStreaming(false);
-          abortRef.current = null;
+          abortMapRef.current.delete(assistantMsgId);
+          setStreamingIds((prev) => {
+            const next = new Set(prev);
+            next.delete(assistantMsgId);
+            return next;
+          });
+          onSettled();
+        },
+        (err) => {
+          setError(err.message);
+          abortMapRef.current.delete(assistantMsgId);
+          setStreamingIds((prev) => {
+            const next = new Set(prev);
+            next.delete(assistantMsgId);
+            return next;
+          });
+          onSettled();
+        }
+      );
+      abortMapRef.current.set(assistantMsgId, controller);
+    },
+    [api, vectorStoreIds, personaId, customSystemPrompt, topK, keyToken]
+  );
+  const runSend = useCallback(
+    (text, baseMessages, attachedUrl) => {
+      if (!text.trim() || !activeThread || !keyToken) return;
+      stopGeneration();
+      setError(null);
+      setCitations([]);
+      const turnId = genId();
+      const userMsg = { id: genId(), role: "user", content: text, attachedUrl, turnId };
+      const assistantMsg = { id: genId(), role: "assistant", content: "", turnId };
+      const threadId = activeThread.id;
+      const updatedMessages = [...baseMessages, userMsg, assistantMsg];
+      const currentKeyAlias = keyAlias;
+      setThreads(
+        (prev) => prev.map(
+          (t) => t.id === threadId ? {
+            ...t,
+            messages: updatedMessages,
+            title: t.messages.length === 0 ? text.slice(0, 40) : t.title,
+            model,
+            vectorStoreIds,
+            personaId,
+            customSystemPrompt,
+            keyAlias,
+            keyToken,
+            mode: "single",
+            updatedAt: Date.now()
+          } : t
+        )
+      );
+      const reqMessages = updatedMessages.slice(0, -1);
+      startStream(threadId, assistantMsg.id, reqMessages, model, attachedUrl, () => {
+        if (currentKeyAlias) {
+          api.getKeySpend(currentKeyAlias).then(setKeySpend).catch(() => {
+          });
+        }
+      });
+    },
+    [activeThread, api, keyToken, model, vectorStoreIds, personaId, customSystemPrompt, keyAlias, startStream, stopGeneration]
+  );
+  const runCompareSend = useCallback(
+    (text, baseMessages, models, attachedUrl) => {
+      if (!text.trim() || !activeThread || !keyToken || models.length === 0) return;
+      stopGeneration();
+      setError(null);
+      setCitations([]);
+      const turnId = genId();
+      const userMsg = { id: genId(), role: "user", content: text, attachedUrl, turnId };
+      const assistantMsgs = models.map((m) => ({
+        id: genId(),
+        role: "assistant",
+        content: "",
+        turnId,
+        compareModel: m
+      }));
+      const threadId = activeThread.id;
+      const updatedMessages = [...baseMessages, userMsg, ...assistantMsgs];
+      const currentKeyAlias = keyAlias;
+      const reqMessagesBase = [...baseMessages, userMsg];
+      setThreads(
+        (prev) => prev.map(
+          (t) => t.id === threadId ? {
+            ...t,
+            messages: updatedMessages,
+            title: t.messages.length === 0 ? text.slice(0, 40) : t.title,
+            vectorStoreIds,
+            personaId,
+            customSystemPrompt,
+            keyAlias,
+            keyToken,
+            mode: "compare",
+            compareModels: models,
+            updatedAt: Date.now()
+          } : t
+        )
+      );
+      assistantMsgs.forEach((am) => {
+        startStream(threadId, am.id, reqMessagesBase, am.compareModel, attachedUrl, () => {
           if (currentKeyAlias) {
             api.getKeySpend(currentKeyAlias).then(setKeySpend).catch(() => {
             });
           }
-        },
-        (err) => {
-          setError(err.message);
-          setIsStreaming(false);
-          abortRef.current = null;
-        }
-      );
-      abortRef.current = controller;
+        });
+      });
     },
-    [activeThread, api, keyToken, model, vectorStoreIds, personaId, customSystemPrompt, keyAlias, topK]
+    [activeThread, api, keyToken, vectorStoreIds, personaId, customSystemPrompt, keyAlias, startStream, stopGeneration]
   );
   const sendMessage = useCallback(
-    (text, attachedUrl) => {
+    (text, attachedUrl, compareModelsOverride) => {
       if (!activeThread) return;
-      runSend(text, activeThread.messages, attachedUrl);
+      const models = compareModelsOverride ?? (activeThread.mode === "compare" ? activeThread.compareModels : void 0);
+      if (models?.length) {
+        runCompareSend(text, activeThread.messages, models, attachedUrl);
+      } else {
+        runSend(text, activeThread.messages, attachedUrl);
+      }
     },
-    [activeThread, runSend]
+    [activeThread, runSend, runCompareSend]
   );
   const regenerateFrom = useCallback(
     (messageId) => {
@@ -440,16 +509,27 @@ function useChat(opts) {
       const messages = activeThread.messages;
       const idx = messages.findIndex((m) => m.id === messageId);
       if (idx === -1) return;
-      if (messages[idx].role === "user") {
-        runSend(messages[idx].content, messages.slice(0, idx));
+      const target = messages[idx];
+      const compareModels = activeThread.compareModels;
+      const isCompare = activeThread.mode === "compare" && !!compareModels?.length;
+      if (target.role === "user") {
+        if (isCompare) runCompareSend(target.content, messages.slice(0, idx), compareModels);
+        else runSend(target.content, messages.slice(0, idx));
         return;
       }
+      const turnId = target.turnId;
       let userIdx = idx - 1;
-      while (userIdx >= 0 && messages[userIdx].role !== "user") userIdx -= 1;
+      while (userIdx >= 0 && !(messages[userIdx].role === "user" && (!turnId || messages[userIdx].turnId === turnId))) {
+        userIdx -= 1;
+      }
       if (userIdx < 0) return;
-      runSend(messages[userIdx].content, messages.slice(0, userIdx));
+      if (isCompare && target.compareModel) {
+        runCompareSend(messages[userIdx].content, messages.slice(0, userIdx), compareModels);
+      } else {
+        runSend(messages[userIdx].content, messages.slice(0, userIdx));
+      }
     },
-    [activeThread, runSend]
+    [activeThread, runSend, runCompareSend]
   );
   const editAndResend = useCallback(
     (messageId, newContent) => {
@@ -457,9 +537,29 @@ function useChat(opts) {
       const messages = activeThread.messages;
       const idx = messages.findIndex((m) => m.id === messageId);
       if (idx === -1 || messages[idx].role !== "user") return;
-      runSend(newContent, messages.slice(0, idx));
+      if (activeThread.mode === "compare" && activeThread.compareModels?.length) {
+        runCompareSend(newContent, messages.slice(0, idx), activeThread.compareModels);
+      } else {
+        runSend(newContent, messages.slice(0, idx));
+      }
     },
-    [activeThread, runSend]
+    [activeThread, runSend, runCompareSend]
+  );
+  const setCompareMode = useCallback(
+    (enabled, models) => {
+      if (!activeThread) return;
+      const threadId = activeThread.id;
+      setThreads(
+        (prev) => prev.map(
+          (t) => t.id === threadId ? {
+            ...t,
+            mode: enabled ? "compare" : "single",
+            compareModels: enabled ? models ?? t.compareModels ?? [] : t.compareModels
+          } : t
+        )
+      );
+    },
+    [activeThread]
   );
   const togglePin = useCallback((id) => {
     setThreads(
@@ -560,7 +660,9 @@ function useChat(opts) {
     togglePin,
     exportThread,
     importThread,
+    setCompareMode,
     isStreaming,
+    streamingMessageIds: streamingIds,
     error,
     citations,
     keySpend
@@ -653,12 +755,79 @@ var init_ModelPicker = __esm({
   }
 });
 
-// src/components/VectorStorePicker.tsx
+// src/components/CompareModelPicker.tsx
 import React2, { useEffect as useEffect3, useState as useState3 } from "react";
 import { Autocomplete, Box, Checkbox, Chip, TextField, Typography as Typography2 } from "@mui/material";
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
 import { useApi as useApi3 } from "@backstage/core-plugin-api";
+import { liteLlmApiRef as liteLlmApiRef2 } from "@acarmisc/backstage-plugin-litellm";
+var CompareModelPicker;
+var init_CompareModelPicker = __esm({
+  "src/components/CompareModelPicker.tsx"() {
+    "use strict";
+    CompareModelPicker = ({ value, onChange }) => {
+      const liteLlmApi = useApi3(liteLlmApiRef2);
+      const [models, setModels] = useState3([]);
+      const [loading, setLoading] = useState3(true);
+      const [error, setError] = useState3(null);
+      useEffect3(() => {
+        let alive = true;
+        liteLlmApi.listModels().then((all) => {
+          if (!alive) return;
+          setModels(all.filter((x) => !x.model_name.startsWith("claude")));
+        }).catch((err) => {
+          if (alive) setError(err.message ?? "Failed to load models");
+        }).finally(() => alive && setLoading(false));
+        return () => {
+          alive = false;
+        };
+      }, [liteLlmApi]);
+      return /* @__PURE__ */ React2.createElement(Box, null, /* @__PURE__ */ React2.createElement(
+        Autocomplete,
+        {
+          multiple: true,
+          size: "small",
+          options: models,
+          value: models.filter((m) => value.includes(m.model_name)),
+          loading,
+          disableCloseOnSelect: true,
+          getOptionLabel: (m) => m.model_name,
+          isOptionEqualToValue: (a, b) => a.model_name === b.model_name,
+          onChange: (_e, newValue) => onChange(newValue.map((m) => m.model_name)),
+          renderOption: (props, option, { selected: isSelected }) => /* @__PURE__ */ React2.createElement("li", { ...props, key: option.model_name }, /* @__PURE__ */ React2.createElement(
+            Checkbox,
+            {
+              icon: /* @__PURE__ */ React2.createElement(CheckBoxOutlineBlankIcon, { fontSize: "small" }),
+              checkedIcon: /* @__PURE__ */ React2.createElement(CheckBoxIcon, { fontSize: "small" }),
+              checked: isSelected,
+              size: "small",
+              sx: { mr: 1, p: 0 }
+            }
+          ), option.model_name),
+          renderTags: (tagValue, getTagProps) => tagValue.map((option, index) => /* @__PURE__ */ React2.createElement(Chip, { ...getTagProps({ index }), key: option.model_name, size: "small", label: option.model_name })),
+          renderInput: (params) => /* @__PURE__ */ React2.createElement(
+            TextField,
+            {
+              ...params,
+              label: "Compare models",
+              placeholder: value.length ? void 0 : "Pick 2+ models\u2026",
+              error: !!error
+            }
+          ),
+          sx: { minWidth: 200 }
+        }
+      ), error && /* @__PURE__ */ React2.createElement(Typography2, { variant: "caption", color: "error", sx: { display: "block", mt: 0.5 } }, error));
+    };
+  }
+});
+
+// src/components/VectorStorePicker.tsx
+import React3, { useEffect as useEffect4, useState as useState4 } from "react";
+import { Autocomplete as Autocomplete2, Box as Box2, Checkbox as Checkbox2, Chip as Chip2, TextField as TextField2, Typography as Typography3 } from "@mui/material";
+import CheckBoxOutlineBlankIcon2 from "@mui/icons-material/CheckBoxOutlineBlank";
+import CheckBoxIcon2 from "@mui/icons-material/CheckBox";
+import { useApi as useApi4 } from "@backstage/core-plugin-api";
 var VectorStorePicker;
 var init_VectorStorePicker = __esm({
   "src/components/VectorStorePicker.tsx"() {
@@ -669,11 +838,11 @@ var init_VectorStorePicker = __esm({
       onChange,
       defaultVectorStoreIds
     }) => {
-      const chatApi = useApi3(liteLlmChatApiRef);
-      const [stores, setStores] = useState3([]);
-      const [loading, setLoading] = useState3(true);
-      const [error, setError] = useState3(null);
-      useEffect3(() => {
+      const chatApi = useApi4(liteLlmChatApiRef);
+      const [stores, setStores] = useState4([]);
+      const [loading, setLoading] = useState4(true);
+      const [error, setError] = useState4(null);
+      useEffect4(() => {
         let alive = true;
         chatApi.listVectorStores().then((s) => {
           if (!alive) return;
@@ -692,8 +861,8 @@ var init_VectorStorePicker = __esm({
         };
       }, []);
       const selected = stores.filter((s) => value.includes(s.id));
-      return /* @__PURE__ */ React2.createElement(Box, null, /* @__PURE__ */ React2.createElement(
-        Autocomplete,
+      return /* @__PURE__ */ React3.createElement(Box2, null, /* @__PURE__ */ React3.createElement(
+        Autocomplete2,
         {
           multiple: true,
           size: "small",
@@ -704,18 +873,18 @@ var init_VectorStorePicker = __esm({
           getOptionLabel: (s) => s.name,
           isOptionEqualToValue: (a, b) => a.id === b.id,
           onChange: (_e, newValue) => onChange(newValue.map((s) => s.id)),
-          renderOption: (props, option, { selected: isSelected }) => /* @__PURE__ */ React2.createElement("li", { ...props, key: option.id }, /* @__PURE__ */ React2.createElement(
-            Checkbox,
+          renderOption: (props, option, { selected: isSelected }) => /* @__PURE__ */ React3.createElement("li", { ...props, key: option.id }, /* @__PURE__ */ React3.createElement(
+            Checkbox2,
             {
-              icon: /* @__PURE__ */ React2.createElement(CheckBoxOutlineBlankIcon, { fontSize: "small" }),
-              checkedIcon: /* @__PURE__ */ React2.createElement(CheckBoxIcon, { fontSize: "small" }),
+              icon: /* @__PURE__ */ React3.createElement(CheckBoxOutlineBlankIcon2, { fontSize: "small" }),
+              checkedIcon: /* @__PURE__ */ React3.createElement(CheckBoxIcon2, { fontSize: "small" }),
               checked: isSelected,
               size: "small",
               sx: { mr: 1, p: 0 }
             }
           ), option.name, " ", option.file_count != null ? `(${option.file_count})` : ""),
-          renderTags: (tagValue, getTagProps) => tagValue.map((option, index) => /* @__PURE__ */ React2.createElement(
-            Chip,
+          renderTags: (tagValue, getTagProps) => tagValue.map((option, index) => /* @__PURE__ */ React3.createElement(
+            Chip2,
             {
               ...getTagProps({ index }),
               key: option.id,
@@ -723,8 +892,8 @@ var init_VectorStorePicker = __esm({
               label: option.name
             }
           )),
-          renderInput: (params) => /* @__PURE__ */ React2.createElement(
-            TextField,
+          renderInput: (params) => /* @__PURE__ */ React3.createElement(
+            TextField2,
             {
               ...params,
               label: "Knowledge bases",
@@ -734,14 +903,14 @@ var init_VectorStorePicker = __esm({
           ),
           sx: { minWidth: 200 }
         }
-      ), error && /* @__PURE__ */ React2.createElement(Typography2, { variant: "caption", color: "error", sx: { display: "block", mt: 0.5 } }, error));
+      ), error && /* @__PURE__ */ React3.createElement(Typography3, { variant: "caption", color: "error", sx: { display: "block", mt: 0.5 } }, error));
     };
   }
 });
 
 // src/components/PersonaPicker.tsx
-import React3 from "react";
-import { Select as Select2, MenuItem as MenuItem2, FormControl as FormControl2, InputLabel as InputLabel2, Typography as Typography3 } from "@mui/material";
+import React4 from "react";
+import { Select as Select2, MenuItem as MenuItem2, FormControl as FormControl2, InputLabel as InputLabel2, Typography as Typography4 } from "@mui/material";
 var PersonaPicker;
 var init_PersonaPicker = __esm({
   "src/components/PersonaPicker.tsx"() {
@@ -753,7 +922,7 @@ var init_PersonaPicker = __esm({
       error,
       onChange
     }) => {
-      return /* @__PURE__ */ React3.createElement(FormControl2, { size: "small", error: !!error, sx: { minWidth: 200 } }, /* @__PURE__ */ React3.createElement(InputLabel2, { shrink: true }, "Persona"), /* @__PURE__ */ React3.createElement(
+      return /* @__PURE__ */ React4.createElement(FormControl2, { size: "small", error: !!error, sx: { minWidth: 200 } }, /* @__PURE__ */ React4.createElement(InputLabel2, { shrink: true }, "Persona"), /* @__PURE__ */ React4.createElement(
         Select2,
         {
           value,
@@ -765,16 +934,16 @@ var init_PersonaPicker = __esm({
           },
           disabled: loading
         },
-        /* @__PURE__ */ React3.createElement(MenuItem2, { value: "" }, /* @__PURE__ */ React3.createElement("em", null, "None")),
-        personas.map((p) => /* @__PURE__ */ React3.createElement(MenuItem2, { key: p.id, value: p.id }, p.title))
-      ), error && /* @__PURE__ */ React3.createElement(Typography3, { variant: "caption", color: "error", sx: { mt: 0.5 } }, error));
+        /* @__PURE__ */ React4.createElement(MenuItem2, { value: "" }, /* @__PURE__ */ React4.createElement("em", null, "None")),
+        personas.map((p) => /* @__PURE__ */ React4.createElement(MenuItem2, { key: p.id, value: p.id }, p.title))
+      ), error && /* @__PURE__ */ React4.createElement(Typography4, { variant: "caption", color: "error", sx: { mt: 0.5 } }, error));
     };
   }
 });
 
 // src/components/PersonaHomepage.tsx
-import React4 from "react";
-import { Box as Box2, Typography as Typography4, Chip as Chip2, CircularProgress } from "@mui/material";
+import React5 from "react";
+import { Box as Box3, Typography as Typography5, Chip as Chip3, CircularProgress } from "@mui/material";
 import PersonIcon from "@mui/icons-material/Person";
 var PersonaHomepage;
 var init_PersonaHomepage = __esm({
@@ -788,13 +957,13 @@ var init_PersonaHomepage = __esm({
       onSelect
     }) => {
       if (loading) {
-        return /* @__PURE__ */ React4.createElement(Box2, { sx: { height: "100%", display: "flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React4.createElement(CircularProgress, { size: 24 }));
+        return /* @__PURE__ */ React5.createElement(Box3, { sx: { height: "100%", display: "flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React5.createElement(CircularProgress, { size: 24 }));
       }
       if (error || personas.length === 0) {
-        return /* @__PURE__ */ React4.createElement(Box2, { sx: { height: "100%", display: "flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React4.createElement(Typography4, { color: "text.secondary" }, error ? `Couldn't load personas: ${error}` : "Start a conversation\u2026"));
+        return /* @__PURE__ */ React5.createElement(Box3, { sx: { height: "100%", display: "flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React5.createElement(Typography5, { color: "text.secondary" }, error ? `Couldn't load personas: ${error}` : "Start a conversation\u2026"));
       }
-      return /* @__PURE__ */ React4.createElement(
-        Box2,
+      return /* @__PURE__ */ React5.createElement(
+        Box3,
         {
           sx: {
             height: "100%",
@@ -806,9 +975,9 @@ var init_PersonaHomepage = __esm({
             py: 4
           }
         },
-        /* @__PURE__ */ React4.createElement(Typography4, { variant: "subtitle1", align: "center", color: "text.secondary" }, "Pick a persona to get started, or just start typing"),
-        /* @__PURE__ */ React4.createElement(
-          Box2,
+        /* @__PURE__ */ React5.createElement(Typography5, { variant: "subtitle1", align: "center", color: "text.secondary" }, "Pick a persona to get started, or just start typing"),
+        /* @__PURE__ */ React5.createElement(
+          Box3,
           {
             sx: {
               display: "grid",
@@ -818,8 +987,8 @@ var init_PersonaHomepage = __esm({
           },
           personas.map((p) => {
             const selected = p.id === selectedId;
-            return /* @__PURE__ */ React4.createElement(
-              Box2,
+            return /* @__PURE__ */ React5.createElement(
+              Box3,
               {
                 key: p.id,
                 role: "button",
@@ -848,9 +1017,9 @@ var init_PersonaHomepage = __esm({
                   }
                 }
               },
-              /* @__PURE__ */ React4.createElement(Box2, { sx: { display: "flex", alignItems: "center", gap: 0.75 } }, /* @__PURE__ */ React4.createElement(PersonIcon, { fontSize: "small", color: selected ? "primary" : "action" }), /* @__PURE__ */ React4.createElement(Typography4, { variant: "body2", sx: { fontWeight: 600 }, noWrap: true }, p.title)),
-              p.description && /* @__PURE__ */ React4.createElement(
-                Typography4,
+              /* @__PURE__ */ React5.createElement(Box3, { sx: { display: "flex", alignItems: "center", gap: 0.75 } }, /* @__PURE__ */ React5.createElement(PersonIcon, { fontSize: "small", color: selected ? "primary" : "action" }), /* @__PURE__ */ React5.createElement(Typography5, { variant: "body2", sx: { fontWeight: 600 }, noWrap: true }, p.title)),
+              p.description && /* @__PURE__ */ React5.createElement(
+                Typography5,
                 {
                   variant: "caption",
                   color: "text.secondary",
@@ -863,7 +1032,7 @@ var init_PersonaHomepage = __esm({
                 },
                 p.description
               ),
-              p.tags && p.tags.length > 0 && /* @__PURE__ */ React4.createElement(Box2, { sx: { display: "flex", flexWrap: "wrap", gap: 0.5, mt: 0.5 } }, p.tags.map((tag) => /* @__PURE__ */ React4.createElement(Chip2, { key: tag, label: tag, size: "small", variant: "outlined" })))
+              p.tags && p.tags.length > 0 && /* @__PURE__ */ React5.createElement(Box3, { sx: { display: "flex", flexWrap: "wrap", gap: 0.5, mt: 0.5 } }, p.tags.map((tag) => /* @__PURE__ */ React5.createElement(Chip3, { key: tag, label: tag, size: "small", variant: "outlined" })))
             );
           })
         )
@@ -873,20 +1042,20 @@ var init_PersonaHomepage = __esm({
 });
 
 // src/components/KeyPicker.tsx
-import React5, { useState as useState4 } from "react";
-import { Button, Box as Box3, Typography as Typography5, CircularProgress as CircularProgress2, Tooltip, IconButton } from "@mui/material";
+import React6, { useState as useState5 } from "react";
+import { Button, Box as Box4, Typography as Typography6, CircularProgress as CircularProgress2, Tooltip, IconButton } from "@mui/material";
 import KeyIcon from "@mui/icons-material/VpnKey";
 import DeleteIcon from "@mui/icons-material/Delete";
-import { useApi as useApi4 } from "@backstage/core-plugin-api";
+import { useApi as useApi5 } from "@backstage/core-plugin-api";
 var KeyPicker;
 var init_KeyPicker = __esm({
   "src/components/KeyPicker.tsx"() {
     "use strict";
     init_api();
     KeyPicker = ({ value, onChange, onDelete }) => {
-      const chatApi = useApi4(liteLlmChatApiRef);
-      const [loading, setLoading] = useState4(false);
-      const [error, setError] = useState4(null);
+      const chatApi = useApi5(liteLlmChatApiRef);
+      const [loading, setLoading] = useState5(false);
+      const [error, setError] = useState5(null);
       const handleGenerate = async () => {
         setLoading(true);
         setError(null);
@@ -909,26 +1078,26 @@ var init_KeyPicker = __esm({
         onChange({ alias: "", token: "" });
       };
       if (value.token) {
-        return /* @__PURE__ */ React5.createElement(Box3, { sx: { display: "flex", alignItems: "center", gap: 1, minWidth: 200 } }, /* @__PURE__ */ React5.createElement(KeyIcon, { fontSize: "small", color: "success" }), /* @__PURE__ */ React5.createElement(Typography5, { variant: "body2", sx: { flex: 1, overflow: "hidden", textOverflow: "ellipsis" } }, value.alias || "chat key"), /* @__PURE__ */ React5.createElement(Tooltip, { title: "Delete chat key" }, /* @__PURE__ */ React5.createElement(IconButton, { edge: "end", size: "small", onClick: handleDelete }, /* @__PURE__ */ React5.createElement(DeleteIcon, { fontSize: "small" }))));
+        return /* @__PURE__ */ React6.createElement(Box4, { sx: { display: "flex", alignItems: "center", gap: 1, minWidth: 200 } }, /* @__PURE__ */ React6.createElement(KeyIcon, { fontSize: "small", color: "success" }), /* @__PURE__ */ React6.createElement(Typography6, { variant: "body2", sx: { flex: 1, overflow: "hidden", textOverflow: "ellipsis" } }, value.alias || "chat key"), /* @__PURE__ */ React6.createElement(Tooltip, { title: "Delete chat key" }, /* @__PURE__ */ React6.createElement(IconButton, { edge: "end", size: "small", onClick: handleDelete }, /* @__PURE__ */ React6.createElement(DeleteIcon, { fontSize: "small" }))));
       }
-      return /* @__PURE__ */ React5.createElement(Box3, { sx: { minWidth: 200 } }, /* @__PURE__ */ React5.createElement(
+      return /* @__PURE__ */ React6.createElement(Box4, { sx: { minWidth: 200 } }, /* @__PURE__ */ React6.createElement(
         Button,
         {
           size: "small",
           variant: "outlined",
-          startIcon: loading ? /* @__PURE__ */ React5.createElement(CircularProgress2, { size: 16 }) : /* @__PURE__ */ React5.createElement(KeyIcon, null),
+          startIcon: loading ? /* @__PURE__ */ React6.createElement(CircularProgress2, { size: 16 }) : /* @__PURE__ */ React6.createElement(KeyIcon, null),
           onClick: handleGenerate,
           disabled: loading
         },
         loading ? "Minting\u2026" : "Generate chat key"
-      ), error && /* @__PURE__ */ React5.createElement(Typography5, { variant: "caption", color: "error", sx: { display: "block", mt: 0.5 } }, error));
+      ), error && /* @__PURE__ */ React6.createElement(Typography6, { variant: "caption", color: "error", sx: { display: "block", mt: 0.5 } }, error));
     };
   }
 });
 
 // src/components/PersonaAvatar.tsx
-import React6 from "react";
-import { Avatar, Box as Box4 } from "@mui/material";
+import React7 from "react";
+import { Avatar, Box as Box5 } from "@mui/material";
 var PersonaAvatar;
 var init_PersonaAvatar = __esm({
   "src/components/PersonaAvatar.tsx"() {
@@ -940,8 +1109,8 @@ var init_PersonaAvatar = __esm({
       size = 32
     }) => {
       const ringSize = size + 4;
-      return /* @__PURE__ */ React6.createElement(Box4, { sx: { position: "relative", width: ringSize, height: ringSize, flexShrink: 0 } }, /* @__PURE__ */ React6.createElement(
-        Box4,
+      return /* @__PURE__ */ React7.createElement(Box5, { sx: { position: "relative", width: ringSize, height: ringSize, flexShrink: 0 } }, /* @__PURE__ */ React7.createElement(
+        Box5,
         {
           sx: {
             position: "absolute",
@@ -958,7 +1127,7 @@ var init_PersonaAvatar = __esm({
             }
           }
         }
-      ), /* @__PURE__ */ React6.createElement(
+      ), /* @__PURE__ */ React7.createElement(
         Avatar,
         {
           sx: {
@@ -979,15 +1148,15 @@ var init_PersonaAvatar = __esm({
 });
 
 // src/components/CodeBlock.tsx
-import React7, { useState as useState5 } from "react";
-import { Box as Box5, IconButton as IconButton2, Tooltip as Tooltip2 } from "@mui/material";
+import React8, { useState as useState6 } from "react";
+import { Box as Box6, IconButton as IconButton2, Tooltip as Tooltip2 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import CheckIcon from "@mui/icons-material/Check";
 function extractText(node) {
   if (typeof node === "string") return node;
   if (typeof node === "number") return String(node);
   if (Array.isArray(node)) return node.map(extractText).join("");
-  if (React7.isValidElement(node)) {
+  if (React8.isValidElement(node)) {
     return extractText(node.props.children);
   }
   return "";
@@ -1002,10 +1171,10 @@ var init_CodeBlock = __esm({
       children,
       ...props
     }) => {
-      const [copied, setCopied] = useState5(false);
+      const [copied, setCopied] = useState6(false);
       const isBlock = /language-/.test(className ?? "");
       if (!isBlock) {
-        return /* @__PURE__ */ React7.createElement("code", { className, style: { fontFamily: MONO_FONT_STACK }, ...props }, children);
+        return /* @__PURE__ */ React8.createElement("code", { className, style: { fontFamily: MONO_FONT_STACK }, ...props }, children);
       }
       const handleCopy = () => {
         const text = extractText(children).replace(/\n$/, "");
@@ -1014,7 +1183,7 @@ var init_CodeBlock = __esm({
           setTimeout(() => setCopied(false), 1500);
         });
       };
-      return /* @__PURE__ */ React7.createElement(Box5, { sx: { position: "relative", "&:hover .litellm-copy-btn": { opacity: 1 } } }, /* @__PURE__ */ React7.createElement(Tooltip2, { title: copied ? "Copied" : "Copy code" }, /* @__PURE__ */ React7.createElement(
+      return /* @__PURE__ */ React8.createElement(Box6, { sx: { position: "relative", "&:hover .litellm-copy-btn": { opacity: 1 } } }, /* @__PURE__ */ React8.createElement(Tooltip2, { title: copied ? "Copied" : "Copy code" }, /* @__PURE__ */ React8.createElement(
         IconButton2,
         {
           size: "small",
@@ -1031,15 +1200,15 @@ var init_CodeBlock = __esm({
             borderColor: "divider"
           }
         },
-        copied ? /* @__PURE__ */ React7.createElement(CheckIcon, { fontSize: "inherit" }) : /* @__PURE__ */ React7.createElement(ContentCopyIcon, { fontSize: "inherit" })
-      )), /* @__PURE__ */ React7.createElement("code", { className, style: { fontFamily: MONO_FONT_STACK }, ...props }, children));
+        copied ? /* @__PURE__ */ React8.createElement(CheckIcon, { fontSize: "inherit" }) : /* @__PURE__ */ React8.createElement(ContentCopyIcon, { fontSize: "inherit" })
+      )), /* @__PURE__ */ React8.createElement("code", { className, style: { fontFamily: MONO_FONT_STACK }, ...props }, children));
     };
   }
 });
 
 // src/components/AssistantMessage.tsx
-import React8, { useState as useState6 } from "react";
-import { Box as Box6, IconButton as IconButton3, Tooltip as Tooltip3 } from "@mui/material";
+import React9, { useState as useState7 } from "react";
+import { Box as Box7, IconButton as IconButton3, Tooltip as Tooltip3 } from "@mui/material";
 import ThumbUpIcon from "@mui/icons-material/ThumbUp";
 import ThumbUpOutlinedIcon from "@mui/icons-material/ThumbUpOutlined";
 import ThumbDownIcon from "@mui/icons-material/ThumbDown";
@@ -1070,7 +1239,7 @@ var init_AssistantMessage = __esm({
       onFeedback,
       onRegenerate
     }) => {
-      const [copied, setCopied] = useState6(false);
+      const [copied, setCopied] = useState7(false);
       const showActions = !!message.content && !isStreaming;
       const handleCopy = () => {
         navigator.clipboard?.writeText(message.content).then(() => {
@@ -1078,8 +1247,8 @@ var init_AssistantMessage = __esm({
           setTimeout(() => setCopied(false), 1500);
         });
       };
-      return /* @__PURE__ */ React8.createElement(
-        Box6,
+      return /* @__PURE__ */ React9.createElement(
+        Box7,
         {
           sx: {
             display: "flex",
@@ -1089,9 +1258,9 @@ var init_AssistantMessage = __esm({
             "&:hover .litellm-actions": { opacity: 1 }
           }
         },
-        /* @__PURE__ */ React8.createElement(PersonaAvatar, { label: avatarLabel.slice(0, 2).toUpperCase(), isStreaming, size: 28 }),
-        /* @__PURE__ */ React8.createElement(Box6, { sx: { minWidth: 0, flex: 1 } }, /* @__PURE__ */ React8.createElement(
-          Box6,
+        /* @__PURE__ */ React9.createElement(PersonaAvatar, { label: avatarLabel.slice(0, 2).toUpperCase(), isStreaming, size: 28 }),
+        /* @__PURE__ */ React9.createElement(Box7, { sx: { minWidth: 0, flex: 1 } }, /* @__PURE__ */ React9.createElement(
+          Box7,
           {
             sx: {
               bgcolor: "background.paper",
@@ -1108,7 +1277,7 @@ var init_AssistantMessage = __esm({
               "& pre code": { bgcolor: "transparent", px: 0 }
             }
           },
-          message.content ? /* @__PURE__ */ React8.createElement(
+          message.content ? /* @__PURE__ */ React9.createElement(
             ReactMarkdown,
             {
               remarkPlugins: [remarkGfm, remarkMath],
@@ -1116,8 +1285,8 @@ var init_AssistantMessage = __esm({
               components: { code: CodeBlock }
             },
             message.content
-          ) : isStreaming ? /* @__PURE__ */ React8.createElement(
-            Box6,
+          ) : isStreaming ? /* @__PURE__ */ React9.createElement(
+            Box7,
             {
               component: "span",
               sx: {
@@ -1131,13 +1300,13 @@ var init_AssistantMessage = __esm({
               }
             }
           ) : null
-        ), showActions && /* @__PURE__ */ React8.createElement(
-          Box6,
+        ), showActions && /* @__PURE__ */ React9.createElement(
+          Box7,
           {
             className: "litellm-actions",
             sx: { display: "flex", gap: 0.25, mt: 0.25, opacity: 0, transition: "opacity 0.15s" }
           },
-          onFeedback && /* @__PURE__ */ React8.createElement(React8.Fragment, null, /* @__PURE__ */ React8.createElement(
+          onFeedback && /* @__PURE__ */ React9.createElement(React9.Fragment, null, /* @__PURE__ */ React9.createElement(
             IconButton3,
             {
               size: "small",
@@ -1145,8 +1314,8 @@ var init_AssistantMessage = __esm({
               color: message.feedback === "up" ? "primary" : "default",
               onClick: () => onFeedback(message.id, "up")
             },
-            message.feedback === "up" ? /* @__PURE__ */ React8.createElement(ThumbUpIcon, { fontSize: "small" }) : /* @__PURE__ */ React8.createElement(ThumbUpOutlinedIcon, { fontSize: "small" })
-          ), /* @__PURE__ */ React8.createElement(
+            message.feedback === "up" ? /* @__PURE__ */ React9.createElement(ThumbUpIcon, { fontSize: "small" }) : /* @__PURE__ */ React9.createElement(ThumbUpOutlinedIcon, { fontSize: "small" })
+          ), /* @__PURE__ */ React9.createElement(
             IconButton3,
             {
               size: "small",
@@ -1154,10 +1323,10 @@ var init_AssistantMessage = __esm({
               color: message.feedback === "down" ? "primary" : "default",
               onClick: () => onFeedback(message.id, "down")
             },
-            message.feedback === "down" ? /* @__PURE__ */ React8.createElement(ThumbDownIcon, { fontSize: "small" }) : /* @__PURE__ */ React8.createElement(ThumbDownOutlinedIcon, { fontSize: "small" })
+            message.feedback === "down" ? /* @__PURE__ */ React9.createElement(ThumbDownIcon, { fontSize: "small" }) : /* @__PURE__ */ React9.createElement(ThumbDownOutlinedIcon, { fontSize: "small" })
           )),
-          onRegenerate && /* @__PURE__ */ React8.createElement(Tooltip3, { title: "Regenerate" }, /* @__PURE__ */ React8.createElement(IconButton3, { size: "small", "aria-label": "Regenerate", onClick: () => onRegenerate(message.id) }, /* @__PURE__ */ React8.createElement(ReplayIcon, { fontSize: "small" }))),
-          /* @__PURE__ */ React8.createElement(Tooltip3, { title: copied ? "Copied" : "Copy" }, /* @__PURE__ */ React8.createElement(IconButton3, { size: "small", "aria-label": "Copy", onClick: handleCopy }, copied ? /* @__PURE__ */ React8.createElement(CheckIcon2, { fontSize: "small" }) : /* @__PURE__ */ React8.createElement(ContentCopyIcon2, { fontSize: "small" })))
+          onRegenerate && /* @__PURE__ */ React9.createElement(Tooltip3, { title: "Regenerate" }, /* @__PURE__ */ React9.createElement(IconButton3, { size: "small", "aria-label": "Regenerate", onClick: () => onRegenerate(message.id) }, /* @__PURE__ */ React9.createElement(ReplayIcon, { fontSize: "small" }))),
+          /* @__PURE__ */ React9.createElement(Tooltip3, { title: copied ? "Copied" : "Copy" }, /* @__PURE__ */ React9.createElement(IconButton3, { size: "small", "aria-label": "Copy", onClick: handleCopy }, copied ? /* @__PURE__ */ React9.createElement(CheckIcon2, { fontSize: "small" }) : /* @__PURE__ */ React9.createElement(ContentCopyIcon2, { fontSize: "small" })))
         ))
       );
     };
@@ -1165,8 +1334,8 @@ var init_AssistantMessage = __esm({
 });
 
 // src/components/UserMessage.tsx
-import React9, { useState as useState7 } from "react";
-import { Box as Box7, Button as Button2, Chip as Chip3, IconButton as IconButton4, TextField as TextField2, Tooltip as Tooltip4 } from "@mui/material";
+import React10, { useState as useState8 } from "react";
+import { Box as Box8, Button as Button2, Chip as Chip4, IconButton as IconButton4, TextField as TextField3, Tooltip as Tooltip4 } from "@mui/material";
 import ContentCopyIcon3 from "@mui/icons-material/ContentCopy";
 import CheckIcon3 from "@mui/icons-material/Check";
 import EditIcon from "@mui/icons-material/Edit";
@@ -1176,9 +1345,9 @@ var init_UserMessage = __esm({
   "src/components/UserMessage.tsx"() {
     "use strict";
     UserMessage = ({ message, onEditAndResend }) => {
-      const [editing, setEditing] = useState7(false);
-      const [draft, setDraft] = useState7(message.content);
-      const [copied, setCopied] = useState7(false);
+      const [editing, setEditing] = useState8(false);
+      const [draft, setDraft] = useState8(message.content);
+      const [copied, setCopied] = useState8(false);
       const handleCopy = () => {
         navigator.clipboard?.writeText(message.content).then(() => {
           setCopied(true);
@@ -1197,8 +1366,8 @@ var init_UserMessage = __esm({
         setEditing(false);
       };
       if (editing) {
-        return /* @__PURE__ */ React9.createElement(Box7, { sx: { alignSelf: "flex-end", maxWidth: "80%", width: "100%", display: "flex", flexDirection: "column", gap: 0.5 } }, /* @__PURE__ */ React9.createElement(
-          TextField2,
+        return /* @__PURE__ */ React10.createElement(Box8, { sx: { alignSelf: "flex-end", maxWidth: "80%", width: "100%", display: "flex", flexDirection: "column", gap: 0.5 } }, /* @__PURE__ */ React10.createElement(
+          TextField3,
           {
             value: draft,
             onChange: (e) => setDraft(e.target.value),
@@ -1209,10 +1378,10 @@ var init_UserMessage = __esm({
             autoFocus: true,
             fullWidth: true
           }
-        ), /* @__PURE__ */ React9.createElement(Box7, { sx: { display: "flex", gap: 1, justifyContent: "flex-end" } }, /* @__PURE__ */ React9.createElement(Button2, { size: "small", onClick: () => setEditing(false) }, "Cancel"), /* @__PURE__ */ React9.createElement(Button2, { size: "small", variant: "contained", onClick: saveEdit, disabled: !draft.trim() }, "Save & resend")));
+        ), /* @__PURE__ */ React10.createElement(Box8, { sx: { display: "flex", gap: 1, justifyContent: "flex-end" } }, /* @__PURE__ */ React10.createElement(Button2, { size: "small", onClick: () => setEditing(false) }, "Cancel"), /* @__PURE__ */ React10.createElement(Button2, { size: "small", variant: "contained", onClick: saveEdit, disabled: !draft.trim() }, "Save & resend")));
       }
-      return /* @__PURE__ */ React9.createElement(
-        Box7,
+      return /* @__PURE__ */ React10.createElement(
+        Box8,
         {
           sx: {
             alignSelf: "flex-end",
@@ -1220,11 +1389,11 @@ var init_UserMessage = __esm({
             "&:hover .litellm-actions": { opacity: 1 }
           }
         },
-        message.attachedUrl && /* @__PURE__ */ React9.createElement(Box7, { sx: { display: "flex", justifyContent: "flex-end", mb: 0.5 } }, /* @__PURE__ */ React9.createElement(Tooltip4, { title: message.attachedUrl.url }, /* @__PURE__ */ React9.createElement(
-          Chip3,
+        message.attachedUrl && /* @__PURE__ */ React10.createElement(Box8, { sx: { display: "flex", justifyContent: "flex-end", mb: 0.5 } }, /* @__PURE__ */ React10.createElement(Tooltip4, { title: message.attachedUrl.url }, /* @__PURE__ */ React10.createElement(
+          Chip4,
           {
             size: "small",
-            icon: /* @__PURE__ */ React9.createElement(LinkIcon, { fontSize: "small" }),
+            icon: /* @__PURE__ */ React10.createElement(LinkIcon, { fontSize: "small" }),
             label: message.attachedUrl.title,
             variant: "outlined",
             component: "a",
@@ -1234,8 +1403,8 @@ var init_UserMessage = __esm({
             clickable: true
           }
         ))),
-        /* @__PURE__ */ React9.createElement(
-          Box7,
+        /* @__PURE__ */ React10.createElement(
+          Box8,
           {
             sx: {
               bgcolor: "action.hover",
@@ -1249,14 +1418,14 @@ var init_UserMessage = __esm({
           },
           message.content
         ),
-        /* @__PURE__ */ React9.createElement(
-          Box7,
+        /* @__PURE__ */ React10.createElement(
+          Box8,
           {
             className: "litellm-actions",
             sx: { display: "flex", gap: 0.25, mt: 0.25, justifyContent: "flex-end", opacity: 0, transition: "opacity 0.15s" }
           },
-          onEditAndResend && /* @__PURE__ */ React9.createElement(Tooltip4, { title: "Edit & resend" }, /* @__PURE__ */ React9.createElement(IconButton4, { size: "small", "aria-label": "Edit and resend", onClick: startEdit }, /* @__PURE__ */ React9.createElement(EditIcon, { fontSize: "small" }))),
-          /* @__PURE__ */ React9.createElement(Tooltip4, { title: copied ? "Copied" : "Copy" }, /* @__PURE__ */ React9.createElement(IconButton4, { size: "small", "aria-label": "Copy", onClick: handleCopy }, copied ? /* @__PURE__ */ React9.createElement(CheckIcon3, { fontSize: "small" }) : /* @__PURE__ */ React9.createElement(ContentCopyIcon3, { fontSize: "small" })))
+          onEditAndResend && /* @__PURE__ */ React10.createElement(Tooltip4, { title: "Edit & resend" }, /* @__PURE__ */ React10.createElement(IconButton4, { size: "small", "aria-label": "Edit and resend", onClick: startEdit }, /* @__PURE__ */ React10.createElement(EditIcon, { fontSize: "small" }))),
+          /* @__PURE__ */ React10.createElement(Tooltip4, { title: copied ? "Copied" : "Copy" }, /* @__PURE__ */ React10.createElement(IconButton4, { size: "small", "aria-label": "Copy", onClick: handleCopy }, copied ? /* @__PURE__ */ React10.createElement(CheckIcon3, { fontSize: "small" }) : /* @__PURE__ */ React10.createElement(ContentCopyIcon3, { fontSize: "small" })))
         )
       );
     };
@@ -1264,8 +1433,25 @@ var init_UserMessage = __esm({
 });
 
 // src/components/MessageList.tsx
-import React10 from "react";
-import { Box as Box8 } from "@mui/material";
+import React11 from "react";
+import { Box as Box9, Typography as Typography7 } from "@mui/material";
+function groupMessages(messages) {
+  const groups = [];
+  let current = null;
+  for (const m of messages) {
+    if (m.role === "user") {
+      current = { user: m, assistants: [] };
+      groups.push(current);
+    } else {
+      if (!current) {
+        current = { assistants: [] };
+        groups.push(current);
+      }
+      current.assistants.push(m);
+    }
+  }
+  return groups;
+}
 var MessageList;
 var init_MessageList = __esm({
   "src/components/MessageList.tsx"() {
@@ -1274,14 +1460,15 @@ var init_MessageList = __esm({
     init_UserMessage();
     MessageList = ({
       messages,
-      isStreaming,
+      streamingMessageIds,
       avatarLabel,
       onFeedback,
       onRegenerate,
       onEditAndResend
     }) => {
-      return /* @__PURE__ */ React10.createElement(
-        Box8,
+      const groups = groupMessages(messages);
+      return /* @__PURE__ */ React11.createElement(
+        Box9,
         {
           sx: {
             flex: 1,
@@ -1293,29 +1480,33 @@ var init_MessageList = __esm({
             gap: 1.5
           }
         },
-        messages.map((msg, i) => {
-          const isUser = msg.role === "user";
-          const isLast = i === messages.length - 1;
-          const messageIsStreaming = isStreaming && isLast && !isUser;
-          return isUser ? /* @__PURE__ */ React10.createElement(UserMessage, { key: msg.id, message: msg, onEditAndResend }) : /* @__PURE__ */ React10.createElement(
-            AssistantMessage,
-            {
-              key: msg.id,
-              message: msg,
-              isStreaming: messageIsStreaming,
-              avatarLabel,
-              onFeedback,
-              onRegenerate
-            }
-          );
-        })
+        groups.map((group, gi) => /* @__PURE__ */ React11.createElement(React11.Fragment, { key: group.user?.id ?? `g${gi}` }, group.user && /* @__PURE__ */ React11.createElement(UserMessage, { message: group.user, onEditAndResend }), group.assistants.length > 1 ? /* @__PURE__ */ React11.createElement(Box9, { sx: { display: "flex", gap: 1.5, overflowX: "auto", width: "100%" } }, group.assistants.map((msg) => /* @__PURE__ */ React11.createElement(Box9, { key: msg.id, sx: { flex: "1 1 320px", minWidth: 280, maxWidth: "none" } }, msg.compareModel && /* @__PURE__ */ React11.createElement(Typography7, { variant: "caption", color: "text.secondary", sx: { display: "block", mb: 0.25 } }, msg.compareModel), /* @__PURE__ */ React11.createElement(
+          AssistantMessage,
+          {
+            message: msg,
+            isStreaming: streamingMessageIds.has(msg.id),
+            avatarLabel: msg.compareModel ?? avatarLabel,
+            onFeedback,
+            onRegenerate
+          }
+        )))) : group.assistants.map((msg) => /* @__PURE__ */ React11.createElement(
+          AssistantMessage,
+          {
+            key: msg.id,
+            message: msg,
+            isStreaming: streamingMessageIds.has(msg.id),
+            avatarLabel,
+            onFeedback,
+            onRegenerate
+          }
+        ))))
       );
     };
   }
 });
 
 // src/components/ErrorBanner.tsx
-import React11 from "react";
+import React12 from "react";
 import { Alert, AlertTitle } from "@mui/material";
 var ErrorBanner;
 var init_ErrorBanner = __esm({
@@ -1323,21 +1514,21 @@ var init_ErrorBanner = __esm({
     "use strict";
     ErrorBanner = ({ error, onDismiss }) => {
       if (!error) return null;
-      return /* @__PURE__ */ React11.createElement(Alert, { severity: "error", onClose: onDismiss, sx: { mb: 1 } }, /* @__PURE__ */ React11.createElement(AlertTitle, null, "Chat error"), error);
+      return /* @__PURE__ */ React12.createElement(Alert, { severity: "error", onClose: onDismiss, sx: { mb: 1 } }, /* @__PURE__ */ React12.createElement(AlertTitle, null, "Chat error"), error);
     };
   }
 });
 
 // src/components/SourcesPanel.tsx
-import React12 from "react";
-import { Box as Box9, Chip as Chip4, Typography as Typography6 } from "@mui/material";
+import React13 from "react";
+import { Box as Box10, Chip as Chip5, Typography as Typography8 } from "@mui/material";
 var SourcesPanel;
 var init_SourcesPanel = __esm({
   "src/components/SourcesPanel.tsx"() {
     "use strict";
     SourcesPanel = ({ citations }) => {
-      return /* @__PURE__ */ React12.createElement(Box9, { sx: { p: 1.5 } }, /* @__PURE__ */ React12.createElement(Typography6, { variant: "overline", color: "text.secondary" }, "Sources"), citations.length === 0 ? /* @__PURE__ */ React12.createElement(Typography6, { variant: "body2", color: "text.secondary", sx: { mt: 0.5 } }, "No sources for the latest reply yet.") : citations.map((c, i) => /* @__PURE__ */ React12.createElement(Box9, { key: i, sx: { mt: 1.5 } }, /* @__PURE__ */ React12.createElement(Box9, { sx: { display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" } }, /* @__PURE__ */ React12.createElement(Typography6, { variant: "body2", fontWeight: 500 }, c.filename), /* @__PURE__ */ React12.createElement(Chip4, { size: "small", label: c.score.toFixed(3), color: "primary", variant: "outlined" })), /* @__PURE__ */ React12.createElement(
-        Typography6,
+      return /* @__PURE__ */ React13.createElement(Box10, { sx: { p: 1.5 } }, /* @__PURE__ */ React13.createElement(Typography8, { variant: "overline", color: "text.secondary" }, "Sources"), citations.length === 0 ? /* @__PURE__ */ React13.createElement(Typography8, { variant: "body2", color: "text.secondary", sx: { mt: 0.5 } }, "No sources for the latest reply yet.") : citations.map((c, i) => /* @__PURE__ */ React13.createElement(Box10, { key: i, sx: { mt: 1.5 } }, /* @__PURE__ */ React13.createElement(Box10, { sx: { display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" } }, /* @__PURE__ */ React13.createElement(Typography8, { variant: "body2", fontWeight: 500 }, c.filename), /* @__PURE__ */ React13.createElement(Chip5, { size: "small", label: c.score.toFixed(3), color: "primary", variant: "outlined" })), /* @__PURE__ */ React13.createElement(
+        Typography8,
         {
           variant: "body2",
           color: "text.secondary",
@@ -1357,8 +1548,8 @@ var init_SourcesPanel = __esm({
 });
 
 // src/components/UsagePanel.tsx
-import React13 from "react";
-import { Box as Box10, Divider, LinearProgress, Typography as Typography7 } from "@mui/material";
+import React14 from "react";
+import { Box as Box11, Divider, LinearProgress, Typography as Typography9 } from "@mui/material";
 function formatUsd(n) {
   return `$${n.toFixed(4)}`;
 }
@@ -1366,14 +1557,14 @@ var Stat, UsagePanel;
 var init_UsagePanel = __esm({
   "src/components/UsagePanel.tsx"() {
     "use strict";
-    Stat = ({ label, value }) => /* @__PURE__ */ React13.createElement(Box10, { sx: { display: "flex", justifyContent: "space-between", py: 0.25 } }, /* @__PURE__ */ React13.createElement(Typography7, { variant: "body2", color: "text.secondary" }, label), /* @__PURE__ */ React13.createElement(Typography7, { variant: "body2", fontWeight: 500 }, value));
+    Stat = ({ label, value }) => /* @__PURE__ */ React14.createElement(Box11, { sx: { display: "flex", justifyContent: "space-between", py: 0.25 } }, /* @__PURE__ */ React14.createElement(Typography9, { variant: "body2", color: "text.secondary" }, label), /* @__PURE__ */ React14.createElement(Typography9, { variant: "body2", fontWeight: 500 }, value));
     UsagePanel = ({
       lastTurnUsage,
       totalTokens,
       keySpend
     }) => {
       const budgetPct = keySpend?.max_budget && keySpend.max_budget > 0 ? Math.min(100, keySpend.spend / keySpend.max_budget * 100) : null;
-      return /* @__PURE__ */ React13.createElement(Box10, { sx: { p: 1.5 } }, /* @__PURE__ */ React13.createElement(Typography7, { variant: "overline", color: "text.secondary" }, "Usage"), !lastTurnUsage && !keySpend ? /* @__PURE__ */ React13.createElement(Typography7, { variant: "body2", color: "text.secondary", sx: { mt: 0.5 } }, "Send a message to see token and budget usage.") : /* @__PURE__ */ React13.createElement(Box10, { sx: { mt: 0.5 } }, lastTurnUsage && /* @__PURE__ */ React13.createElement(React13.Fragment, null, /* @__PURE__ */ React13.createElement(Stat, { label: "This turn", value: `${lastTurnUsage.total_tokens.toLocaleString()} tokens` }), /* @__PURE__ */ React13.createElement(Stat, { label: "Prompt / completion", value: `${lastTurnUsage.prompt_tokens.toLocaleString()} / ${lastTurnUsage.completion_tokens.toLocaleString()}` }), /* @__PURE__ */ React13.createElement(Stat, { label: "Session total", value: `${totalTokens.toLocaleString()} tokens` })), keySpend && /* @__PURE__ */ React13.createElement(React13.Fragment, null, /* @__PURE__ */ React13.createElement(Divider, { sx: { my: 1 } }), /* @__PURE__ */ React13.createElement(Stat, { label: "Spent", value: formatUsd(keySpend.spend) }), keySpend.max_budget != null && /* @__PURE__ */ React13.createElement(React13.Fragment, null, /* @__PURE__ */ React13.createElement(Stat, { label: "Budget", value: `${formatUsd(keySpend.spend)} / ${formatUsd(keySpend.max_budget)}` }), /* @__PURE__ */ React13.createElement(
+      return /* @__PURE__ */ React14.createElement(Box11, { sx: { p: 1.5 } }, /* @__PURE__ */ React14.createElement(Typography9, { variant: "overline", color: "text.secondary" }, "Usage"), !lastTurnUsage && !keySpend ? /* @__PURE__ */ React14.createElement(Typography9, { variant: "body2", color: "text.secondary", sx: { mt: 0.5 } }, "Send a message to see token and budget usage.") : /* @__PURE__ */ React14.createElement(Box11, { sx: { mt: 0.5 } }, lastTurnUsage && /* @__PURE__ */ React14.createElement(React14.Fragment, null, /* @__PURE__ */ React14.createElement(Stat, { label: "This turn", value: `${lastTurnUsage.total_tokens.toLocaleString()} tokens` }), /* @__PURE__ */ React14.createElement(Stat, { label: "Prompt / completion", value: `${lastTurnUsage.prompt_tokens.toLocaleString()} / ${lastTurnUsage.completion_tokens.toLocaleString()}` }), /* @__PURE__ */ React14.createElement(Stat, { label: "Session total", value: `${totalTokens.toLocaleString()} tokens` })), keySpend && /* @__PURE__ */ React14.createElement(React14.Fragment, null, /* @__PURE__ */ React14.createElement(Divider, { sx: { my: 1 } }), /* @__PURE__ */ React14.createElement(Stat, { label: "Spent", value: formatUsd(keySpend.spend) }), keySpend.max_budget != null && /* @__PURE__ */ React14.createElement(React14.Fragment, null, /* @__PURE__ */ React14.createElement(Stat, { label: "Budget", value: `${formatUsd(keySpend.spend)} / ${formatUsd(keySpend.max_budget)}` }), /* @__PURE__ */ React14.createElement(
         LinearProgress,
         {
           variant: "determinate",
@@ -1391,9 +1582,9 @@ var ChatPage_exports = {};
 __export(ChatPage_exports, {
   ChatPage: () => ChatPage
 });
-import React14, { useEffect as useEffect4, useMemo, useRef as useRef2, useState as useState8 } from "react";
+import React15, { useEffect as useEffect5, useMemo, useRef as useRef2, useState as useState9 } from "react";
 import {
-  Box as Box11,
+  Box as Box12,
   Button as Button3,
   List,
   ListItem,
@@ -1401,18 +1592,20 @@ import {
   ListItemText,
   IconButton as IconButton5,
   Divider as Divider2,
-  Typography as Typography8,
+  Typography as Typography10,
   Collapse,
   Tooltip as Tooltip5,
   InputBase,
-  TextField as TextField3,
+  TextField as TextField4,
   Accordion,
   AccordionSummary,
   AccordionDetails,
   Menu,
   MenuItem as MenuItem3,
   ListItemIcon,
-  Chip as Chip5
+  Chip as Chip6,
+  Switch,
+  FormControlLabel
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon2 from "@mui/icons-material/Delete";
@@ -1431,7 +1624,7 @@ import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import LinkIcon2 from "@mui/icons-material/Link";
 import CloseIcon from "@mui/icons-material/Close";
-import { useApi as useApi5, identityApiRef } from "@backstage/core-plugin-api";
+import { useApi as useApi6, identityApiRef } from "@backstage/core-plugin-api";
 function threadMatchesQuery(thread, query) {
   const q = query.trim().toLowerCase();
   if (!q) return true;
@@ -1452,6 +1645,7 @@ var init_ChatPage = __esm({
     init_useChat();
     init_theme();
     init_ModelPicker();
+    init_CompareModelPicker();
     init_VectorStorePicker();
     init_PersonaPicker();
     init_PersonaHomepage();
@@ -1467,42 +1661,44 @@ var init_ChatPage = __esm({
     URL_TOKEN_RE = /#(https:\/\/\S+)/;
     URL_PREVIEW_DEBOUNCE_MS = 500;
     ChatPage = () => {
-      const chatApi = useApi5(liteLlmChatApiRef);
-      const identityApi = useApi5(identityApiRef);
-      const [userId, setUserId] = useState8("default");
-      const [config, setConfig] = useState8({
+      const chatApi = useApi6(liteLlmChatApiRef);
+      const identityApi = useApi6(identityApiRef);
+      const [userId, setUserId] = useState9("default");
+      const [config, setConfig] = useState9({
         defaultModel: null,
         defaultVectorStoreIds: null,
         maxRequestBudget: null
       });
-      const [model, setModel] = useState8("");
-      const [vectorStoreIds, setVectorStoreIds] = useState8([]);
-      const [personaId, setPersonaId] = useState8("");
-      const [customSystemPrompt, setCustomSystemPrompt] = useState8("");
-      const [keyVal, setKeyVal] = useState8({
+      const [model, setModel] = useState9("");
+      const [compareMode, setCompareModeUi] = useState9(false);
+      const [compareModelsSel, setCompareModelsSel] = useState9([]);
+      const [vectorStoreIds, setVectorStoreIds] = useState9([]);
+      const [personaId, setPersonaId] = useState9("");
+      const [customSystemPrompt, setCustomSystemPrompt] = useState9("");
+      const [keyVal, setKeyVal] = useState9({
         alias: "",
         token: ""
       });
-      const [showSettings, setShowSettings] = useState8(true);
-      const [input, setInput] = useState8("");
-      const [configError, setConfigError] = useState8(null);
-      const [personas, setPersonas] = useState8([]);
-      const [personasLoading, setPersonasLoading] = useState8(true);
-      const [personasError, setPersonasError] = useState8(null);
-      const [searchQuery, setSearchQuery] = useState8("");
-      const [sidebarCollapsed, setSidebarCollapsed] = useState8(false);
-      const [rightPanelCollapsed, setRightPanelCollapsed] = useState8(false);
-      const [threadMenuAnchor, setThreadMenuAnchor] = useState8(null);
-      const [threadMenuTarget, setThreadMenuTarget] = useState8(null);
-      const [importError, setImportError] = useState8(null);
-      const [urlPreview, setUrlPreview] = useState8(null);
-      const [urlPreviewLoading, setUrlPreviewLoading] = useState8(false);
-      const [urlPreviewError, setUrlPreviewError] = useState8(null);
-      const [dismissedUrl, setDismissedUrl] = useState8(null);
+      const [showSettings, setShowSettings] = useState9(true);
+      const [input, setInput] = useState9("");
+      const [configError, setConfigError] = useState9(null);
+      const [personas, setPersonas] = useState9([]);
+      const [personasLoading, setPersonasLoading] = useState9(true);
+      const [personasError, setPersonasError] = useState9(null);
+      const [searchQuery, setSearchQuery] = useState9("");
+      const [sidebarCollapsed, setSidebarCollapsed] = useState9(false);
+      const [rightPanelCollapsed, setRightPanelCollapsed] = useState9(false);
+      const [threadMenuAnchor, setThreadMenuAnchor] = useState9(null);
+      const [threadMenuTarget, setThreadMenuTarget] = useState9(null);
+      const [importError, setImportError] = useState9(null);
+      const [urlPreview, setUrlPreview] = useState9(null);
+      const [urlPreviewLoading, setUrlPreviewLoading] = useState9(false);
+      const [urlPreviewError, setUrlPreviewError] = useState9(null);
+      const [dismissedUrl, setDismissedUrl] = useState9(null);
       const messagesEndRef = useRef2(null);
       const messagesContainerRef = useRef2(null);
       const importInputRef = useRef2(null);
-      useEffect4(() => {
+      useEffect5(() => {
         injectDesignSystemAssets();
         chatApi.getChatConfig().then(setConfig).catch((err) => setConfigError(err.message ?? "Failed to reach the chat backend"));
         chatApi.listPersonas().then(setPersonas).catch((err) => setPersonasError(err.message ?? "Failed to load personas")).finally(() => setPersonasLoading(false));
@@ -1520,20 +1716,22 @@ var init_ChatPage = __esm({
         topK: 5
       });
       const activeThreadId = chat.activeThread?.id ?? null;
-      useEffect4(() => {
+      useEffect5(() => {
         if (!chat.activeThread) return;
         setModel(chat.activeThread.model);
         setVectorStoreIds(chat.activeThread.vectorStoreIds);
         setPersonaId(chat.activeThread.personaId ?? "");
         setCustomSystemPrompt(chat.activeThread.customSystemPrompt ?? "");
         setKeyVal({ alias: chat.activeThread.keyAlias, token: chat.activeThread.keyToken });
+        setCompareModeUi(chat.activeThread.mode === "compare");
+        setCompareModelsSel(chat.activeThread.compareModels ?? []);
       }, [activeThreadId]);
       const messages = chat.activeThread?.messages ?? [];
       const isStreaming = chat.isStreaming;
-      useEffect4(() => {
+      useEffect5(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
       }, [messages, isStreaming]);
-      useEffect4(() => {
+      useEffect5(() => {
         const match = input.match(URL_TOKEN_RE);
         const url = match?.[1];
         if (!url) {
@@ -1569,14 +1767,16 @@ var init_ChatPage = __esm({
       };
       const handleSend = () => {
         if (!input.trim() || !keyVal.token || isStreaming) return;
+        if (compareMode && compareModelsSel.length === 0) return;
         const text = input.trim();
         const activeUrlMatch = text.match(URL_TOKEN_RE)?.[1];
         const attachedUrl = activeUrlMatch && urlPreview?.url === activeUrlMatch && activeUrlMatch !== dismissedUrl ? { url: urlPreview.url, title: urlPreview.title } : void 0;
+        const compareModelsOverride = compareMode ? compareModelsSel : void 0;
         if (!chat.activeThread) {
           chat.newThread();
-          requestAnimationFrame(() => chat.sendMessage(text, attachedUrl));
+          requestAnimationFrame(() => chat.sendMessage(text, attachedUrl, compareModelsOverride));
         } else {
-          chat.sendMessage(text, attachedUrl);
+          chat.sendMessage(text, attachedUrl, compareModelsOverride);
         }
         setInput("");
         setUrlPreview(null);
@@ -1631,8 +1831,8 @@ var init_ChatPage = __esm({
           statusParts.push(`$${chat.keySpend.spend.toFixed(2)} / $${chat.keySpend.max_budget.toFixed(2)} budget`);
         }
       }
-      return /* @__PURE__ */ React14.createElement(Box11, { sx: { display: "flex", height: "100dvh", overflow: "hidden" } }, /* @__PURE__ */ React14.createElement(
-        Box11,
+      return /* @__PURE__ */ React15.createElement(Box12, { sx: { display: "flex", height: "100dvh", overflow: "hidden" } }, /* @__PURE__ */ React15.createElement(
+        Box12,
         {
           sx: {
             width: sidebarCollapsed ? SIDEBAR_RAIL_WIDTH : SIDEBAR_WIDTH,
@@ -1645,9 +1845,9 @@ var init_ChatPage = __esm({
             transition: "width 0.15s"
           }
         },
-        /* @__PURE__ */ React14.createElement(Box11, { sx: { display: "flex", alignItems: "center", justifyContent: sidebarCollapsed ? "center" : "flex-end", px: 0.5, py: 0.5 } }, /* @__PURE__ */ React14.createElement(Tooltip5, { title: sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar" }, /* @__PURE__ */ React14.createElement(IconButton5, { size: "small", onClick: () => setSidebarCollapsed((v) => !v) }, sidebarCollapsed ? /* @__PURE__ */ React14.createElement(ChevronRightIcon, { fontSize: "small" }) : /* @__PURE__ */ React14.createElement(ChevronLeftIcon, { fontSize: "small" })))),
-        sidebarCollapsed ? /* @__PURE__ */ React14.createElement(Box11, { sx: { display: "flex", flexDirection: "column", alignItems: "center", gap: 1, pt: 1 } }, /* @__PURE__ */ React14.createElement(Tooltip5, { title: "New chat", placement: "right" }, /* @__PURE__ */ React14.createElement(IconButton5, { onClick: chat.newThread }, /* @__PURE__ */ React14.createElement(AddIcon, null))), /* @__PURE__ */ React14.createElement(Tooltip5, { title: "Settings", placement: "right" }, /* @__PURE__ */ React14.createElement(IconButton5, { onClick: () => setSidebarCollapsed(false) }, /* @__PURE__ */ React14.createElement(SettingsIcon, null)))) : /* @__PURE__ */ React14.createElement(React14.Fragment, null, /* @__PURE__ */ React14.createElement(Box11, { sx: { flexShrink: 0 } }, /* @__PURE__ */ React14.createElement(
-          Box11,
+        /* @__PURE__ */ React15.createElement(Box12, { sx: { display: "flex", alignItems: "center", justifyContent: sidebarCollapsed ? "center" : "flex-end", px: 0.5, py: 0.5 } }, /* @__PURE__ */ React15.createElement(Tooltip5, { title: sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar" }, /* @__PURE__ */ React15.createElement(IconButton5, { size: "small", onClick: () => setSidebarCollapsed((v) => !v) }, sidebarCollapsed ? /* @__PURE__ */ React15.createElement(ChevronRightIcon, { fontSize: "small" }) : /* @__PURE__ */ React15.createElement(ChevronLeftIcon, { fontSize: "small" })))),
+        sidebarCollapsed ? /* @__PURE__ */ React15.createElement(Box12, { sx: { display: "flex", flexDirection: "column", alignItems: "center", gap: 1, pt: 1 } }, /* @__PURE__ */ React15.createElement(Tooltip5, { title: "New chat", placement: "right" }, /* @__PURE__ */ React15.createElement(IconButton5, { onClick: chat.newThread }, /* @__PURE__ */ React15.createElement(AddIcon, null))), /* @__PURE__ */ React15.createElement(Tooltip5, { title: "Settings", placement: "right" }, /* @__PURE__ */ React15.createElement(IconButton5, { onClick: () => setSidebarCollapsed(false) }, /* @__PURE__ */ React15.createElement(SettingsIcon, null)))) : /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box12, { sx: { flexShrink: 0 } }, /* @__PURE__ */ React15.createElement(
+          Box12,
           {
             sx: {
               display: "flex",
@@ -1659,9 +1859,9 @@ var init_ChatPage = __esm({
             },
             onClick: () => setShowSettings((v) => !v)
           },
-          /* @__PURE__ */ React14.createElement(SettingsIcon, { fontSize: "small", sx: { mr: 1 } }),
-          /* @__PURE__ */ React14.createElement(Typography8, { variant: "overline", sx: { flex: 1 } }, "Settings"),
-          /* @__PURE__ */ React14.createElement(
+          /* @__PURE__ */ React15.createElement(SettingsIcon, { fontSize: "small", sx: { mr: 1 } }),
+          /* @__PURE__ */ React15.createElement(Typography10, { variant: "overline", sx: { flex: 1 } }, "Settings"),
+          /* @__PURE__ */ React15.createElement(
             ExpandMoreIcon,
             {
               fontSize: "small",
@@ -1671,7 +1871,7 @@ var init_ChatPage = __esm({
               }
             }
           )
-        ), /* @__PURE__ */ React14.createElement(Collapse, { in: showSettings }, /* @__PURE__ */ React14.createElement(Box11, { sx: { p: 1.5, display: "flex", flexDirection: "column", gap: 1.5 } }, configError && /* @__PURE__ */ React14.createElement(Typography8, { variant: "caption", color: "error" }, "Couldn't load chat defaults: ", configError), /* @__PURE__ */ React14.createElement(
+        ), /* @__PURE__ */ React15.createElement(Collapse, { in: showSettings }, /* @__PURE__ */ React15.createElement(Box12, { sx: { p: 1.5, display: "flex", flexDirection: "column", gap: 1.5 } }, configError && /* @__PURE__ */ React15.createElement(Typography10, { variant: "caption", color: "error" }, "Couldn't load chat defaults: ", configError), /* @__PURE__ */ React15.createElement(
           PersonaPicker,
           {
             value: personaId,
@@ -1680,8 +1880,8 @@ var init_ChatPage = __esm({
             error: personasError,
             onChange: handlePersonaChange
           }
-        ), /* @__PURE__ */ React14.createElement(
-          TextField3,
+        ), /* @__PURE__ */ React15.createElement(
+          TextField4,
           {
             label: "Custom system prompt",
             placeholder: personaId ? "Appended after the persona system prompt\u2026" : "Used as the system prompt (no persona selected)\u2026",
@@ -1693,22 +1893,35 @@ var init_ChatPage = __esm({
             size: "small",
             fullWidth: true
           }
-        ), /* @__PURE__ */ React14.createElement(ModelPicker, { value: model, onChange: setModel, defaultModel: config.defaultModel }), /* @__PURE__ */ React14.createElement(
+        ), /* @__PURE__ */ React15.createElement(
+          FormControlLabel,
+          {
+            control: /* @__PURE__ */ React15.createElement(
+              Switch,
+              {
+                size: "small",
+                checked: compareMode,
+                onChange: (e) => setCompareModeUi(e.target.checked)
+              }
+            ),
+            label: /* @__PURE__ */ React15.createElement(Typography10, { variant: "body2" }, "Compare models side-by-side")
+          }
+        ), compareMode ? /* @__PURE__ */ React15.createElement(CompareModelPicker, { value: compareModelsSel, onChange: setCompareModelsSel }) : /* @__PURE__ */ React15.createElement(ModelPicker, { value: model, onChange: setModel, defaultModel: config.defaultModel }), /* @__PURE__ */ React15.createElement(
           Accordion,
           {
             disableGutters: true,
             variant: "outlined",
             sx: { "&:before": { display: "none" } }
           },
-          /* @__PURE__ */ React14.createElement(AccordionSummary, { expandIcon: /* @__PURE__ */ React14.createElement(ExpandMoreIcon, { fontSize: "small" }) }, /* @__PURE__ */ React14.createElement(Typography8, { variant: "body2", sx: { fontWeight: 500 } }, "Advanced")),
-          /* @__PURE__ */ React14.createElement(AccordionDetails, { sx: { display: "flex", flexDirection: "column", gap: 1.5 } }, /* @__PURE__ */ React14.createElement(
+          /* @__PURE__ */ React15.createElement(AccordionSummary, { expandIcon: /* @__PURE__ */ React15.createElement(ExpandMoreIcon, { fontSize: "small" }) }, /* @__PURE__ */ React15.createElement(Typography10, { variant: "body2", sx: { fontWeight: 500 } }, "Advanced")),
+          /* @__PURE__ */ React15.createElement(AccordionDetails, { sx: { display: "flex", flexDirection: "column", gap: 1.5 } }, /* @__PURE__ */ React15.createElement(
             VectorStorePicker,
             {
               value: vectorStoreIds,
               onChange: setVectorStoreIds,
               defaultVectorStoreIds: config.defaultVectorStoreIds
             }
-          ), /* @__PURE__ */ React14.createElement(
+          ), /* @__PURE__ */ React15.createElement(
             KeyPicker,
             {
               value: keyVal,
@@ -1721,17 +1934,17 @@ var init_ChatPage = __esm({
               }
             }
           ))
-        )))), /* @__PURE__ */ React14.createElement(Divider2, null), /* @__PURE__ */ React14.createElement(Box11, { sx: { p: 1.5, display: "flex", gap: 1 } }, /* @__PURE__ */ React14.createElement(
+        )))), /* @__PURE__ */ React15.createElement(Divider2, null), /* @__PURE__ */ React15.createElement(Box12, { sx: { p: 1.5, display: "flex", gap: 1 } }, /* @__PURE__ */ React15.createElement(
           Button3,
           {
             fullWidth: true,
             variant: "outlined",
-            startIcon: /* @__PURE__ */ React14.createElement(AddIcon, null),
+            startIcon: /* @__PURE__ */ React15.createElement(AddIcon, null),
             onClick: chat.newThread,
             size: "small"
           },
           "New chat"
-        ), /* @__PURE__ */ React14.createElement(Tooltip5, { title: "Import thread" }, /* @__PURE__ */ React14.createElement(IconButton5, { size: "small", onClick: () => importInputRef.current?.click() }, /* @__PURE__ */ React14.createElement(FileUploadIcon, { fontSize: "small" }))), /* @__PURE__ */ React14.createElement(
+        ), /* @__PURE__ */ React15.createElement(Tooltip5, { title: "Import thread" }, /* @__PURE__ */ React15.createElement(IconButton5, { size: "small", onClick: () => importInputRef.current?.click() }, /* @__PURE__ */ React15.createElement(FileUploadIcon, { fontSize: "small" }))), /* @__PURE__ */ React15.createElement(
           "input",
           {
             ref: importInputRef,
@@ -1740,14 +1953,14 @@ var init_ChatPage = __esm({
             hidden: true,
             onChange: handleImportFile
           }
-        )), importError && /* @__PURE__ */ React14.createElement(Box11, { sx: { px: 1.5, pb: 1 } }, /* @__PURE__ */ React14.createElement(Typography8, { variant: "caption", color: "error" }, importError)), /* @__PURE__ */ React14.createElement(Box11, { sx: { px: 1.5, pb: 1 } }, /* @__PURE__ */ React14.createElement(
+        )), importError && /* @__PURE__ */ React15.createElement(Box12, { sx: { px: 1.5, pb: 1 } }, /* @__PURE__ */ React15.createElement(Typography10, { variant: "caption", color: "error" }, importError)), /* @__PURE__ */ React15.createElement(Box12, { sx: { px: 1.5, pb: 1 } }, /* @__PURE__ */ React15.createElement(
           InputBase,
           {
             fullWidth: true,
             placeholder: "Search threads\u2026",
             value: searchQuery,
             onChange: (e) => setSearchQuery(e.target.value),
-            startAdornment: /* @__PURE__ */ React14.createElement(SearchIcon, { fontSize: "small", sx: { mr: 0.75, color: "text.secondary" } }),
+            startAdornment: /* @__PURE__ */ React15.createElement(SearchIcon, { fontSize: "small", sx: { mr: 0.75, color: "text.secondary" } }),
             sx: {
               border: 1,
               borderColor: "divider",
@@ -1757,22 +1970,22 @@ var init_ChatPage = __esm({
               fontSize: "0.85rem"
             }
           }
-        )), /* @__PURE__ */ React14.createElement(Box11, { sx: { flex: 1, overflowY: "auto", minHeight: 0 } }, /* @__PURE__ */ React14.createElement(List, { dense: true }, visibleThreads.map((t) => /* @__PURE__ */ React14.createElement(
+        )), /* @__PURE__ */ React15.createElement(Box12, { sx: { flex: 1, overflowY: "auto", minHeight: 0 } }, /* @__PURE__ */ React15.createElement(List, { dense: true }, visibleThreads.map((t) => /* @__PURE__ */ React15.createElement(
           ListItem,
           {
             key: t.id,
             disablePadding: true,
-            secondaryAction: /* @__PURE__ */ React14.createElement(IconButton5, { edge: "end", size: "small", onClick: (e) => openThreadMenu(e, t.id) }, /* @__PURE__ */ React14.createElement(MoreVertIcon, { fontSize: "small" }))
+            secondaryAction: /* @__PURE__ */ React15.createElement(IconButton5, { edge: "end", size: "small", onClick: (e) => openThreadMenu(e, t.id) }, /* @__PURE__ */ React15.createElement(MoreVertIcon, { fontSize: "small" }))
           },
-          /* @__PURE__ */ React14.createElement(
+          /* @__PURE__ */ React15.createElement(
             ListItemButton,
             {
               selected: chat.activeThread?.id === t.id,
               onClick: () => chat.selectThread(t.id),
               sx: { pr: 6 }
             },
-            t.pinned && /* @__PURE__ */ React14.createElement(PushPinIcon, { fontSize: "small", sx: { mr: 0.75, color: "text.secondary" } }),
-            /* @__PURE__ */ React14.createElement(
+            t.pinned && /* @__PURE__ */ React15.createElement(PushPinIcon, { fontSize: "small", sx: { mr: 0.75, color: "text.secondary" } }),
+            /* @__PURE__ */ React15.createElement(
               ListItemText,
               {
                 primary: t.title,
@@ -1781,7 +1994,7 @@ var init_ChatPage = __esm({
               }
             )
           )
-        )), visibleThreads.length === 0 && /* @__PURE__ */ React14.createElement(Typography8, { variant: "caption", color: "text.secondary", sx: { px: 2, py: 1, display: "block" } }, searchQuery ? "No threads match your search." : "No threads yet."))), /* @__PURE__ */ React14.createElement(Menu, { anchorEl: threadMenuAnchor, open: !!threadMenuAnchor, onClose: closeThreadMenu }, /* @__PURE__ */ React14.createElement(
+        )), visibleThreads.length === 0 && /* @__PURE__ */ React15.createElement(Typography10, { variant: "caption", color: "text.secondary", sx: { px: 2, py: 1, display: "block" } }, searchQuery ? "No threads match your search." : "No threads yet."))), /* @__PURE__ */ React15.createElement(Menu, { anchorEl: threadMenuAnchor, open: !!threadMenuAnchor, onClose: closeThreadMenu }, /* @__PURE__ */ React15.createElement(
           MenuItem3,
           {
             onClick: () => {
@@ -1789,9 +2002,9 @@ var init_ChatPage = __esm({
               closeThreadMenu();
             }
           },
-          /* @__PURE__ */ React14.createElement(ListItemIcon, null, menuTargetThread?.pinned ? /* @__PURE__ */ React14.createElement(PushPinIcon, { fontSize: "small" }) : /* @__PURE__ */ React14.createElement(PushPinOutlinedIcon, { fontSize: "small" })),
+          /* @__PURE__ */ React15.createElement(ListItemIcon, null, menuTargetThread?.pinned ? /* @__PURE__ */ React15.createElement(PushPinIcon, { fontSize: "small" }) : /* @__PURE__ */ React15.createElement(PushPinOutlinedIcon, { fontSize: "small" })),
           menuTargetThread?.pinned ? "Unpin" : "Pin"
-        ), /* @__PURE__ */ React14.createElement(
+        ), /* @__PURE__ */ React15.createElement(
           MenuItem3,
           {
             onClick: () => {
@@ -1799,9 +2012,9 @@ var init_ChatPage = __esm({
               closeThreadMenu();
             }
           },
-          /* @__PURE__ */ React14.createElement(ListItemIcon, null, /* @__PURE__ */ React14.createElement(FileDownloadIcon, { fontSize: "small" })),
+          /* @__PURE__ */ React15.createElement(ListItemIcon, null, /* @__PURE__ */ React15.createElement(FileDownloadIcon, { fontSize: "small" })),
           "Export"
-        ), /* @__PURE__ */ React14.createElement(
+        ), /* @__PURE__ */ React15.createElement(
           MenuItem3,
           {
             onClick: () => {
@@ -1809,11 +2022,11 @@ var init_ChatPage = __esm({
               closeThreadMenu();
             }
           },
-          /* @__PURE__ */ React14.createElement(ListItemIcon, null, /* @__PURE__ */ React14.createElement(DeleteIcon2, { fontSize: "small" })),
+          /* @__PURE__ */ React15.createElement(ListItemIcon, null, /* @__PURE__ */ React15.createElement(DeleteIcon2, { fontSize: "small" })),
           "Delete"
         )))
-      ), /* @__PURE__ */ React14.createElement(
-        Box11,
+      ), /* @__PURE__ */ React15.createElement(
+        Box12,
         {
           sx: {
             flex: 3,
@@ -1822,8 +2035,8 @@ var init_ChatPage = __esm({
             overflow: "hidden"
           }
         },
-        /* @__PURE__ */ React14.createElement(
-          Box11,
+        /* @__PURE__ */ React15.createElement(
+          Box12,
           {
             sx: {
               width: "100%",
@@ -1833,8 +2046,8 @@ var init_ChatPage = __esm({
               overflow: "hidden"
             }
           },
-          /* @__PURE__ */ React14.createElement(
-            Box11,
+          /* @__PURE__ */ React15.createElement(
+            Box12,
             {
               sx: {
                 flexShrink: 0,
@@ -1847,14 +2060,14 @@ var init_ChatPage = __esm({
                 gap: 1
               }
             },
-            /* @__PURE__ */ React14.createElement(ChatIcon, { fontSize: "small", color: "action" }),
-            /* @__PURE__ */ React14.createElement(Typography8, { variant: "subtitle2", noWrap: true, sx: { flex: 1 } }, chat.activeThread?.title ?? "AI Chat"),
-            /* @__PURE__ */ React14.createElement(Tooltip5, { title: rightPanelCollapsed ? "Show context panel" : "Hide context panel" }, /* @__PURE__ */ React14.createElement(IconButton5, { size: "small", onClick: () => setRightPanelCollapsed((v) => !v) }, rightPanelCollapsed ? /* @__PURE__ */ React14.createElement(ChevronLeftIcon, { fontSize: "small" }) : /* @__PURE__ */ React14.createElement(ChevronRightIcon, { fontSize: "small" })))
+            /* @__PURE__ */ React15.createElement(ChatIcon, { fontSize: "small", color: "action" }),
+            /* @__PURE__ */ React15.createElement(Typography10, { variant: "subtitle2", noWrap: true, sx: { flex: 1 } }, chat.activeThread?.title ?? "AI Chat"),
+            /* @__PURE__ */ React15.createElement(Tooltip5, { title: rightPanelCollapsed ? "Show context panel" : "Hide context panel" }, /* @__PURE__ */ React15.createElement(IconButton5, { size: "small", onClick: () => setRightPanelCollapsed((v) => !v) }, rightPanelCollapsed ? /* @__PURE__ */ React15.createElement(ChevronLeftIcon, { fontSize: "small" }) : /* @__PURE__ */ React15.createElement(ChevronRightIcon, { fontSize: "small" })))
           ),
-          chat.error && /* @__PURE__ */ React14.createElement(Box11, { sx: { px: 2, pt: 1 } }, /* @__PURE__ */ React14.createElement(ErrorBanner, { error: chat.error, onDismiss: () => {
+          chat.error && /* @__PURE__ */ React15.createElement(Box12, { sx: { px: 2, pt: 1 } }, /* @__PURE__ */ React15.createElement(ErrorBanner, { error: chat.error, onDismiss: () => {
           } })),
-          /* @__PURE__ */ React14.createElement(
-            Box11,
+          /* @__PURE__ */ React15.createElement(
+            Box12,
             {
               ref: messagesContainerRef,
               sx: {
@@ -1863,7 +2076,7 @@ var init_ChatPage = __esm({
                 minHeight: 0
               }
             },
-            messages.length === 0 ? /* @__PURE__ */ React14.createElement(
+            messages.length === 0 ? /* @__PURE__ */ React15.createElement(
               PersonaHomepage,
               {
                 personas,
@@ -1872,42 +2085,42 @@ var init_ChatPage = __esm({
                 selectedId: personaId,
                 onSelect: handlePersonaChange
               }
-            ) : /* @__PURE__ */ React14.createElement(
+            ) : /* @__PURE__ */ React15.createElement(
               MessageList,
               {
                 messages,
-                isStreaming,
+                streamingMessageIds: chat.streamingMessageIds,
                 onFeedback: chat.submitFeedback,
                 onRegenerate: chat.regenerateFrom,
                 onEditAndResend: chat.editAndResend
               }
             ),
-            /* @__PURE__ */ React14.createElement("div", { ref: messagesEndRef })
+            /* @__PURE__ */ React15.createElement("div", { ref: messagesEndRef })
           ),
-          (urlPreviewLoading || urlPreview || urlPreviewError) && /* @__PURE__ */ React14.createElement(Box11, { sx: { px: 2, pt: 1 } }, urlPreviewLoading ? /* @__PURE__ */ React14.createElement(Chip5, { size: "small", icon: /* @__PURE__ */ React14.createElement(LinkIcon2, { fontSize: "small" }), label: "Fetching page\u2026", variant: "outlined" }) : urlPreviewError ? /* @__PURE__ */ React14.createElement(
-            Chip5,
+          (urlPreviewLoading || urlPreview || urlPreviewError) && /* @__PURE__ */ React15.createElement(Box12, { sx: { px: 2, pt: 1 } }, urlPreviewLoading ? /* @__PURE__ */ React15.createElement(Chip6, { size: "small", icon: /* @__PURE__ */ React15.createElement(LinkIcon2, { fontSize: "small" }), label: "Fetching page\u2026", variant: "outlined" }) : urlPreviewError ? /* @__PURE__ */ React15.createElement(
+            Chip6,
             {
               size: "small",
               color: "error",
-              icon: /* @__PURE__ */ React14.createElement(LinkIcon2, { fontSize: "small" }),
+              icon: /* @__PURE__ */ React15.createElement(LinkIcon2, { fontSize: "small" }),
               label: urlPreviewError,
               variant: "outlined",
               onDelete: dismissUrlPreview,
-              deleteIcon: /* @__PURE__ */ React14.createElement(CloseIcon, { fontSize: "small" })
+              deleteIcon: /* @__PURE__ */ React15.createElement(CloseIcon, { fontSize: "small" })
             }
-          ) : urlPreview ? /* @__PURE__ */ React14.createElement(Tooltip5, { title: urlPreview.url }, /* @__PURE__ */ React14.createElement(
-            Chip5,
+          ) : urlPreview ? /* @__PURE__ */ React15.createElement(Tooltip5, { title: urlPreview.url }, /* @__PURE__ */ React15.createElement(
+            Chip6,
             {
               size: "small",
-              icon: /* @__PURE__ */ React14.createElement(LinkIcon2, { fontSize: "small" }),
+              icon: /* @__PURE__ */ React15.createElement(LinkIcon2, { fontSize: "small" }),
               label: `Page attached: ${urlPreview.title}`,
               variant: "outlined",
               onDelete: dismissUrlPreview,
-              deleteIcon: /* @__PURE__ */ React14.createElement(CloseIcon, { fontSize: "small" })
+              deleteIcon: /* @__PURE__ */ React15.createElement(CloseIcon, { fontSize: "small" })
             }
           )) : null),
-          /* @__PURE__ */ React14.createElement(
-            Box11,
+          /* @__PURE__ */ React15.createElement(
+            Box12,
             {
               sx: {
                 flexShrink: 0,
@@ -1920,7 +2133,7 @@ var init_ChatPage = __esm({
                 alignItems: "flex-end"
               }
             },
-            /* @__PURE__ */ React14.createElement(
+            /* @__PURE__ */ React15.createElement(
               InputBase,
               {
                 multiline: true,
@@ -1942,20 +2155,20 @@ var init_ChatPage = __esm({
                 }
               }
             ),
-            isStreaming ? /* @__PURE__ */ React14.createElement(Tooltip5, { title: "Stop" }, /* @__PURE__ */ React14.createElement(IconButton5, { color: "error", onClick: chat.stopGeneration }, /* @__PURE__ */ React14.createElement(StopIcon, null))) : /* @__PURE__ */ React14.createElement(Tooltip5, { title: "Send" }, /* @__PURE__ */ React14.createElement(
+            isStreaming ? /* @__PURE__ */ React15.createElement(Tooltip5, { title: "Stop" }, /* @__PURE__ */ React15.createElement(IconButton5, { color: "error", onClick: chat.stopGeneration }, /* @__PURE__ */ React15.createElement(StopIcon, null))) : /* @__PURE__ */ React15.createElement(Tooltip5, { title: "Send" }, /* @__PURE__ */ React15.createElement(
               IconButton5,
               {
                 color: "primary",
                 onClick: handleSend,
-                disabled: !input.trim() || !keyVal.token
+                disabled: !input.trim() || !keyVal.token || compareMode && compareModelsSel.length === 0
               },
-              /* @__PURE__ */ React14.createElement(SendIcon, null)
+              /* @__PURE__ */ React15.createElement(SendIcon, null)
             ))
           ),
-          statusParts.length > 0 && /* @__PURE__ */ React14.createElement(Box11, { sx: { px: 2, pb: 1 } }, /* @__PURE__ */ React14.createElement(Typography8, { variant: "caption", color: "text.secondary" }, statusParts.join(" \xB7 ")))
+          statusParts.length > 0 && /* @__PURE__ */ React15.createElement(Box12, { sx: { px: 2, pb: 1 } }, /* @__PURE__ */ React15.createElement(Typography10, { variant: "caption", color: "text.secondary" }, statusParts.join(" \xB7 ")))
         )
-      ), !rightPanelCollapsed && /* @__PURE__ */ React14.createElement(
-        Box11,
+      ), !rightPanelCollapsed && /* @__PURE__ */ React15.createElement(
+        Box12,
         {
           sx: {
             width: RIGHT_RAIL_WIDTH,
@@ -1967,9 +2180,9 @@ var init_ChatPage = __esm({
             overflowY: "auto"
           }
         },
-        /* @__PURE__ */ React14.createElement(SourcesPanel, { citations: chat.citations }),
-        /* @__PURE__ */ React14.createElement(Divider2, null),
-        /* @__PURE__ */ React14.createElement(
+        /* @__PURE__ */ React15.createElement(SourcesPanel, { citations: chat.citations }),
+        /* @__PURE__ */ React15.createElement(Divider2, null),
+        /* @__PURE__ */ React15.createElement(
           UsagePanel,
           {
             lastTurnUsage,
@@ -1984,7 +2197,7 @@ var init_ChatPage = __esm({
 
 // src/plugin.tsx
 init_api();
-import React15 from "react";
+import React16 from "react";
 import { Chat as ChatIcon2 } from "@mui/icons-material";
 import {
   createFrontendPlugin,
@@ -2003,10 +2216,10 @@ var chatPage = PageBlueprint.make({
   params: {
     path: "/ai-chat",
     title: "AI Chat",
-    icon: /* @__PURE__ */ React15.createElement(ChatIcon2, null),
+    icon: /* @__PURE__ */ React16.createElement(ChatIcon2, null),
     loader: async () => {
       const { ChatPage: ChatPage2 } = await Promise.resolve().then(() => (init_ChatPage(), ChatPage_exports));
-      return /* @__PURE__ */ React15.createElement(ChatPage2, null);
+      return /* @__PURE__ */ React16.createElement(ChatPage2, null);
     }
   }
 });
