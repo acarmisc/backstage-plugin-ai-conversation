@@ -8,6 +8,7 @@ export interface UseChatOptions {
     keyAlias: string;
     keyToken: string;
     topK?: number;
+    webSearch?: boolean;
 }
 export interface UseChatResult {
     threads: Thread[];

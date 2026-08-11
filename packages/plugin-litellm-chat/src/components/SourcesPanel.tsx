@@ -21,8 +21,22 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({ citations }) => {
           <Box key={i} sx={{ mt: 1.5 }}>
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
               <Typography variant="body2" fontWeight={500}>
-                {c.filename}
+                {c.url ? (
+                  <a href={c.url} target="_blank" rel="noopener noreferrer">
+                    {c.filename}
+                  </a>
+                ) : (
+                  c.filename
+                )}
               </Typography>
+              {c.source && (
+                <Chip
+                  size="small"
+                  label={c.source === 'web' ? 'Web' : 'Knowledge base'}
+                  variant="outlined"
+                  color={c.source === 'web' ? 'secondary' : 'default'}
+                />
+              )}
               <Chip size="small" label={c.score.toFixed(3)} color="primary" variant="outlined" />
             </Box>
             <Typography

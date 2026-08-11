@@ -52,6 +52,7 @@ export interface UseChatOptions {
   keyAlias: string;
   keyToken: string;
   topK?: number;
+  webSearch?: boolean;
 }
 
 export interface UseChatResult {
@@ -83,7 +84,7 @@ export interface UseChatResult {
 }
 
 export function useChat(opts: UseChatOptions): UseChatResult {
-  const { userId, model, vectorStoreIds, personaId, customSystemPrompt, keyAlias, keyToken, topK } = opts;
+  const { userId, model, vectorStoreIds, personaId, customSystemPrompt, keyAlias, keyToken, topK, webSearch } = opts;
   const api = useApi(liteLlmChatApiRef) as InstanceType<typeof LiteLlmChatApi>;
 
   const [threads, setThreads] = useState<Thread[]>(() => loadThreads(userId));
@@ -236,6 +237,7 @@ export function useChat(opts: UseChatOptions): UseChatResult {
           persona_id: personaId || undefined,
           custom_system_prompt: customSystemPrompt || undefined,
           context_url: attachedUrl?.url,
+          web_search: webSearch || undefined,
           top_k: topK,
           user_key: keyToken,
         },
@@ -250,6 +252,8 @@ export function useChat(opts: UseChatOptions): UseChatResult {
                 filename: r.filename,
                 score: r.score,
                 snippet: r.text,
+                source: r.source,
+                url: r.url,
               })),
             );
           }
@@ -302,7 +306,7 @@ export function useChat(opts: UseChatOptions): UseChatResult {
 
       abortMapRef.current.set(assistantMsgId, controller);
     },
-    [api, vectorStoreIds, personaId, customSystemPrompt, topK, keyToken],
+    [api, vectorStoreIds, personaId, customSystemPrompt, topK, keyToken, webSearch],
   );
 
   // Shared core for sendMessage/regenerateFrom/editAndResend: appends a user
@@ -339,6 +343,7 @@ export function useChat(opts: UseChatOptions): UseChatResult {
                 customSystemPrompt,
                 keyAlias,
                 keyToken,
+                webSearch,
                 mode: 'single',
                 updatedAt: Date.now(),
               }
@@ -353,7 +358,7 @@ export function useChat(opts: UseChatOptions): UseChatResult {
         }
       });
     },
-    [activeThread, api, keyToken, model, vectorStoreIds, personaId, customSystemPrompt, keyAlias, startStream, stopGeneration],
+    [activeThread, api, keyToken, model, vectorStoreIds, personaId, customSystemPrompt, keyAlias, webSearch, startStream, stopGeneration],
   );
 
   // Compare mode: sends the same prompt to every model in `models` in
@@ -399,6 +404,7 @@ export function useChat(opts: UseChatOptions): UseChatResult {
                 customSystemPrompt,
                 keyAlias,
                 keyToken,
+                webSearch,
                 mode: 'compare',
                 compareModels: models,
                 updatedAt: Date.now(),
@@ -415,7 +421,7 @@ export function useChat(opts: UseChatOptions): UseChatResult {
         });
       });
     },
-    [activeThread, api, keyToken, vectorStoreIds, personaId, customSystemPrompt, keyAlias, startStream, stopGeneration],
+    [activeThread, api, keyToken, vectorStoreIds, personaId, customSystemPrompt, keyAlias, webSearch, startStream, stopGeneration],
   );
 
   const sendMessage = useCallback(
