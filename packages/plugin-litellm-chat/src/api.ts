@@ -59,9 +59,13 @@ function normalizeChunk(raw: any): ChatStreamChunk {
   if (typeof content === 'string') chunk.delta = content;
   if (Array.isArray(raw?.search_results)) {
     chunk.search_results = raw.search_results.map((r: any): SearchResult => ({
-      filename: r.filename ?? r.file_name ?? r.source ?? r.name ?? '',
+      filename: r.filename ?? r.file_name ?? r.title ?? r.source ?? r.name ?? '',
       score: typeof r.score === 'number' ? r.score : 0,
       text: r.text ?? r.snippet ?? r.content ?? '',
+      // LiteLLM doesn't tag result origin explicitly — a `url` field is the
+      // best available signal that this came from web search, not the KB.
+      source: r.url ? 'web' : 'kb',
+      url: r.url,
     }));
   }
   if (raw?.usage && typeof raw.usage === 'object') {

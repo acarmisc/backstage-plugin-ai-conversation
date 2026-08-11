@@ -434,6 +434,9 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
         payload.vector_store_ids = body.vector_store_ids;
         payload.top_k = body.top_k ?? 5;
       }
+      if (body.web_search) {
+        payload.web_search_options = {};
+      }
 
       const upstream = await fetch(
         `${chatConfig.baseUrl}/v1/chat/completions`,
@@ -496,6 +499,9 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       };
       if (body.vector_store_ids?.length) {
         chatBody.vector_store_ids = body.vector_store_ids;
+      }
+      if (body.web_search) {
+        chatBody.web_search_options = {};
       }
       await proxySSE({
         upstreamUrl: `${base}/v1/chat/completions`,

@@ -92,6 +92,7 @@ export const ChatPage: React.FC = () => {
   const [compareMode, setCompareModeUi] = useState(false);
   const [compareModelsSel, setCompareModelsSel] = useState<string[]>([]);
   const [vectorStoreIds, setVectorStoreIds] = useState<string[]>([]);
+  const [webSearch, setWebSearch] = useState(false);
   const [personaId, setPersonaId] = useState('');
   const [customSystemPrompt, setCustomSystemPrompt] = useState('');
   const [keyVal, setKeyVal] = useState<{ alias: string; token: string }>({
@@ -145,6 +146,7 @@ export const ChatPage: React.FC = () => {
     keyAlias: keyVal.alias,
     keyToken: keyVal.token,
     topK: 5,
+    webSearch,
   });
 
   // Restore the selected thread's own model/KBs/persona/key into Settings
@@ -161,6 +163,7 @@ export const ChatPage: React.FC = () => {
     setKeyVal({ alias: chat.activeThread.keyAlias, token: chat.activeThread.keyToken });
     setCompareModeUi(chat.activeThread.mode === 'compare');
     setCompareModelsSel(chat.activeThread.compareModels ?? []);
+    setWebSearch(!!chat.activeThread.webSearch);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeThreadId]);
 
@@ -420,6 +423,16 @@ export const ChatPage: React.FC = () => {
                         value={vectorStoreIds}
                         onChange={setVectorStoreIds}
                         defaultVectorStoreIds={config.defaultVectorStoreIds}
+                      />
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            size="small"
+                            checked={webSearch}
+                            onChange={e => setWebSearch(e.target.checked)}
+                          />
+                        }
+                        label={<Typography variant="body2">Include web search</Typography>}
                       />
                       <KeyPicker
                         value={keyVal}

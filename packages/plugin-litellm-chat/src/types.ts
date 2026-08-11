@@ -71,12 +71,21 @@ export interface ChatRequest {
   /** URL typed as `#https://...` in the composer, resolved server-side and
    * injected as one-off context for this turn only. */
   context_url?: string;
+  /** Requests LiteLLM's native web search alongside (not instead of) any
+   * selected knowledge bases. Passed through as-is — see AGENTS.md for the
+   * "verify LiteLLM has a native web_search tool first" caveat. */
+  web_search?: boolean;
 }
 
 export interface SearchResult {
   filename: string;
   score: number;
   text: string;
+  /** 'web' for web-search results, 'kb' for vector-store hits. Inferred
+   * client-side from shape (a `url` field implies a web result) — LiteLLM
+   * doesn't currently tag these explicitly, so treat this as best-effort. */
+  source?: 'kb' | 'web';
+  url?: string;
 }
 
 export interface UsageInfo {
@@ -102,6 +111,8 @@ export interface Citation {
   filename: string;
   score: number;
   snippet: string;
+  source?: 'kb' | 'web';
+  url?: string;
 }
 
 export interface ChatResult {
@@ -140,6 +151,7 @@ export interface Thread {
    * the default for every thread created before this field existed. */
   mode?: 'single' | 'compare';
   compareModels?: string[];
+  webSearch?: boolean;
 }
 
 /** Portable export shape written by exportThread() / read by importThread().

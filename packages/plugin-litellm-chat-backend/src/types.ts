@@ -60,6 +60,11 @@ export interface ChatStreamRequest {
    * (SSRF-guarded, see urlContext.ts) and injected as one-off context for
    * this turn only — never registered as a vector store. */
   context_url?: string;
+  /** Passed through as LiteLLM's `web_search_options` when set — assumes
+   * the proxy has a native web-search-capable model/tool. If the target
+   * LiteLLM deployment doesn't, this is a silent no-op upstream rather
+   * than an error; verify against the live proxy before relying on it. */
+  web_search?: boolean;
 }
 
 export interface FetchContextRequest {

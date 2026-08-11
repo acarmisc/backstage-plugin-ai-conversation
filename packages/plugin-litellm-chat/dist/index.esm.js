@@ -25,9 +25,13 @@ function normalizeChunk(raw) {
   if (typeof content === "string") chunk.delta = content;
   if (Array.isArray(raw?.search_results)) {
     chunk.search_results = raw.search_results.map((r) => ({
-      filename: r.filename ?? r.file_name ?? r.source ?? r.name ?? "",
+      filename: r.filename ?? r.file_name ?? r.title ?? r.source ?? r.name ?? "",
       score: typeof r.score === "number" ? r.score : 0,
-      text: r.text ?? r.snippet ?? r.content ?? ""
+      text: r.text ?? r.snippet ?? r.content ?? "",
+      // LiteLLM doesn't tag result origin explicitly — a `url` field is the
+      // best available signal that this came from web search, not the KB.
+      source: r.url ? "web" : "kb",
+      url: r.url
     }));
   }
   if (raw?.usage && typeof raw.usage === "object") {
@@ -224,7 +228,7 @@ function findQuestionFor(messages, messageId) {
   return messages[idx - 1];
 }
 function useChat(opts) {
-  const { userId, model, vectorStoreIds, personaId, customSystemPrompt, keyAlias, keyToken, topK } = opts;
+  const { userId, model, vectorStoreIds, personaId, customSystemPrompt, keyAlias, keyToken, topK, webSearch } = opts;
   const api = useApi(liteLlmChatApiRef);
   const [threads, setThreads] = useState(() => loadThreads(userId));
   const [activeId, setActiveId] = useState(
@@ -340,6 +344,7 @@ function useChat(opts) {
           persona_id: personaId || void 0,
           custom_system_prompt: customSystemPrompt || void 0,
           context_url: attachedUrl?.url,
+          web_search: webSearch || void 0,
           top_k: topK,
           user_key: keyToken
         },
@@ -353,7 +358,9 @@ function useChat(opts) {
               chunk.search_results.map((r) => ({
                 filename: r.filename,
                 score: r.score,
-                snippet: r.text
+                snippet: r.text,
+                source: r.source,
+                url: r.url
               }))
             );
           }
@@ -403,7 +410,7 @@ function useChat(opts) {
       );
       abortMapRef.current.set(assistantMsgId, controller);
     },
-    [api, vectorStoreIds, personaId, customSystemPrompt, topK, keyToken]
+    [api, vectorStoreIds, personaId, customSystemPrompt, topK, keyToken, webSearch]
   );
   const runSend = useCallback(
     (text, baseMessages, attachedUrl) => {
@@ -429,6 +436,7 @@ function useChat(opts) {
             customSystemPrompt,
             keyAlias,
             keyToken,
+            webSearch,
             mode: "single",
             updatedAt: Date.now()
           } : t
@@ -442,7 +450,7 @@ function useChat(opts) {
         }
       });
     },
-    [activeThread, api, keyToken, model, vectorStoreIds, personaId, customSystemPrompt, keyAlias, startStream, stopGeneration]
+    [activeThread, api, keyToken, model, vectorStoreIds, personaId, customSystemPrompt, keyAlias, webSearch, startStream, stopGeneration]
   );
   const runCompareSend = useCallback(
     (text, baseMessages, models, attachedUrl) => {
@@ -474,6 +482,7 @@ function useChat(opts) {
             customSystemPrompt,
             keyAlias,
             keyToken,
+            webSearch,
             mode: "compare",
             compareModels: models,
             updatedAt: Date.now()
@@ -489,7 +498,7 @@ function useChat(opts) {
         });
       });
     },
-    [activeThread, api, keyToken, vectorStoreIds, personaId, customSystemPrompt, keyAlias, startStream, stopGeneration]
+    [activeThread, api, keyToken, vectorStoreIds, personaId, customSystemPrompt, keyAlias, webSearch, startStream, stopGeneration]
   );
   const sendMessage = useCallback(
     (text, attachedUrl, compareModelsOverride) => {
@@ -1527,7 +1536,15 @@ var init_SourcesPanel = __esm({
   "src/components/SourcesPanel.tsx"() {
     "use strict";
     SourcesPanel = ({ citations }) => {
-      return /* @__PURE__ */ React13.createElement(Box10, { sx: { p: 1.5 } }, /* @__PURE__ */ React13.createElement(Typography8, { variant: "overline", color: "text.secondary" }, "Sources"), citations.length === 0 ? /* @__PURE__ */ React13.createElement(Typography8, { variant: "body2", color: "text.secondary", sx: { mt: 0.5 } }, "No sources for the latest reply yet.") : citations.map((c, i) => /* @__PURE__ */ React13.createElement(Box10, { key: i, sx: { mt: 1.5 } }, /* @__PURE__ */ React13.createElement(Box10, { sx: { display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" } }, /* @__PURE__ */ React13.createElement(Typography8, { variant: "body2", fontWeight: 500 }, c.filename), /* @__PURE__ */ React13.createElement(Chip5, { size: "small", label: c.score.toFixed(3), color: "primary", variant: "outlined" })), /* @__PURE__ */ React13.createElement(
+      return /* @__PURE__ */ React13.createElement(Box10, { sx: { p: 1.5 } }, /* @__PURE__ */ React13.createElement(Typography8, { variant: "overline", color: "text.secondary" }, "Sources"), citations.length === 0 ? /* @__PURE__ */ React13.createElement(Typography8, { variant: "body2", color: "text.secondary", sx: { mt: 0.5 } }, "No sources for the latest reply yet.") : citations.map((c, i) => /* @__PURE__ */ React13.createElement(Box10, { key: i, sx: { mt: 1.5 } }, /* @__PURE__ */ React13.createElement(Box10, { sx: { display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" } }, /* @__PURE__ */ React13.createElement(Typography8, { variant: "body2", fontWeight: 500 }, c.url ? /* @__PURE__ */ React13.createElement("a", { href: c.url, target: "_blank", rel: "noopener noreferrer" }, c.filename) : c.filename), c.source && /* @__PURE__ */ React13.createElement(
+        Chip5,
+        {
+          size: "small",
+          label: c.source === "web" ? "Web" : "Knowledge base",
+          variant: "outlined",
+          color: c.source === "web" ? "secondary" : "default"
+        }
+      ), /* @__PURE__ */ React13.createElement(Chip5, { size: "small", label: c.score.toFixed(3), color: "primary", variant: "outlined" })), /* @__PURE__ */ React13.createElement(
         Typography8,
         {
           variant: "body2",
@@ -1673,6 +1690,7 @@ var init_ChatPage = __esm({
       const [compareMode, setCompareModeUi] = useState9(false);
       const [compareModelsSel, setCompareModelsSel] = useState9([]);
       const [vectorStoreIds, setVectorStoreIds] = useState9([]);
+      const [webSearch, setWebSearch] = useState9(false);
       const [personaId, setPersonaId] = useState9("");
       const [customSystemPrompt, setCustomSystemPrompt] = useState9("");
       const [keyVal, setKeyVal] = useState9({
@@ -1713,7 +1731,8 @@ var init_ChatPage = __esm({
         customSystemPrompt,
         keyAlias: keyVal.alias,
         keyToken: keyVal.token,
-        topK: 5
+        topK: 5,
+        webSearch
       });
       const activeThreadId = chat.activeThread?.id ?? null;
       useEffect5(() => {
@@ -1725,6 +1744,7 @@ var init_ChatPage = __esm({
         setKeyVal({ alias: chat.activeThread.keyAlias, token: chat.activeThread.keyToken });
         setCompareModeUi(chat.activeThread.mode === "compare");
         setCompareModelsSel(chat.activeThread.compareModels ?? []);
+        setWebSearch(!!chat.activeThread.webSearch);
       }, [activeThreadId]);
       const messages = chat.activeThread?.messages ?? [];
       const isStreaming = chat.isStreaming;
@@ -1920,6 +1940,19 @@ var init_ChatPage = __esm({
               value: vectorStoreIds,
               onChange: setVectorStoreIds,
               defaultVectorStoreIds: config.defaultVectorStoreIds
+            }
+          ), /* @__PURE__ */ React15.createElement(
+            FormControlLabel,
+            {
+              control: /* @__PURE__ */ React15.createElement(
+                Switch,
+                {
+                  size: "small",
+                  checked: webSearch,
+                  onChange: (e) => setWebSearch(e.target.checked)
+                }
+              ),
+              label: /* @__PURE__ */ React15.createElement(Typography10, { variant: "body2" }, "Include web search")
             }
           ), /* @__PURE__ */ React15.createElement(
             KeyPicker,
