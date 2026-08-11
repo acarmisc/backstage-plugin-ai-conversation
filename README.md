@@ -35,7 +35,11 @@ litellm:
 
 ## Features
 
-- **Streaming UI**: Real-time token streaming for a modern chat experience.
-- **RAG Support**: Seamlessly switch between plain chat and grounded retrieval using LiteLLm vector stores.
+- **Streaming UI**: Real-time token streaming for a modern chat experience, with regenerate/edit-and-resend, message and code-block copy, and a streaming-state indicator ring on the persona avatar.
+- **RAG Support**: Seamlessly switch between plain chat and grounded retrieval using LiteLLm vector stores, plus an optional web search source and an ad-hoc `#https://...` page-context command.
 - **Governance Integratied**: Inherits all user authentication, budget, and rate limiting from the existing LiteLLM Governance plugin.
 - **Per-user Keys**: Allow users to select their own LiteLLM keys for spend attribution.
+- **Threads**: Search, pin, export/import as portable JSON.
+- **Compare mode**: Send the same prompt to several models in parallel and compare replies side by side.
+- **LaTeX rendering** in assistant messages.
+- **Analytics**: A lightweight `/ai-chat/analytics` page for usage-by-persona/model and feedback totals.

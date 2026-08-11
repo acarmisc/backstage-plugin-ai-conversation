@@ -108,4 +108,37 @@
 (A) 2026-07-28 +phase9-personas Wire PersonaPicker into ChatPage settings with model/KB prefill @frontend
 (B) 2026-07-28 +phase9-personas Register ces-ai-personas catalog-info.yaml discovery end-to-end in Backstage UI @integration
 (B) 2026-07-28 +phase9-personas Fix oo-business-analyst default-model claude-3-5-sonnet filtered out by ModelPicker @integration
-(B) 2026-07-28 +phase9-personas Browser-verify persona selection applies system prompt and RAG grounding end-to-end @integration
+(B) 2026-07-28 +phase9-personas Browser-verify persona selection applies system prompt and RAG grounding end-to-end @integration(A) 2026-08-11 +phase10-design-system Add accent gradient tokens and JetBrains Mono webfont injection @frontend
+(A) 2026-08-11 +phase10-design-system Split MessageBubble into AssistantMessage and UserMessage components @frontend
+(A) 2026-08-11 +phase10-design-system Implement PersonaAvatar with isStreaming conic-gradient ring @frontend
+(A) 2026-08-11 +phase10-design-system Add collapsible sidebar icon-rail and context-panel toggle @frontend
+(A) 2026-08-11 +phase10-message-actions Implement useChat regenerateFrom via shared runSend truncate-and-resend @frontend
+(A) 2026-08-11 +phase10-message-actions Implement useChat editAndResend @frontend
+(A) 2026-08-11 +phase10-message-actions Add hover Regenerate Edit Copy actions to AssistantMessage UserMessage @frontend
+(A) 2026-08-11 +phase10-message-actions Add copy button to markdown code block renderer @frontend
+(B) 2026-08-11 +phase10-message-actions Abort in-flight generation before regenerate or edit-resend @frontend
+(A) 2026-08-11 +phase11-export-import Implement useChat exportThread portable JSON excluding live chat key @frontend
+(A) 2026-08-11 +phase11-export-import Implement useChat importThread with schema validation @frontend
+(A) 2026-08-11 +phase11-export-import Add sidebar thread menu Export and Import entries @frontend
+(A) 2026-08-11 +phase11-search-pin Add sidebar thread search filtering by title and message content @frontend
+(A) 2026-08-11 +phase11-search-pin Add pinned field to Thread and pinned-first sidebar sort @frontend
+(A) 2026-08-11 +phase11-search-pin Implement useChat togglePin @frontend
+(A) 2026-08-11 +phase12-latex Add remark-math and rehype-katex to markdown pipeline @frontend
+(A) 2026-08-11 +phase12-latex Inject KaTeX stylesheet via runtime link tag no CSS loader in esbuild pipeline @frontend
+(A) 2026-08-11 +phase12-url-context Implement SSRF-guarded fetchUrlContext https-only DNS private-range block @backend
+(A) 2026-08-11 +phase12-url-context Re-validate every redirect hop enforce timeout and response size cap @backend
+(A) 2026-08-11 +phase12-url-context Implement POST fetch-context preview endpoint title and snippet only @backend
+(A) 2026-08-11 +phase12-url-context Inject fetched page as one-off system message in chat stream and completions @backend
+(A) 2026-08-11 +phase12-url-context Add hash-https detection debounced preview chip and history chip in composer @frontend
+(A) 2026-08-11 +phase13-compare Refactor useChat from single AbortController to per-message abort map and streamingMessageIds @frontend
+(A) 2026-08-11 +phase13-compare Implement runCompareSend parallel per-model streams sharing turnId @frontend
+(A) 2026-08-11 +phase13-compare Add CompareModelPicker multi-select and Settings compare-mode toggle @frontend
+(A) 2026-08-11 +phase13-compare Render multi-assistant turns as side-by-side columns in MessageList @frontend
+(B) 2026-08-11 +phase13-compare Regenerate and edit-resend re-run every column of a compare turn together @frontend
+(A) 2026-08-11 +phase14-web-search Add web_search toggle passed as web_search_options to LiteLLM chat completions @backend
+(A) 2026-08-11 +phase14-web-search Label sources panel citations Web vs Knowledge base by url-field heuristic @frontend
+(B) 2026-08-11 +phase14-web-search Verify target LiteLLM deployment has native web-search-capable model before enabling in production @research
+(A) 2026-08-11 +phase15-analytics Add chat_events migration and best-effort per-turn logging @backend
+(A) 2026-08-11 +phase15-analytics Implement GET feedback-summary and GET usage-summary endpoints @backend
+(A) 2026-08-11 +phase15-analytics Add ai-chat-analytics page with hand-rolled BarList charts @frontend
+(B) 2026-08-11 +phase15-analytics Wire real admin-only RBAC gate for ai-chat-analytics in target Backstage app @integration
