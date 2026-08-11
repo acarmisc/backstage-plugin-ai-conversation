@@ -40,6 +40,7 @@ const integration_1 = require("@backstage/integration");
 const backstage_plugin_litellm_backend_1 = require("@acarmisc/backstage-plugin-litellm-backend");
 const stream_1 = require("./stream");
 const persona_1 = require("./persona");
+const urlContext_1 = require("./urlContext");
 const types_1 = require("./types");
 /** How long a composed persona prompt is cached before it's re-fetched and
  * re-expanded from source. Keeps message sends off the SCM hot path while
@@ -51,6 +52,7 @@ function readChatConfig(config) {
         defaultModel: config.getOptionalString('litellm.chat.defaultModel'),
         defaultVectorStoreIds: config.getOptionalStringArray('litellm.chat.defaultVectorStoreIds'),
         maxRequestBudget: config.getOptionalNumber('litellm.chat.maxRequestBudget'),
+        fetchContextMaxChars: config.getOptionalNumber('litellm.chat.fetchContext.maxChars'),
     };
 }
 async function createRouter(options) {
@@ -104,6 +106,45 @@ async function createRouter(options) {
         if (!systemPrompt)
             return messages;
         return [{ id: 'persona-system', role: 'system', content: systemPrompt }, ...messages];
+    }
+    // Ad-hoc #url context: SSRF-guarded fetch + extraction lives in
+    // urlContext.ts. Cached briefly by URL so the preview chip fetch (on
+    // typing) and the actual chat-turn fetch (on send) don't hit the target
+    // site twice for the same message.
+    const URL_CONTEXT_TTL_MS = 10 * 60 * 1000;
+    const urlContextCache = new Map();
+    async function resolveUrlContext(url) {
+        const cached = urlContextCache.get(url);
+        if (cached && cached.expiresAt > Date.now())
+            return cached.result;
+        const result = await (0, urlContext_1.fetchUrlContext)(url, chatConfig.fetchContextMaxChars);
+        urlContextCache.set(url, { result, expiresAt: Date.now() + URL_CONTEXT_TTL_MS });
+        return result;
+    }
+    // Prepends the fetched page as a one-off system message, after the
+    // persona/custom system prompt. Best-effort: a fetch failure here logs
+    // and degrades to no context rather than failing the whole chat turn —
+    // the user already saw the error in the composer's preview chip before
+    // sending.
+    async function applyUrlContext(contextUrl, messages) {
+        if (!contextUrl)
+            return messages;
+        let fetched;
+        try {
+            fetched = await resolveUrlContext(contextUrl);
+        }
+        catch (err) {
+            logger.warn(`Failed to fetch #url context for ${contextUrl}: ${err.message}`);
+            return messages;
+        }
+        const content = [
+            'The user attached the following web page as one-off context for this message.',
+            `URL: ${fetched.url}`,
+            `Title: ${fetched.title}`,
+            '',
+            fetched.text,
+        ].join('\n');
+        return [{ id: 'url-context', role: 'system', content }, ...messages];
     }
     // LiteLLM-native endpoint (not OpenAI passthrough /v1/vector_stores).
     async function fetchVectorStores() {
@@ -172,6 +213,36 @@ async function createRouter(options) {
         catch (err) {
             logger.error('Failed to list vector stores', err);
             res.status(502).json({ error: err.message });
+        }
+    });
+    // Preview for the composer's `#url` chip: fetches (SSRF-guarded) and
+    // returns title + a short snippet only, never the full extracted text —
+    // the full text is re-resolved (cache-hit, same guarded fetch) server-side
+    // when the chat turn is actually sent, same pattern as personas never
+    // sending their system prompt to the browser.
+    router.post('/fetch-context', async (req, res) => {
+        try {
+            const tokenEntityRef = await (0, backstage_plugin_litellm_backend_1.resolveUserId)(req, auth);
+            if (!tokenEntityRef) {
+                res.status(401).json({ error: 'unauthenticated' });
+                return;
+            }
+            const body = req.body;
+            if (!body?.url || typeof body.url !== 'string' || body.url.length > 2000) {
+                res.status(400).json({ error: 'url required' });
+                return;
+            }
+            const result = await resolveUrlContext(body.url);
+            res.json({
+                url: result.url,
+                title: result.title,
+                snippet: result.text.slice(0, 240),
+                charCount: result.text.length,
+            });
+        }
+        catch (err) {
+            logger.warn('fetch-context failed', err);
+            res.status(err.status ?? 502).json({ error: err.message });
         }
     });
     // Mint a dedicated chat key for the authenticated user. The real sk- key
@@ -320,7 +391,8 @@ async function createRouter(options) {
             // Resolve to confirm identity — LiteLLM auth uses the user_key, but
             // resolving the user_id validates the Backstage token.
             (0, backstage_plugin_litellm_backend_1.toLiteLLMUserId)(tokenEntityRef, userIdDomain);
-            const messages = await applyPersona(body.persona_id, body.custom_system_prompt, body.messages);
+            let messages = await applyPersona(body.persona_id, body.custom_system_prompt, body.messages);
+            messages = await applyUrlContext(body.context_url, messages);
             const payload = {
                 model: body.model,
                 messages,
@@ -365,7 +437,8 @@ async function createRouter(options) {
                 return;
             }
             (0, backstage_plugin_litellm_backend_1.toLiteLLMUserId)(tokenEntityRef, userIdDomain);
-            const messages = await applyPersona(body.persona_id, body.custom_system_prompt, body.messages);
+            let messages = await applyPersona(body.persona_id, body.custom_system_prompt, body.messages);
+            messages = await applyUrlContext(body.context_url, messages);
             const base = chatConfig.baseUrl;
             // /v1/chat/completions (+ vector_store_ids for RAG) — works on
             // LiteLLM v1.90.0 with DB-backed pgvector stores. No fallback: the

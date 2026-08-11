@@ -1,11 +1,10 @@
 import React from 'react';
 import type { ChatMessage } from '../types';
-export interface MessageListProps {
-    messages: ChatMessage[];
+export interface AssistantMessageProps {
+    message: ChatMessage;
     isStreaming: boolean;
     avatarLabel?: string;
     onFeedback?: (messageId: string, vote: 'up' | 'down') => void;
     onRegenerate?: (messageId: string) => void;
-    onEditAndResend?: (messageId: string, newContent: string) => void;
 }
-export declare const MessageList: React.FC<MessageListProps>;
+export declare const AssistantMessage: React.FC<AssistantMessageProps>;
