@@ -47,10 +47,13 @@
     "@emotion/styled": "^11.11.0",
     "@mui/icons-material": "^5.18.0",
     "@mui/material": "^5.16.0",
+    "katex": "^0.16.9",
     "react": "^18.0.0",
     "react-markdown": "^9.0.1",
     "react-use": "^17.2.4",
-    "remark-gfm": "^4.0.0"
+    "rehype-katex": "^7.0.0",
+    "remark-gfm": "^4.0.0",
+    "remark-math": "^6.0.0"
   },
   "devDependencies": {
     "@backstage/cli": "^0.36.2",

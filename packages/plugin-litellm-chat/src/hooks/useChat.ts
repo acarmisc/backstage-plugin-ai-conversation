@@ -7,7 +7,10 @@ import type {
   ChatStreamChunk,
   Citation,
   KeySpend,
+  ThreadExport,
 } from '../types';
+
+const THREAD_EXPORT_VERSION = 1 as const;
 
 const STORAGE_PREFIX = 'litellm-chat:threads';
 
@@ -57,9 +60,14 @@ export interface UseChatResult {
   newThread: () => void;
   selectThread: (id: string) => void;
   deleteThread: (id: string) => void;
-  sendMessage: (text: string) => void;
+  sendMessage: (text: string, attachedUrl?: { url: string; title: string }) => void;
+  regenerateFrom: (messageId: string) => void;
+  editAndResend: (messageId: string, newContent: string) => void;
   stopGeneration: () => void;
   submitFeedback: (messageId: string, vote: 'up' | 'down') => void;
+  togglePin: (id: string) => void;
+  exportThread: (id: string) => void;
+  importThread: (file: File) => Promise<void>;
   isStreaming: boolean;
   error: string | null;
   citations: Citation[];
@@ -193,18 +201,24 @@ export function useChat(opts: UseChatOptions): UseChatResult {
     setIsStreaming(false);
   }, []);
 
-  const sendMessage = useCallback(
-    (text: string) => {
+  // Shared core for sendMessage/regenerateFrom/editAndResend: appends a user
+  // message + assistant placeholder onto `baseMessages` (not necessarily the
+  // thread's current messages — the two callers above pass a truncated
+  // slice) and streams into it. Any in-flight generation is aborted first so
+  // regenerating never races the previous response's tokens into the thread.
+  const runSend = useCallback(
+    (text: string, baseMessages: ChatMessage[], attachedUrl?: { url: string; title: string }) => {
       if (!text.trim() || !activeThread || !keyToken) return;
 
+      abortRef.current?.abort();
       setError(null);
       setCitations([]);
 
-      const userMsg: ChatMessage = { id: genId(), role: 'user', content: text };
+      const userMsg: ChatMessage = { id: genId(), role: 'user', content: text, attachedUrl };
       const assistantMsg: ChatMessage = { id: genId(), role: 'assistant', content: '' };
 
       const threadId = activeThread.id;
-      const updatedMessages = [...activeThread.messages, userMsg, assistantMsg];
+      const updatedMessages = [...baseMessages, userMsg, assistantMsg];
       const currentKeyAlias = keyAlias;
 
       setThreads(prev =>
@@ -237,6 +251,7 @@ export function useChat(opts: UseChatOptions): UseChatResult {
           vector_store_ids: vectorStoreIds.length ? vectorStoreIds : undefined,
           persona_id: personaId || undefined,
           custom_system_prompt: customSystemPrompt || undefined,
+          context_url: attachedUrl?.url,
           top_k: topK,
           user_key: keyToken,
         },
@@ -302,6 +317,118 @@ export function useChat(opts: UseChatOptions): UseChatResult {
     [activeThread, api, keyToken, model, vectorStoreIds, personaId, customSystemPrompt, keyAlias, topK],
   );
 
+  const sendMessage = useCallback(
+    (text: string, attachedUrl?: { url: string; title: string }) => {
+      if (!activeThread) return;
+      runSend(text, activeThread.messages, attachedUrl);
+    },
+    [activeThread, runSend],
+  );
+
+  // Re-asks the question behind `messageId` and streams a fresh assistant
+  // reply. Truncates through the target (exclusive if it's the assistant
+  // reply being regenerated — that reply and anything after it is dropped
+  // and reproduced fresh; inclusive if it's a user message — that message
+  // and its old reply are dropped and re-sent).
+  const regenerateFrom = useCallback(
+    (messageId: string) => {
+      if (!activeThread) return;
+      const messages = activeThread.messages;
+      const idx = messages.findIndex(m => m.id === messageId);
+      if (idx === -1) return;
+
+      if (messages[idx].role === 'user') {
+        runSend(messages[idx].content, messages.slice(0, idx));
+        return;
+      }
+
+      let userIdx = idx - 1;
+      while (userIdx >= 0 && messages[userIdx].role !== 'user') userIdx -= 1;
+      if (userIdx < 0) return;
+      runSend(messages[userIdx].content, messages.slice(0, userIdx));
+    },
+    [activeThread, runSend],
+  );
+
+  // Replaces a past user message with `newContent` and re-sends it, dropping
+  // that message and everything after it — same truncate-and-resend
+  // mechanics as regenerateFrom, just with edited text instead of the
+  // original.
+  const editAndResend = useCallback(
+    (messageId: string, newContent: string) => {
+      if (!activeThread) return;
+      const messages = activeThread.messages;
+      const idx = messages.findIndex(m => m.id === messageId);
+      if (idx === -1 || messages[idx].role !== 'user') return;
+      runSend(newContent, messages.slice(0, idx));
+    },
+    [activeThread, runSend],
+  );
+
+  const togglePin = useCallback((id: string) => {
+    setThreads(prev =>
+      prev.map(t => (t.id === id ? { ...t, pinned: !t.pinned } : t)),
+    );
+  }, []);
+
+  const exportThread = useCallback(
+    (id: string) => {
+      const thread = threads.find(t => t.id === id);
+      if (!thread) return;
+      const { keyToken: _keyToken, keyAlias: _keyAlias, ...portable } = thread;
+      const payload: ThreadExport = { version: THREAD_EXPORT_VERSION, thread: portable };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${thread.title.replace(/[^\w-]+/g, '_').slice(0, 60) || 'thread'}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    },
+    [threads],
+  );
+
+  const importThread = useCallback(async (file: File) => {
+    const text = await file.text();
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      throw new Error('Not valid JSON');
+    }
+    const payload = parsed as { version?: unknown; thread?: Partial<Thread> };
+    if (
+      payload?.version !== THREAD_EXPORT_VERSION ||
+      !payload.thread ||
+      typeof payload.thread.id !== 'string' ||
+      !Array.isArray(payload.thread.messages)
+    ) {
+      throw new Error('Unrecognized thread export format');
+    }
+    const src = payload.thread;
+    const imported: Thread = {
+      id: genId(),
+      title: typeof src.title === 'string' ? src.title : 'Imported chat',
+      messages: src.messages as ChatMessage[],
+      model: typeof src.model === 'string' ? src.model : '',
+      vectorStoreIds: Array.isArray(src.vectorStoreIds) ? src.vectorStoreIds : [],
+      personaId: typeof src.personaId === 'string' ? src.personaId : '',
+      customSystemPrompt:
+        typeof src.customSystemPrompt === 'string' ? src.customSystemPrompt : '',
+      keyAlias: '',
+      keyToken: '',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      totalTokens: typeof src.totalTokens === 'number' ? src.totalTokens : 0,
+      lastTurnUsage: null,
+      pinned: false,
+    };
+    setThreads(prev => [imported, ...prev]);
+    setActiveId(imported.id);
+  }, []);
+
   const submitFeedback = useCallback(
     (messageId: string, vote: 'up' | 'down') => {
       if (!activeThread) return;
@@ -346,8 +473,13 @@ export function useChat(opts: UseChatOptions): UseChatResult {
     selectThread,
     deleteThread,
     sendMessage,
+    regenerateFrom,
+    editAndResend,
     stopGeneration,
     submitFeedback,
+    togglePin,
+    exportThread,
+    importThread,
     isStreaming,
     error,
     citations,

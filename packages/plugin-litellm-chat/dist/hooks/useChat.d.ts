@@ -15,9 +15,17 @@ export interface UseChatResult {
     newThread: () => void;
     selectThread: (id: string) => void;
     deleteThread: (id: string) => void;
-    sendMessage: (text: string) => void;
+    sendMessage: (text: string, attachedUrl?: {
+        url: string;
+        title: string;
+    }) => void;
+    regenerateFrom: (messageId: string) => void;
+    editAndResend: (messageId: string, newContent: string) => void;
     stopGeneration: () => void;
     submitFeedback: (messageId: string, vote: 'up' | 'down') => void;
+    togglePin: (id: string) => void;
+    exportThread: (id: string) => void;
+    importThread: (file: File) => Promise<void>;
     isStreaming: boolean;
     error: string | null;
     citations: Citation[];

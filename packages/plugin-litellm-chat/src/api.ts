@@ -9,12 +9,14 @@ import type {
   ChatResult,
   ChatConfig,
   KeySpend,
+  UrlContextPreview,
 } from './types';
 
 export interface LiteLlmChatApiInterface {
   listVectorStores(): Promise<VectorStore[]>;
   listPersonas(): Promise<Persona[]>;
   getChatConfig(): Promise<ChatConfig>;
+  fetchUrlContext(url: string): Promise<UrlContextPreview>;
   chatStream(
     req: ChatRequest,
     onToken: (chunk: ChatStreamChunk) => void,
@@ -96,6 +98,19 @@ export class LiteLlmChatApi implements LiteLlmChatApiInterface {
     const res = await this.fetchApi.fetch(`${BASE_PATH}/config`);
     if (!res.ok) {
       return { defaultModel: null, defaultVectorStoreIds: null, maxRequestBudget: null };
+    }
+    return res.json();
+  }
+
+  async fetchUrlContext(url: string): Promise<UrlContextPreview> {
+    const res = await this.fetchApi.fetch(`${BASE_PATH}/fetch-context`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error ?? `fetch-context ${res.status}`);
     }
     return res.json();
   }

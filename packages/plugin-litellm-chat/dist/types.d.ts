@@ -24,6 +24,19 @@ export interface ChatMessage {
     role: 'user' | 'assistant' | 'system';
     content: string;
     feedback?: 'up' | 'down';
+    /** Set when this user message was sent with a `#https://...` ad-hoc
+     * context attachment — display-only, the fetched page text itself is
+     * never stored client-side (see UrlContextPreview / #url command). */
+    attachedUrl?: {
+        url: string;
+        title: string;
+    };
+}
+export interface UrlContextPreview {
+    url: string;
+    title: string;
+    snippet: string;
+    charCount: number;
 }
 export interface ChatFeedbackRequest {
     threadId: string;
@@ -46,6 +59,9 @@ export interface ChatRequest {
     /** Free-text system prompt supplied by the user. Combined with the
      * persona's system prompt (if any) rather than replacing it. */
     custom_system_prompt?: string;
+    /** URL typed as `#https://...` in the composer, resolved server-side and
+     * injected as one-off context for this turn only. */
+    context_url?: string;
 }
 export interface SearchResult {
     filename: string;
@@ -101,4 +117,12 @@ export interface Thread {
     updatedAt: number;
     totalTokens: number;
     lastTurnUsage: UsageInfo | null;
+    pinned?: boolean;
+}
+/** Portable export shape written by exportThread() / read by importThread().
+ * Deliberately excludes keyToken/keyAlias — a chat key is a live credential
+ * scoped to its minting user and must never be written to a shared file. */
+export interface ThreadExport {
+    version: 1;
+    thread: Omit<Thread, 'keyToken' | 'keyAlias'>;
 }

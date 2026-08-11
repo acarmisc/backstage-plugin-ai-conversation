@@ -16,12 +16,14 @@ import {
 } from '@acarmisc/backstage-plugin-litellm-backend';
 import { proxySSE } from './stream';
 import { entityToPersonaSummary, resolveSystemPrompt } from './persona';
+import { fetchUrlContext, FetchedUrlContext } from './urlContext';
 import type {
   VectorStore,
   ChatStreamRequest,
   ChatCompletionsRequest,
   ChatFeedbackRequest,
   ChatMessage,
+  FetchContextRequest,
   LiteLLMChatConfig,
 } from './types';
 import { CHAT_PERSONA_TYPE } from './types';
@@ -49,6 +51,7 @@ function readChatConfig(config: Config): LiteLLMChatConfig {
       'litellm.chat.defaultVectorStoreIds',
     ),
     maxRequestBudget: config.getOptionalNumber('litellm.chat.maxRequestBudget'),
+    fetchContextMaxChars: config.getOptionalNumber('litellm.chat.fetchContext.maxChars'),
   };
 }
 
@@ -113,6 +116,48 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
     const systemPrompt = [personaPrompt, trimmedCustom].filter(Boolean).join('\n\n');
     if (!systemPrompt) return messages;
     return [{ id: 'persona-system', role: 'system', content: systemPrompt }, ...messages];
+  }
+
+  // Ad-hoc #url context: SSRF-guarded fetch + extraction lives in
+  // urlContext.ts. Cached briefly by URL so the preview chip fetch (on
+  // typing) and the actual chat-turn fetch (on send) don't hit the target
+  // site twice for the same message.
+  const URL_CONTEXT_TTL_MS = 10 * 60 * 1000;
+  const urlContextCache = new Map<string, { result: FetchedUrlContext; expiresAt: number }>();
+
+  async function resolveUrlContext(url: string): Promise<FetchedUrlContext> {
+    const cached = urlContextCache.get(url);
+    if (cached && cached.expiresAt > Date.now()) return cached.result;
+    const result = await fetchUrlContext(url, chatConfig.fetchContextMaxChars);
+    urlContextCache.set(url, { result, expiresAt: Date.now() + URL_CONTEXT_TTL_MS });
+    return result;
+  }
+
+  // Prepends the fetched page as a one-off system message, after the
+  // persona/custom system prompt. Best-effort: a fetch failure here logs
+  // and degrades to no context rather than failing the whole chat turn —
+  // the user already saw the error in the composer's preview chip before
+  // sending.
+  async function applyUrlContext(
+    contextUrl: string | undefined,
+    messages: ChatMessage[],
+  ): Promise<ChatMessage[]> {
+    if (!contextUrl) return messages;
+    let fetched: FetchedUrlContext;
+    try {
+      fetched = await resolveUrlContext(contextUrl);
+    } catch (err: any) {
+      logger.warn(`Failed to fetch #url context for ${contextUrl}: ${err.message}`);
+      return messages;
+    }
+    const content = [
+      'The user attached the following web page as one-off context for this message.',
+      `URL: ${fetched.url}`,
+      `Title: ${fetched.title}`,
+      '',
+      fetched.text,
+    ].join('\n');
+    return [{ id: 'url-context', role: 'system', content }, ...messages];
   }
 
   // LiteLLM-native endpoint (not OpenAI passthrough /v1/vector_stores).
@@ -189,6 +234,36 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
     } catch (err: any) {
       logger.error('Failed to list vector stores', err);
       res.status(502).json({ error: err.message });
+    }
+  });
+
+  // Preview for the composer's `#url` chip: fetches (SSRF-guarded) and
+  // returns title + a short snippet only, never the full extracted text —
+  // the full text is re-resolved (cache-hit, same guarded fetch) server-side
+  // when the chat turn is actually sent, same pattern as personas never
+  // sending their system prompt to the browser.
+  router.post('/fetch-context', async (req: Request, res: Response) => {
+    try {
+      const tokenEntityRef = await resolveUserId(req, auth);
+      if (!tokenEntityRef) {
+        res.status(401).json({ error: 'unauthenticated' });
+        return;
+      }
+      const body = req.body as FetchContextRequest;
+      if (!body?.url || typeof body.url !== 'string' || body.url.length > 2000) {
+        res.status(400).json({ error: 'url required' });
+        return;
+      }
+      const result = await resolveUrlContext(body.url);
+      res.json({
+        url: result.url,
+        title: result.title,
+        snippet: result.text.slice(0, 240),
+        charCount: result.text.length,
+      });
+    } catch (err: any) {
+      logger.warn('fetch-context failed', err);
+      res.status(err.status ?? 502).json({ error: err.message });
     }
   });
 
@@ -343,11 +418,12 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       // resolving the user_id validates the Backstage token.
       toLiteLLMUserId(tokenEntityRef, userIdDomain);
 
-      const messages = await applyPersona(
+      let messages = await applyPersona(
         body.persona_id,
         body.custom_system_prompt,
         body.messages,
       );
+      messages = await applyUrlContext(body.context_url, messages);
 
       const payload: Record<string, unknown> = {
         model: body.model,
@@ -399,11 +475,12 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       }
       toLiteLLMUserId(tokenEntityRef, userIdDomain);
 
-      const messages = await applyPersona(
+      let messages = await applyPersona(
         body.persona_id,
         body.custom_system_prompt,
         body.messages,
       );
+      messages = await applyUrlContext(body.context_url, messages);
 
       const base = chatConfig.baseUrl;
 

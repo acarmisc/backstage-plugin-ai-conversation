@@ -50,6 +50,19 @@ export interface ChatStreamRequest {
     /** Free-text system prompt supplied by the user. Combined with the
      * persona's system prompt (if any) rather than replacing it. */
     custom_system_prompt?: string;
+    /** URL typed as `#https://...` in the composer. Fetched server-side
+     * (SSRF-guarded, see urlContext.ts) and injected as one-off context for
+     * this turn only — never registered as a vector store. */
+    context_url?: string;
+}
+export interface FetchContextRequest {
+    url: string;
+}
+export interface FetchContextResult {
+    url: string;
+    title: string;
+    snippet: string;
+    charCount: number;
 }
 export interface ChatCompletionsRequest extends ChatStreamRequest {
     stream?: false;
@@ -83,4 +96,5 @@ export interface LiteLLMChatConfig {
     defaultModel?: string;
     defaultVectorStoreIds?: string[];
     maxRequestBudget?: number;
+    fetchContextMaxChars?: number;
 }
