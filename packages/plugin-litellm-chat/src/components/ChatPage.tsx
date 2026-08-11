@@ -20,6 +20,8 @@ import {
   MenuItem,
   ListItemIcon,
   Chip,
+  Switch,
+  FormControlLabel,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -43,6 +45,7 @@ import { liteLlmChatApiRef } from '../api';
 import { useChat } from '../hooks/useChat';
 import { injectDesignSystemAssets } from '../theme';
 import { ModelPicker } from './ModelPicker';
+import { CompareModelPicker } from './CompareModelPicker';
 import { VectorStorePicker } from './VectorStorePicker';
 import { PersonaPicker } from './PersonaPicker';
 import { PersonaHomepage } from './PersonaHomepage';
@@ -86,6 +89,8 @@ export const ChatPage: React.FC = () => {
   });
 
   const [model, setModel] = useState('');
+  const [compareMode, setCompareModeUi] = useState(false);
+  const [compareModelsSel, setCompareModelsSel] = useState<string[]>([]);
   const [vectorStoreIds, setVectorStoreIds] = useState<string[]>([]);
   const [personaId, setPersonaId] = useState('');
   const [customSystemPrompt, setCustomSystemPrompt] = useState('');
@@ -154,6 +159,8 @@ export const ChatPage: React.FC = () => {
     setPersonaId(chat.activeThread.personaId ?? '');
     setCustomSystemPrompt(chat.activeThread.customSystemPrompt ?? '');
     setKeyVal({ alias: chat.activeThread.keyAlias, token: chat.activeThread.keyToken });
+    setCompareModeUi(chat.activeThread.mode === 'compare');
+    setCompareModelsSel(chat.activeThread.compareModels ?? []);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeThreadId]);
 
@@ -212,19 +219,21 @@ export const ChatPage: React.FC = () => {
 
   const handleSend = () => {
     if (!input.trim() || !keyVal.token || isStreaming) return;
+    if (compareMode && compareModelsSel.length === 0) return;
     const text = input.trim();
     const activeUrlMatch = text.match(URL_TOKEN_RE)?.[1];
     const attachedUrl =
       activeUrlMatch && urlPreview?.url === activeUrlMatch && activeUrlMatch !== dismissedUrl
         ? { url: urlPreview.url, title: urlPreview.title }
         : undefined;
+    const compareModelsOverride = compareMode ? compareModelsSel : undefined;
     if (!chat.activeThread) {
       chat.newThread();
       // newThread() setState is async; defer sendMessage to the next tick
       // so it sees the freshly created active thread.
-      requestAnimationFrame(() => chat.sendMessage(text, attachedUrl));
+      requestAnimationFrame(() => chat.sendMessage(text, attachedUrl, compareModelsOverride));
     } else {
-      chat.sendMessage(text, attachedUrl);
+      chat.sendMessage(text, attachedUrl, compareModelsOverride);
     }
     setInput('');
     setUrlPreview(null);
@@ -379,7 +388,23 @@ export const ChatPage: React.FC = () => {
                     size="small"
                     fullWidth
                   />
-                  <ModelPicker value={model} onChange={setModel} defaultModel={config.defaultModel} />
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        size="small"
+                        checked={compareMode}
+                        onChange={e => setCompareModeUi(e.target.checked)}
+                      />
+                    }
+                    label={
+                      <Typography variant="body2">Compare models side-by-side</Typography>
+                    }
+                  />
+                  {compareMode ? (
+                    <CompareModelPicker value={compareModelsSel} onChange={setCompareModelsSel} />
+                  ) : (
+                    <ModelPicker value={model} onChange={setModel} defaultModel={config.defaultModel} />
+                  )}
                   <Accordion
                     disableGutters
                     variant="outlined"
@@ -611,7 +636,7 @@ export const ChatPage: React.FC = () => {
             ) : (
               <MessageList
                 messages={messages}
-                isStreaming={isStreaming}
+                streamingMessageIds={chat.streamingMessageIds}
                 onFeedback={chat.submitFeedback}
                 onRegenerate={chat.regenerateFrom}
                 onEditAndResend={chat.editAndResend}
@@ -697,7 +722,9 @@ export const ChatPage: React.FC = () => {
                 <IconButton
                   color="primary"
                   onClick={handleSend}
-                  disabled={!input.trim() || !keyVal.token}
+                  disabled={
+                    !input.trim() || !keyVal.token || (compareMode && compareModelsSel.length === 0)
+                  }
                 >
                   <SendIcon />
                 </IconButton>

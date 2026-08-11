@@ -18,7 +18,7 @@ export interface UseChatResult {
     sendMessage: (text: string, attachedUrl?: {
         url: string;
         title: string;
-    }) => void;
+    }, compareModelsOverride?: string[]) => void;
     regenerateFrom: (messageId: string) => void;
     editAndResend: (messageId: string, newContent: string) => void;
     stopGeneration: () => void;
@@ -26,7 +26,11 @@ export interface UseChatResult {
     togglePin: (id: string) => void;
     exportThread: (id: string) => void;
     importThread: (file: File) => Promise<void>;
+    setCompareMode: (enabled: boolean, models?: string[]) => void;
     isStreaming: boolean;
+    /** IDs of assistant messages currently receiving tokens — in compare
+     * mode several are streaming at once, one per model column. */
+    streamingMessageIds: Set<string>;
     error: string | null;
     citations: Citation[];
     keySpend: KeySpend | null;

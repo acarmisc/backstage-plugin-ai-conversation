@@ -31,6 +31,13 @@ export interface ChatMessage {
         url: string;
         title: string;
     };
+    /** Groups a user message with its assistant reply/replies from the same
+     * send — in compare mode, several assistant messages share one turnId
+     * and are rendered as side-by-side columns instead of stacked. */
+    turnId?: string;
+    /** Set on assistant messages produced in compare mode: which of
+     * Thread.compareModels generated this particular reply. */
+    compareModel?: string;
 }
 export interface UrlContextPreview {
     url: string;
@@ -118,6 +125,11 @@ export interface Thread {
     totalTokens: number;
     lastTurnUsage: UsageInfo | null;
     pinned?: boolean;
+    /** 'compare' sends the same prompt to every model in compareModels in
+     * parallel instead of the single selected model. Missing/'single' is
+     * the default for every thread created before this field existed. */
+    mode?: 'single' | 'compare';
+    compareModels?: string[];
 }
 /** Portable export shape written by exportThread() / read by importThread().
  * Deliberately excludes keyToken/keyAlias — a chat key is a live credential

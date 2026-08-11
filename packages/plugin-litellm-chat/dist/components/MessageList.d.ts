@@ -2,7 +2,7 @@ import React from 'react';
 import type { ChatMessage } from '../types';
 export interface MessageListProps {
     messages: ChatMessage[];
-    isStreaming: boolean;
+    streamingMessageIds: Set<string>;
     avatarLabel?: string;
     onFeedback?: (messageId: string, vote: 'up' | 'down') => void;
     onRegenerate?: (messageId: string) => void;
