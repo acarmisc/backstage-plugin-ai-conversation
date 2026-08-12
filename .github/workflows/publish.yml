@@ -1,0 +1,82 @@
+name: Publish to npm
+
+# Release process (see AGENTS.md):
+#   git tag litellm-chat@X.Y.Z          # or litellm-chat-backend@X.Y.Z
+#   git push origin litellm-chat@X.Y.Z
+#
+# The tag prefix selects which workspace package gets published, and its
+# version must match the version already committed in that package's
+# package.json.
+
+on:
+  push:
+    tags:
+      - "litellm-chat@*"
+      - "litellm-chat-backend@*"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Resolve package from tag
+        id: pkg
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          case "$TAG" in
+            litellm-chat-backend@*)
+              echo "workspace=@acarmisc/backstage-plugin-litellm-chat-backend" >> "$GITHUB_OUTPUT"
+              echo "dir=packages/plugin-litellm-chat-backend" >> "$GITHUB_OUTPUT"
+              echo "version=${TAG#litellm-chat-backend@}" >> "$GITHUB_OUTPUT"
+              ;;
+            litellm-chat@*)
+              echo "workspace=@acarmisc/backstage-plugin-litellm-chat" >> "$GITHUB_OUTPUT"
+              echo "dir=packages/plugin-litellm-chat" >> "$GITHUB_OUTPUT"
+              echo "version=${TAG#litellm-chat@}" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "::error::Unrecognized tag pattern: $TAG"
+              exit 1
+              ;;
+          esac
+
+      - name: Verify tag version matches package.json
+        run: |
+          PKG_VERSION=$(node -p "require('./${{ steps.pkg.outputs.dir }}/package.json').version")
+          TAG_VERSION="${{ steps.pkg.outputs.version }}"
+          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Tag version ($TAG_VERSION) does not match ${{ steps.pkg.outputs.dir }}/package.json version ($PKG_VERSION)"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Build
+        run: yarn workspace "${{ steps.pkg.outputs.workspace }}" build
+
+      - name: Publish to npm
+        working-directory: ${{ steps.pkg.outputs.dir }}
+        run: yarn npm publish --access public
+        env:
+          YARN_NPM_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
