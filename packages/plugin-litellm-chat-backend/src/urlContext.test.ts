@@ -31,6 +31,17 @@ describe('isBlockedAddress', () => {
     ['ff02::1', 'multicast'],
     ['::ffff:127.0.0.1', 'IPv4-mapped loopback'],
     ['::ffff:169.254.169.254', 'IPv4-mapped cloud metadata'],
+    // Non-canonical spellings of the addresses above — a textual match on
+    // "::1"/"::ffff:<dotted quad>" alone would let every one of these
+    // through, which is exactly the SSRF this guard exists to stop.
+    ['0:0:0:0:0:0:0:1', 'fully expanded loopback'],
+    ['0000:0000:0000:0000:0000:0000:0000:0001', 'zero-padded loopback'],
+    ['::ffff:7f00:1', 'IPv4-mapped loopback written in hex'],
+    ['::ffff:a9fe:a9fe', 'IPv4-mapped cloud metadata written in hex'],
+    ['0:0:0:0:0:ffff:127.0.0.1', 'expanded IPv4-mapped loopback'],
+    ['::127.0.0.1', 'IPv4-compatible loopback'],
+    ['64:ff9b::169.254.169.254', 'NAT64-embedded cloud metadata'],
+    ['fe80::1%eth0', 'link-local with a zone id'],
   ])('blocks IPv6 %s (%s)', ip => {
     expect(isBlockedAddress(ip)).toBe(true);
   });
@@ -38,6 +49,8 @@ describe('isBlockedAddress', () => {
   it.each([
     ['2001:4860:4860::8888', 'public DNS'],
     ['::ffff:8.8.8.8', 'IPv4-mapped public'],
+    ['::ffff:808:808', 'IPv4-mapped public written in hex'],
+    ['2001:4860:4860:0:0:0:0:8888', 'fully expanded public'],
   ])('allows IPv6 %s (%s)', ip => {
     expect(isBlockedAddress(ip)).toBe(false);
   });

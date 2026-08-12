@@ -1398,6 +1398,22 @@ var init_AssistantMessage = __esm({
   }
 });
 
+// src/safeUrl.ts
+function safeHref(url) {
+  if (!url) return void 0;
+  try {
+    const parsed = new URL(url, window.location.origin);
+    return parsed.protocol === "https:" || parsed.protocol === "http:" ? url : void 0;
+  } catch {
+    return void 0;
+  }
+}
+var init_safeUrl = __esm({
+  "src/safeUrl.ts"() {
+    "use strict";
+  }
+});
+
 // src/components/UserMessage.tsx
 var import_react11, import_material10, import_ContentCopy3, import_Check3, import_Edit, import_Link, UserMessage;
 var init_UserMessage = __esm({
@@ -1409,6 +1425,7 @@ var init_UserMessage = __esm({
     import_Check3 = __toESM(require("@mui/icons-material/Check"));
     import_Edit = __toESM(require("@mui/icons-material/Edit"));
     import_Link = __toESM(require("@mui/icons-material/Link"));
+    init_safeUrl();
     UserMessage = ({ message, onEditAndResend }) => {
       const [editing, setEditing] = (0, import_react11.useState)(false);
       const [draft, setDraft] = (0, import_react11.useState)(message.content);
@@ -1461,11 +1478,13 @@ var init_UserMessage = __esm({
             icon: /* @__PURE__ */ import_react11.default.createElement(import_Link.default, { fontSize: "small" }),
             label: message.attachedUrl.title,
             variant: "outlined",
-            component: "a",
-            href: message.attachedUrl.url,
-            target: "_blank",
-            rel: "noopener noreferrer",
-            clickable: true
+            ...safeHref(message.attachedUrl.url) ? {
+              component: "a",
+              href: safeHref(message.attachedUrl.url),
+              target: "_blank",
+              rel: "noopener noreferrer",
+              clickable: true
+            } : {}
           }
         ))),
         /* @__PURE__ */ import_react11.default.createElement(
@@ -1591,8 +1610,9 @@ var init_SourcesPanel = __esm({
     "use strict";
     import_react14 = __toESM(require("react"));
     import_material13 = require("@mui/material");
+    init_safeUrl();
     SourcesPanel = ({ citations }) => {
-      return /* @__PURE__ */ import_react14.default.createElement(import_material13.Box, { sx: { p: 1.5 } }, /* @__PURE__ */ import_react14.default.createElement(import_material13.Typography, { variant: "overline", color: "text.secondary" }, "Sources"), citations.length === 0 ? /* @__PURE__ */ import_react14.default.createElement(import_material13.Typography, { variant: "body2", color: "text.secondary", sx: { mt: 0.5 } }, "No sources for the latest reply yet.") : citations.map((c, i) => /* @__PURE__ */ import_react14.default.createElement(import_material13.Box, { key: i, sx: { mt: 1.5 } }, /* @__PURE__ */ import_react14.default.createElement(import_material13.Box, { sx: { display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" } }, /* @__PURE__ */ import_react14.default.createElement(import_material13.Typography, { variant: "body2", fontWeight: 500 }, c.url ? /* @__PURE__ */ import_react14.default.createElement("a", { href: c.url, target: "_blank", rel: "noopener noreferrer" }, c.filename) : c.filename), c.source && /* @__PURE__ */ import_react14.default.createElement(
+      return /* @__PURE__ */ import_react14.default.createElement(import_material13.Box, { sx: { p: 1.5 } }, /* @__PURE__ */ import_react14.default.createElement(import_material13.Typography, { variant: "overline", color: "text.secondary" }, "Sources"), citations.length === 0 ? /* @__PURE__ */ import_react14.default.createElement(import_material13.Typography, { variant: "body2", color: "text.secondary", sx: { mt: 0.5 } }, "No sources for the latest reply yet.") : citations.map((c, i) => /* @__PURE__ */ import_react14.default.createElement(import_material13.Box, { key: i, sx: { mt: 1.5 } }, /* @__PURE__ */ import_react14.default.createElement(import_material13.Box, { sx: { display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" } }, /* @__PURE__ */ import_react14.default.createElement(import_material13.Typography, { variant: "body2", fontWeight: 500 }, safeHref(c.url) ? /* @__PURE__ */ import_react14.default.createElement("a", { href: safeHref(c.url), target: "_blank", rel: "noopener noreferrer" }, c.filename) : c.filename), c.source && /* @__PURE__ */ import_react14.default.createElement(
         import_material13.Chip,
         {
           size: "small",

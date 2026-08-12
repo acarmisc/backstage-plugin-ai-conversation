@@ -37,6 +37,9 @@ const IPV4_BLOCKED_RANGES = [
 function ipv4ToInt(ip) {
     return ip.split('.').reduce((acc, octet) => (acc << 8) + Number(octet), 0) >>> 0;
 }
+function intToIpv4(addr) {
+    return [addr >>> 24, (addr >>> 16) & 0xff, (addr >>> 8) & 0xff, addr & 0xff].join('.');
+}
 function isPrivateIPv4(ip) {
     const addr = ipv4ToInt(ip);
     return IPV4_BLOCKED_RANGES.some(([base, bits]) => {
@@ -44,21 +47,57 @@ function isPrivateIPv4(ip) {
         return (addr & mask) === (ipv4ToInt(base) & mask);
     });
 }
-function isPrivateIPv6(ip) {
-    const normalized = ip.toLowerCase();
-    if (normalized === '::1' || normalized === '::')
-        return true;
-    if (normalized.startsWith('::ffff:')) {
-        const mapped = normalized.slice('::ffff:'.length);
-        if (net_1.default.isIPv4(mapped))
-            return isPrivateIPv4(mapped);
+/**
+ * Expands any textual IPv6 form — compressed (`::1`), fully written out
+ * (`0:0:0:0:0:0:0:1`), or with a trailing dotted quad (`::ffff:127.0.0.1`)
+ * — into its 8 numeric hextets. Matching on the raw string instead would
+ * miss the non-canonical spellings of the very addresses this module
+ * exists to block. Returns null for anything unparseable, which callers
+ * treat as blocked.
+ */
+function ipv6Hextets(ip) {
+    let rest = ip.toLowerCase().split('%')[0]; // drop any zone id
+    // A trailing dotted quad occupies the last two hextets.
+    const dotted = /(\d{1,3}(?:\.\d{1,3}){3})$/.exec(rest);
+    if (dotted) {
+        if (!net_1.default.isIPv4(dotted[1]))
+            return null;
+        const v4 = ipv4ToInt(dotted[1]);
+        rest = `${rest.slice(0, dotted.index)}${(v4 >>> 16).toString(16)}:${(v4 & 0xffff).toString(16)}`;
     }
-    const firstHextet = parseInt(normalized.split(':')[0] || '0', 16);
-    if ((firstHextet & 0xfe00) === 0xfc00)
+    const parts = rest.split('::');
+    if (parts.length > 2)
+        return null;
+    const toHextets = (part) => part ? part.split(':').map(h => (/^[0-9a-f]{1,4}$/.test(h) ? parseInt(h, 16) : NaN)) : [];
+    const head = toHextets(parts[0]);
+    const tail = parts.length === 2 ? toHextets(parts[1]) : [];
+    const hextets = parts.length === 2
+        ? [...head, ...new Array(Math.max(0, 8 - head.length - tail.length)).fill(0), ...tail]
+        : head;
+    if (hextets.length !== 8 || hextets.some(h => !Number.isInteger(h)))
+        return null;
+    return hextets;
+}
+function isPrivateIPv6(ip) {
+    const hextets = ipv6Hextets(ip);
+    if (!hextets)
+        return true; // unparseable — fail closed
+    // IPv4-mapped (::ffff:a.b.c.d), IPv4-compatible (::a.b.c.d) and NAT64
+    // (64:ff9b::a.b.c.d) all carry a real IPv4 destination in the last two
+    // hextets — judge those by the embedded address, not by the IPv6
+    // prefix. `::` and `::1` fall out of this too, via 0.0.0.0/8.
+    const embedded = ((hextets[6] << 16) >>> 0) + hextets[7];
+    const zeroPrefix = hextets.slice(0, 5).every(h => h === 0);
+    const isNat64 = hextets[0] === 0x64 && hextets[1] === 0xff9b && hextets.slice(2, 6).every(h => h === 0);
+    if ((zeroPrefix && (hextets[5] === 0xffff || hextets[5] === 0)) || isNat64) {
+        return isPrivateIPv4(intToIpv4(embedded));
+    }
+    const first = hextets[0];
+    if ((first & 0xfe00) === 0xfc00)
         return true; // fc00::/7 unique local
-    if ((firstHextet & 0xffc0) === 0xfe80)
+    if ((first & 0xffc0) === 0xfe80)
         return true; // fe80::/10 link-local
-    if ((firstHextet & 0xff00) === 0xff00)
+    if ((first & 0xff00) === 0xff00)
         return true; // ff00::/8 multicast
     return false;
 }
@@ -77,13 +116,18 @@ function isBlockedAddress(ip) {
  * so a 302 to an internal host can't bypass this.
  */
 async function assertPublicHostname(hostname) {
-    if (net_1.default.isIP(hostname)) {
-        if (isBlockedAddress(hostname)) {
+    // URL.hostname keeps the brackets on an IPv6 literal ("[::1]"), which is
+    // not something net.isIP/dns.lookup recognise — strip them so a literal
+    // takes the address check below rather than falling through to a DNS
+    // lookup that just fails with a misleading error.
+    const host = hostname.replace(/^\[(.*)\]$/, '$1');
+    if (net_1.default.isIP(host)) {
+        if (isBlockedAddress(host)) {
             throw Object.assign(new Error('URL resolves to a private address'), { status: 400 });
         }
         return;
     }
-    const records = await dns_1.default.promises.lookup(hostname, { all: true, verbatim: true });
+    const records = await dns_1.default.promises.lookup(host, { all: true, verbatim: true });
     if (records.length === 0) {
         throw Object.assign(new Error('URL host does not resolve'), { status: 400 });
     }
