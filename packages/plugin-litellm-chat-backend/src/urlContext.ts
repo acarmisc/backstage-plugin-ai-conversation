@@ -61,7 +61,7 @@ function isPrivateIPv6(ip: string): boolean {
   return false;
 }
 
-function isBlockedAddress(ip: string): boolean {
+export function isBlockedAddress(ip: string): boolean {
   if (net.isIPv4(ip)) return isPrivateIPv4(ip);
   if (net.isIPv6(ip)) return isPrivateIPv6(ip);
   return true;
@@ -102,7 +102,7 @@ function decodeEntities(s: string): string {
     .replace(/&#39;|&#x27;/g, "'");
 }
 
-function stripHtml(html: string): { title: string; text: string } {
+export function stripHtml(html: string): { title: string; text: string } {
   const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
   const title = titleMatch ? decodeEntities(titleMatch[1]).trim().slice(0, 200) : '';
   const withoutNoise = html

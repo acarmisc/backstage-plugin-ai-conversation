@@ -49,9 +49,13 @@
   },
   "devDependencies": {
     "@backstage/cli": "^0.36.2",
+    "@jest/environment-jsdom-abstract": "^30.0.0",
     "@types/express": "^4.17.25",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20.0.0",
     "esbuild": "^0.28.1",
+    "jest": "^30.0.0",
+    "jsdom": "^27.1.0",
     "typescript": "^5.9.3",
     "winston": "^3.17.0"
   },

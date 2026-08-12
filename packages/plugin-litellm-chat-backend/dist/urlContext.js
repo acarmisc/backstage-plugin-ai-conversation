@@ -3,6 +3,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.isBlockedAddress = isBlockedAddress;
+exports.stripHtml = stripHtml;
 exports.fetchUrlContext = fetchUrlContext;
 const dns_1 = __importDefault(require("dns"));
 const net_1 = __importDefault(require("net"));

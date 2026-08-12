@@ -239,6 +239,37 @@ var init_api = __esm({
   }
 });
 
+// src/hooks/chatTruncation.ts
+function computeRegenerateTarget(messages, messageId) {
+  const idx = messages.findIndex((m) => m.id === messageId);
+  if (idx === -1) return null;
+  const target = messages[idx];
+  if (target.role === "user") {
+    return { baseMessages: messages.slice(0, idx), text: target.content, isCompareEligible: true };
+  }
+  const turnId = target.turnId;
+  let userIdx = idx - 1;
+  while (userIdx >= 0 && !(messages[userIdx].role === "user" && (!turnId || messages[userIdx].turnId === turnId))) {
+    userIdx -= 1;
+  }
+  if (userIdx < 0) return null;
+  return {
+    baseMessages: messages.slice(0, userIdx),
+    text: messages[userIdx].content,
+    isCompareEligible: !!target.compareModel
+  };
+}
+function computeEditTarget(messages, messageId) {
+  const idx = messages.findIndex((m) => m.id === messageId);
+  if (idx === -1 || messages[idx].role !== "user") return null;
+  return { baseMessages: messages.slice(0, idx) };
+}
+var init_chatTruncation = __esm({
+  "src/hooks/chatTruncation.ts"() {
+    "use strict";
+  }
+});
+
 // src/hooks/useChat.ts
 function loadThreads(userId) {
   try {
@@ -551,27 +582,14 @@ function useChat(opts) {
   const regenerateFrom = (0, import_react.useCallback)(
     (messageId) => {
       if (!activeThread) return;
-      const messages = activeThread.messages;
-      const idx = messages.findIndex((m) => m.id === messageId);
-      if (idx === -1) return;
-      const target = messages[idx];
+      const target = computeRegenerateTarget(activeThread.messages, messageId);
+      if (!target) return;
       const compareModels = activeThread.compareModels;
-      const isCompare = activeThread.mode === "compare" && !!compareModels?.length;
-      if (target.role === "user") {
-        if (isCompare) runCompareSend(target.content, messages.slice(0, idx), compareModels);
-        else runSend(target.content, messages.slice(0, idx));
-        return;
-      }
-      const turnId = target.turnId;
-      let userIdx = idx - 1;
-      while (userIdx >= 0 && !(messages[userIdx].role === "user" && (!turnId || messages[userIdx].turnId === turnId))) {
-        userIdx -= 1;
-      }
-      if (userIdx < 0) return;
-      if (isCompare && target.compareModel) {
-        runCompareSend(messages[userIdx].content, messages.slice(0, userIdx), compareModels);
+      const isCompare = activeThread.mode === "compare" && !!compareModels?.length && target.isCompareEligible;
+      if (isCompare) {
+        runCompareSend(target.text, target.baseMessages, compareModels);
       } else {
-        runSend(messages[userIdx].content, messages.slice(0, userIdx));
+        runSend(target.text, target.baseMessages);
       }
     },
     [activeThread, runSend, runCompareSend]
@@ -579,13 +597,12 @@ function useChat(opts) {
   const editAndResend = (0, import_react.useCallback)(
     (messageId, newContent) => {
       if (!activeThread) return;
-      const messages = activeThread.messages;
-      const idx = messages.findIndex((m) => m.id === messageId);
-      if (idx === -1 || messages[idx].role !== "user") return;
+      const target = computeEditTarget(activeThread.messages, messageId);
+      if (!target) return;
       if (activeThread.mode === "compare" && activeThread.compareModels?.length) {
-        runCompareSend(newContent, messages.slice(0, idx), activeThread.compareModels);
+        runCompareSend(newContent, target.baseMessages, activeThread.compareModels);
       } else {
-        runSend(newContent, messages.slice(0, idx));
+        runSend(newContent, target.baseMessages);
       }
     },
     [activeThread, runSend, runCompareSend]
@@ -720,6 +737,7 @@ var init_useChat = __esm({
     import_react = require("react");
     import_core_plugin_api2 = require("@backstage/core-plugin-api");
     init_api();
+    init_chatTruncation();
     THREAD_EXPORT_VERSION = 1;
     STORAGE_PREFIX = "litellm-chat:threads";
     SAVE_DEBOUNCE_MS = 400;
