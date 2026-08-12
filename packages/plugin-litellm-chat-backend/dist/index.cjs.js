@@ -4525,7 +4525,7 @@ var require_lodash = __commonJS({
         var defer = baseRest(function(func, args) {
           return baseDelay(func, 1, args);
         });
-        var delay2 = baseRest(function(func, wait, args) {
+        var delay = baseRest(function(func, wait, args) {
           return baseDelay(func, toNumber(wait) || 0, args);
         });
         function flip(func) {
@@ -5644,7 +5644,7 @@ var require_lodash = __commonJS({
         lodash.defaults = defaults;
         lodash.defaultsDeep = defaultsDeep;
         lodash.defer = defer;
-        lodash.delay = delay2;
+        lodash.delay = delay;
         lodash.difference = difference;
         lodash.differenceBy = differenceBy;
         lodash.differenceWith = differenceWith;
@@ -9979,12 +9979,7 @@ var require_fast_uri = __commonJS({
     }
     function resolve(baseURI, relativeURI, options) {
       const schemelessOptions = options ? Object.assign({ scheme: "null" }, options) : { scheme: "null" };
-      const { parsed: baseParsed, malformedAuthorityOrPort: baseMalformed } = parseWithStatus(baseURI, schemelessOptions);
-      const { parsed: relativeParsed, malformedAuthorityOrPort: relativeMalformed } = parseWithStatus(relativeURI, schemelessOptions);
-      if (baseMalformed || relativeMalformed) {
-        throw new Error(baseParsed.error || relativeParsed.error || "URI is malformed.");
-      }
-      const resolved = resolveComponent(baseParsed, relativeParsed, schemelessOptions, true);
+      const resolved = resolveComponent(parse(baseURI, schemelessOptions), parse(relativeURI, schemelessOptions), schemelessOptions, true);
       schemelessOptions.skipEscape = true;
       return serialize(resolved, schemelessOptions);
     }
@@ -10109,8 +10104,6 @@ var require_fast_uri = __commonJS({
       return uriTokens.join("");
     }
     var URI_PARSE = /^(?:([^#/:?]+):)?(?:\/\/((?:([^#/?@]*)@)?(\[[^#/?\]]+\]|[^#/:?]*)(?::(\d*))?))?([^#?]*)(?:\?([^#]*))?(?:#((?:.|[\n\r])*))?/u;
-    var AUTHORITY_PREFIX = /^(?:[^#/:?]+:)?\/\/([^/?#]*)/;
-    var AUTHORITY_INTRODUCER_REGION = /^(?:[^#/:?]+:)?([/\\\t\n\r]*)/;
     function getParseError(parsed, matches) {
       if (matches[2] !== void 0 && parsed.path && parsed.path[0] !== "/") {
         return 'URI path must start with "/" when authority is present.';
@@ -10138,25 +10131,6 @@ var require_fast_uri = __commonJS({
           uri = options.scheme + ":" + uri;
         } else {
           uri = "//" + uri;
-        }
-      }
-      const authorityMatch = uri.match(AUTHORITY_PREFIX);
-      if (authorityMatch !== null && authorityMatch[1].indexOf("\\") !== -1) {
-        parsed.error = "URI authority must not contain a literal backslash.";
-        malformedAuthorityOrPort = true;
-      }
-      const introducerMatch = uri.match(AUTHORITY_INTRODUCER_REGION);
-      if (introducerMatch !== null) {
-        const region = introducerMatch[1];
-        const normalizedRegion = region.replace(/[\t\n\r]/g, "");
-        if (normalizedRegion.length >= 2) {
-          if (normalizedRegion.slice(0, 2) !== "//") {
-            parsed.error = parsed.error || "URI authority must not contain a literal backslash.";
-            malformedAuthorityOrPort = true;
-          } else if (region.length !== normalizedRegion.length) {
-            parsed.error = parsed.error || "URI authority introducer must not contain whitespace.";
-            malformedAuthorityOrPort = true;
-          }
         }
       }
       const matches = uri.match(URI_PARSE);
@@ -14060,9 +14034,9 @@ var require_validateMetaSchema_cjs = __commonJS({
   }
 });
 
-// ../../node_modules/@backstage/catalog-model/node_modules/zod/v3/helpers/util.cjs
+// ../../node_modules/zod/v3/helpers/util.cjs
 var require_util2 = __commonJS({
-  "../../node_modules/@backstage/catalog-model/node_modules/zod/v3/helpers/util.cjs"(exports2) {
+  "../../node_modules/zod/v3/helpers/util.cjs"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.getParsedType = exports2.ZodParsedType = exports2.objectUtil = exports2.util = void 0;
@@ -14202,9 +14176,9 @@ var require_util2 = __commonJS({
   }
 });
 
-// ../../node_modules/@backstage/catalog-model/node_modules/zod/v3/ZodError.cjs
+// ../../node_modules/zod/v3/ZodError.cjs
 var require_ZodError = __commonJS({
-  "../../node_modules/@backstage/catalog-model/node_modules/zod/v3/ZodError.cjs"(exports2) {
+  "../../node_modules/zod/v3/ZodError.cjs"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.ZodError = exports2.quotelessJson = exports2.ZodIssueCode = void 0;
@@ -14330,9 +14304,9 @@ var require_ZodError = __commonJS({
   }
 });
 
-// ../../node_modules/@backstage/catalog-model/node_modules/zod/v3/locales/en.cjs
+// ../../node_modules/zod/v3/locales/en.cjs
 var require_en = __commonJS({
-  "../../node_modules/@backstage/catalog-model/node_modules/zod/v3/locales/en.cjs"(exports2) {
+  "../../node_modules/zod/v3/locales/en.cjs"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var ZodError_js_1 = require_ZodError();
@@ -14441,9 +14415,9 @@ var require_en = __commonJS({
   }
 });
 
-// ../../node_modules/@backstage/catalog-model/node_modules/zod/v3/errors.cjs
+// ../../node_modules/zod/v3/errors.cjs
 var require_errors2 = __commonJS({
-  "../../node_modules/@backstage/catalog-model/node_modules/zod/v3/errors.cjs"(exports2) {
+  "../../node_modules/zod/v3/errors.cjs"(exports2) {
     "use strict";
     var __importDefault2 = exports2 && exports2.__importDefault || function(mod) {
       return mod && mod.__esModule ? mod : { "default": mod };
@@ -14464,9 +14438,9 @@ var require_errors2 = __commonJS({
   }
 });
 
-// ../../node_modules/@backstage/catalog-model/node_modules/zod/v3/helpers/parseUtil.cjs
+// ../../node_modules/zod/v3/helpers/parseUtil.cjs
 var require_parseUtil = __commonJS({
-  "../../node_modules/@backstage/catalog-model/node_modules/zod/v3/helpers/parseUtil.cjs"(exports2) {
+  "../../node_modules/zod/v3/helpers/parseUtil.cjs"(exports2) {
     "use strict";
     var __importDefault2 = exports2 && exports2.__importDefault || function(mod) {
       return mod && mod.__esModule ? mod : { "default": mod };
@@ -14595,17 +14569,17 @@ var require_parseUtil = __commonJS({
   }
 });
 
-// ../../node_modules/@backstage/catalog-model/node_modules/zod/v3/helpers/typeAliases.cjs
+// ../../node_modules/zod/v3/helpers/typeAliases.cjs
 var require_typeAliases = __commonJS({
-  "../../node_modules/@backstage/catalog-model/node_modules/zod/v3/helpers/typeAliases.cjs"(exports2) {
+  "../../node_modules/zod/v3/helpers/typeAliases.cjs"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
   }
 });
 
-// ../../node_modules/@backstage/catalog-model/node_modules/zod/v3/helpers/errorUtil.cjs
+// ../../node_modules/zod/v3/helpers/errorUtil.cjs
 var require_errorUtil = __commonJS({
-  "../../node_modules/@backstage/catalog-model/node_modules/zod/v3/helpers/errorUtil.cjs"(exports2) {
+  "../../node_modules/zod/v3/helpers/errorUtil.cjs"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.errorUtil = void 0;
@@ -14617,9 +14591,9 @@ var require_errorUtil = __commonJS({
   }
 });
 
-// ../../node_modules/@backstage/catalog-model/node_modules/zod/v3/types.cjs
+// ../../node_modules/zod/v3/types.cjs
 var require_types2 = __commonJS({
-  "../../node_modules/@backstage/catalog-model/node_modules/zod/v3/types.cjs"(exports2) {
+  "../../node_modules/zod/v3/types.cjs"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.discriminatedUnion = exports2.date = exports2.boolean = exports2.bigint = exports2.array = exports2.any = exports2.coerce = exports2.ZodFirstPartyTypeKind = exports2.late = exports2.ZodSchema = exports2.Schema = exports2.ZodReadonly = exports2.ZodPipeline = exports2.ZodBranded = exports2.BRAND = exports2.ZodNaN = exports2.ZodCatch = exports2.ZodDefault = exports2.ZodNullable = exports2.ZodOptional = exports2.ZodTransformer = exports2.ZodEffects = exports2.ZodPromise = exports2.ZodNativeEnum = exports2.ZodEnum = exports2.ZodLiteral = exports2.ZodLazy = exports2.ZodFunction = exports2.ZodSet = exports2.ZodMap = exports2.ZodRecord = exports2.ZodTuple = exports2.ZodIntersection = exports2.ZodDiscriminatedUnion = exports2.ZodUnion = exports2.ZodObject = exports2.ZodArray = exports2.ZodVoid = exports2.ZodNever = exports2.ZodUnknown = exports2.ZodAny = exports2.ZodNull = exports2.ZodUndefined = exports2.ZodSymbol = exports2.ZodDate = exports2.ZodBoolean = exports2.ZodBigInt = exports2.ZodNumber = exports2.ZodString = exports2.ZodType = void 0;
@@ -18159,9 +18133,9 @@ var require_types2 = __commonJS({
   }
 });
 
-// ../../node_modules/@backstage/catalog-model/node_modules/zod/v3/external.cjs
+// ../../node_modules/zod/v3/external.cjs
 var require_external = __commonJS({
-  "../../node_modules/@backstage/catalog-model/node_modules/zod/v3/external.cjs"(exports2) {
+  "../../node_modules/zod/v3/external.cjs"(exports2) {
     "use strict";
     var __createBinding2 = exports2 && exports2.__createBinding || (Object.create ? (function(o, m, k, k2) {
       if (k2 === void 0) k2 = k;
@@ -18189,9 +18163,9 @@ var require_external = __commonJS({
   }
 });
 
-// ../../node_modules/@backstage/catalog-model/node_modules/zod/v3/index.cjs
+// ../../node_modules/zod/v3/index.cjs
 var require_v3 = __commonJS({
-  "../../node_modules/@backstage/catalog-model/node_modules/zod/v3/index.cjs"(exports2) {
+  "../../node_modules/zod/v3/index.cjs"(exports2) {
     "use strict";
     var __createBinding2 = exports2 && exports2.__createBinding || (Object.create ? (function(o, m, k, k2) {
       if (k2 === void 0) k2 = k;
@@ -21691,9 +21665,9 @@ var require_conversion_cjs = __commonJS({
   "../../node_modules/@backstage/plugin-catalog-node/dist/conversion.cjs.js"(exports2) {
     "use strict";
     var catalogModel = require_index_cjs2();
-    var crypto = require("crypto");
+    var crypto2 = require("crypto");
     function locationSpecToMetadataName(location) {
-      const hash = crypto.createHash("sha1").update(`${location.type}:${location.target}`).digest("hex");
+      const hash = crypto2.createHash("sha1").update(`${location.type}:${location.target}`).digest("hex");
       return `generated-${hash}`;
     }
     function locationSpecToLocationEntity(opts) {
@@ -29210,9 +29184,9 @@ var require_utils_cjs = __commonJS({
   }
 });
 
-// ../../node_modules/webidl-conversions/lib/index.js
+// ../../node_modules/node-fetch/node_modules/webidl-conversions/lib/index.js
 var require_lib = __commonJS({
-  "../../node_modules/webidl-conversions/lib/index.js"(exports2, module2) {
+  "../../node_modules/node-fetch/node_modules/webidl-conversions/lib/index.js"(exports2, module2) {
     "use strict";
     var conversions = {};
     module2.exports = conversions;
@@ -29363,9 +29337,9 @@ var require_lib = __commonJS({
   }
 });
 
-// ../../node_modules/whatwg-url/lib/utils.js
+// ../../node_modules/node-fetch/node_modules/whatwg-url/lib/utils.js
 var require_utils2 = __commonJS({
-  "../../node_modules/whatwg-url/lib/utils.js"(exports2, module2) {
+  "../../node_modules/node-fetch/node_modules/whatwg-url/lib/utils.js"(exports2, module2) {
     "use strict";
     module2.exports.mixin = function mixin(target, source) {
       const keys = Object.getOwnPropertyNames(source);
@@ -29552,9 +29526,9 @@ var require_tr46 = __commonJS({
   }
 });
 
-// ../../node_modules/whatwg-url/lib/url-state-machine.js
+// ../../node_modules/node-fetch/node_modules/whatwg-url/lib/url-state-machine.js
 var require_url_state_machine = __commonJS({
-  "../../node_modules/whatwg-url/lib/url-state-machine.js"(exports2, module2) {
+  "../../node_modules/node-fetch/node_modules/whatwg-url/lib/url-state-machine.js"(exports2, module2) {
     "use strict";
     var punycode = require("punycode");
     var tr46 = require_tr46();
@@ -30624,9 +30598,9 @@ var require_url_state_machine = __commonJS({
   }
 });
 
-// ../../node_modules/whatwg-url/lib/URL-impl.js
+// ../../node_modules/node-fetch/node_modules/whatwg-url/lib/URL-impl.js
 var require_URL_impl = __commonJS({
-  "../../node_modules/whatwg-url/lib/URL-impl.js"(exports2) {
+  "../../node_modules/node-fetch/node_modules/whatwg-url/lib/URL-impl.js"(exports2) {
     "use strict";
     var usm = require_url_state_machine();
     exports2.implementation = class URLImpl {
@@ -30781,9 +30755,9 @@ var require_URL_impl = __commonJS({
   }
 });
 
-// ../../node_modules/whatwg-url/lib/URL.js
+// ../../node_modules/node-fetch/node_modules/whatwg-url/lib/URL.js
 var require_URL = __commonJS({
-  "../../node_modules/whatwg-url/lib/URL.js"(exports2, module2) {
+  "../../node_modules/node-fetch/node_modules/whatwg-url/lib/URL.js"(exports2, module2) {
     "use strict";
     var conversions = require_lib();
     var utils = require_utils2();
@@ -30963,9 +30937,9 @@ var require_URL = __commonJS({
   }
 });
 
-// ../../node_modules/whatwg-url/lib/public-api.js
+// ../../node_modules/node-fetch/node_modules/whatwg-url/lib/public-api.js
 var require_public_api2 = __commonJS({
-  "../../node_modules/whatwg-url/lib/public-api.js"(exports2) {
+  "../../node_modules/node-fetch/node_modules/whatwg-url/lib/public-api.js"(exports2) {
     "use strict";
     exports2.URL = require_URL().interface;
     exports2.serializeURL = require_url_state_machine().serializeURL;
@@ -36678,38 +36652,19 @@ var require_internal = __commonJS({
 
 // ../../node_modules/@azure/logger/dist/commonjs/index.js
 var require_commonjs = __commonJS({
-  "../../node_modules/@azure/logger/dist/commonjs/index.js"(exports2, module2) {
-    var __defProp2 = Object.defineProperty;
-    var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
-    var __getOwnPropNames2 = Object.getOwnPropertyNames;
-    var __hasOwnProp2 = Object.prototype.hasOwnProperty;
-    var __export2 = (target, all) => {
-      for (var name in all)
-        __defProp2(target, name, { get: all[name], enumerable: true });
-    };
-    var __copyProps2 = (to, from, except, desc) => {
-      if (from && typeof from === "object" || typeof from === "function") {
-        for (let key of __getOwnPropNames2(from))
-          if (!__hasOwnProp2.call(to, key) && key !== except)
-            __defProp2(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc2(from, key)) || desc.enumerable });
-      }
-      return to;
-    };
-    var __toCommonJS2 = (mod) => __copyProps2(__defProp2({}, "__esModule", { value: true }), mod);
-    var src_exports = {};
-    __export2(src_exports, {
-      AzureLogger: () => AzureLogger,
-      createClientLogger: () => createClientLogger2,
-      getLogLevel: () => getLogLevel2,
-      setLogLevel: () => setLogLevel2
-    });
-    module2.exports = __toCommonJS2(src_exports);
-    var import_logger = require_internal();
-    var context = (0, import_logger.createLoggerContext)({
+  "../../node_modules/@azure/logger/dist/commonjs/index.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.AzureLogger = void 0;
+    exports2.setLogLevel = setLogLevel2;
+    exports2.getLogLevel = getLogLevel2;
+    exports2.createClientLogger = createClientLogger2;
+    var logger_1 = require_internal();
+    var context = (0, logger_1.createLoggerContext)({
       logLevelEnvVarName: "AZURE_LOG_LEVEL",
       namespace: "azure"
     });
-    var AzureLogger = context.logger;
+    exports2.AzureLogger = context.logger;
     function setLogLevel2(level) {
       context.setLogLevel(level);
     }
@@ -36838,9 +36793,9 @@ var require_tracingContext = __commonJS({
   }
 });
 
-// ../../node_modules/@azure/core-tracing/dist/commonjs/state-cjs.js
-var require_state_cjs = __commonJS({
-  "../../node_modules/@azure/core-tracing/dist/commonjs/state-cjs.js"(exports2) {
+// ../../node_modules/@azure/core-tracing/dist/commonjs/state.js
+var require_state = __commonJS({
+  "../../node_modules/@azure/core-tracing/dist/commonjs/state.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.state = void 0;
@@ -36860,7 +36815,7 @@ var require_instrumenter = __commonJS({
     exports2.useInstrumenter = useInstrumenter;
     exports2.getInstrumenter = getInstrumenter;
     var tracingContext_js_1 = require_tracingContext();
-    var state_1 = require_state_cjs();
+    var state_js_1 = require_state();
     function createDefaultTracingSpan() {
       return {
         end: () => {
@@ -36896,13 +36851,13 @@ var require_instrumenter = __commonJS({
       };
     }
     function useInstrumenter(instrumenter) {
-      state_1.state.instrumenterImplementation = instrumenter;
+      state_js_1.state.instrumenterImplementation = instrumenter;
     }
     function getInstrumenter() {
-      if (!state_1.state.instrumenterImplementation) {
-        state_1.state.instrumenterImplementation = createDefaultInstrumenter();
+      if (!state_js_1.state.instrumenterImplementation) {
+        state_js_1.state.instrumenterImplementation = createDefaultInstrumenter();
       }
-      return state_1.state.instrumenterImplementation;
+      return state_js_1.state.instrumenterImplementation;
     }
   }
 });
@@ -36941,7 +36896,7 @@ var require_tracingClient = __commonJS({
       async function withSpan(name, operationOptions, callback, spanOptions) {
         const { span, updatedOptions } = startSpan(name, operationOptions, spanOptions);
         try {
-          const result = await withContext(updatedOptions.tracingOptions.tracingContext, () => callback(updatedOptions, span));
+          const result = await withContext(updatedOptions.tracingOptions.tracingContext, () => Promise.resolve(callback(updatedOptions, span)));
           span.setStatus({ status: "success" });
           return result;
         } catch (err) {
@@ -37400,14 +37355,14 @@ var require_buffer_equal_constant_time = __commonJS({
 var require_jwa = __commonJS({
   "../../node_modules/jwa/index.js"(exports2, module2) {
     var Buffer3 = require_safe_buffer().Buffer;
-    var crypto = require("crypto");
+    var crypto2 = require("crypto");
     var formatEcdsa = require_ecdsa_sig_formatter();
     var util = require("util");
     var MSG_INVALID_ALGORITHM = '"%s" is not a valid algorithm.\n  Supported algorithms are:\n  "HS256", "HS384", "HS512", "RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "ES512" and "none".';
     var MSG_INVALID_SECRET = "secret must be a string or buffer";
     var MSG_INVALID_VERIFIER_KEY = "key must be a string or a buffer";
     var MSG_INVALID_SIGNER_KEY = "key must be a string, a buffer or an object";
-    var supportsKeyObjects = typeof crypto.createPublicKey === "function";
+    var supportsKeyObjects = typeof crypto2.createPublicKey === "function";
     if (supportsKeyObjects) {
       MSG_INVALID_VERIFIER_KEY += " or a KeyObject";
       MSG_INVALID_SECRET += "or a KeyObject";
@@ -37497,17 +37452,17 @@ var require_jwa = __commonJS({
       return function sign(thing, secret) {
         checkIsSecretKey(secret);
         thing = normalizeInput(thing);
-        var hmac = crypto.createHmac("sha" + bits, secret);
+        var hmac = crypto2.createHmac("sha" + bits, secret);
         var sig = (hmac.update(thing), hmac.digest("base64"));
         return fromBase64(sig);
       };
     }
     var bufferEqual;
-    var timingSafeEqual = "timingSafeEqual" in crypto ? function timingSafeEqual2(a, b) {
+    var timingSafeEqual = "timingSafeEqual" in crypto2 ? function timingSafeEqual2(a, b) {
       if (a.byteLength !== b.byteLength) {
         return false;
       }
-      return crypto.timingSafeEqual(a, b);
+      return crypto2.timingSafeEqual(a, b);
     } : function timingSafeEqual2(a, b) {
       if (!bufferEqual) {
         bufferEqual = require_buffer_equal_constant_time();
@@ -37524,7 +37479,7 @@ var require_jwa = __commonJS({
       return function sign(thing, privateKey) {
         checkIsPrivateKey(privateKey);
         thing = normalizeInput(thing);
-        var signer = crypto.createSign("RSA-SHA" + bits);
+        var signer = crypto2.createSign("RSA-SHA" + bits);
         var sig = (signer.update(thing), signer.sign(privateKey, "base64"));
         return fromBase64(sig);
       };
@@ -37534,7 +37489,7 @@ var require_jwa = __commonJS({
         checkIsPublicKey(publicKey);
         thing = normalizeInput(thing);
         signature = toBase64(signature);
-        var verifier = crypto.createVerify("RSA-SHA" + bits);
+        var verifier = crypto2.createVerify("RSA-SHA" + bits);
         verifier.update(thing);
         return verifier.verify(publicKey, signature, "base64");
       };
@@ -37543,11 +37498,11 @@ var require_jwa = __commonJS({
       return function sign(thing, privateKey) {
         checkIsPrivateKey(privateKey);
         thing = normalizeInput(thing);
-        var signer = crypto.createSign("RSA-SHA" + bits);
+        var signer = crypto2.createSign("RSA-SHA" + bits);
         var sig = (signer.update(thing), signer.sign({
           key: privateKey,
-          padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
-          saltLength: crypto.constants.RSA_PSS_SALTLEN_DIGEST
+          padding: crypto2.constants.RSA_PKCS1_PSS_PADDING,
+          saltLength: crypto2.constants.RSA_PSS_SALTLEN_DIGEST
         }, "base64"));
         return fromBase64(sig);
       };
@@ -37557,12 +37512,12 @@ var require_jwa = __commonJS({
         checkIsPublicKey(publicKey);
         thing = normalizeInput(thing);
         signature = toBase64(signature);
-        var verifier = crypto.createVerify("RSA-SHA" + bits);
+        var verifier = crypto2.createVerify("RSA-SHA" + bits);
         verifier.update(thing);
         return verifier.verify({
           key: publicKey,
-          padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
-          saltLength: crypto.constants.RSA_PSS_SALTLEN_DIGEST
+          padding: crypto2.constants.RSA_PKCS1_PSS_PADDING,
+          saltLength: crypto2.constants.RSA_PSS_SALTLEN_DIGEST
         }, signature, "base64");
       };
     }
@@ -41026,7 +40981,7 @@ var require_msal_node = __commonJS({
   "../../node_modules/@azure/msal-node/lib/msal-node.cjs"(exports2) {
     "use strict";
     var node_crypto = require("node:crypto");
-    var crypto = require("crypto");
+    var crypto2 = require("crypto");
     var jwt = require_jsonwebtoken();
     var http = require("http");
     var fs6 = require("fs");
@@ -41164,58 +41119,6 @@ var require_msal_node = __commonJS({
         };
       }
     };
-    var CLIENT_ID = "client_id";
-    var REDIRECT_URI = "redirect_uri";
-    var RESPONSE_TYPE = "response_type";
-    var RESPONSE_MODE = "response_mode";
-    var GRANT_TYPE = "grant_type";
-    var CLAIMS = "claims";
-    var SCOPE = "scope";
-    var REFRESH_TOKEN = "refresh_token";
-    var STATE = "state";
-    var NONCE = "nonce";
-    var PROMPT = "prompt";
-    var CODE = "code";
-    var CODE_CHALLENGE = "code_challenge";
-    var CODE_CHALLENGE_METHOD = "code_challenge_method";
-    var CODE_VERIFIER = "code_verifier";
-    var CLIENT_REQUEST_ID = "client-request-id";
-    var X_CLIENT_SKU = "x-client-SKU";
-    var X_CLIENT_VER = "x-client-VER";
-    var X_CLIENT_OS = "x-client-OS";
-    var X_CLIENT_CPU = "x-client-CPU";
-    var X_CLIENT_CURR_TELEM = "x-client-current-telemetry";
-    var X_CLIENT_LAST_TELEM = "x-client-last-telemetry";
-    var X_MS_LIB_CAPABILITY = "x-ms-lib-capability";
-    var X_APP_NAME = "x-app-name";
-    var X_APP_VER = "x-app-ver";
-    var POST_LOGOUT_URI = "post_logout_redirect_uri";
-    var ID_TOKEN_HINT = "id_token_hint";
-    var DEVICE_CODE = "device_code";
-    var CLIENT_SECRET = "client_secret";
-    var CLIENT_ASSERTION = "client_assertion";
-    var CLIENT_ASSERTION_TYPE = "client_assertion_type";
-    var TOKEN_TYPE = "token_type";
-    var REQ_CNF = "req_cnf";
-    var OBO_ASSERTION = "assertion";
-    var REQUESTED_TOKEN_USE = "requested_token_use";
-    var ON_BEHALF_OF = "on_behalf_of";
-    var RETURN_SPA_CODE = "return_spa_code";
-    var LOGOUT_HINT = "logout_hint";
-    var SID = "sid";
-    var LOGIN_HINT = "login_hint";
-    var DOMAIN_HINT = "domain_hint";
-    var X_CLIENT_EXTRA_SKU = "x-client-xtra-sku";
-    var BROKER_CLIENT_ID = "brk_client_id";
-    var BROKER_REDIRECT_URI = "brk_redirect_uri";
-    var INSTANCE_AWARE = "instance_aware";
-    var RESOURCE = "resource";
-    var CLI_DATA = "clidata";
-    var USER_FEDERATED_IDENTITY_CREDENTIAL = "user_federated_identity_credential";
-    var USERNAME = "username";
-    var USER_ID = "user_id";
-    var FMI_PATH = "fmi_path";
-    var ATTRIBUTE_TOKENS = "attribute_tokens";
     var SKU = "msal.js.common";
     var DEFAULT_AUTHORITY = "https://login.microsoftonline.com/common/";
     var DEFAULT_AUTHORITY_HOST = "login.microsoftonline.com";
@@ -41299,7 +41202,6 @@ var require_msal_node = __commonJS({
       NO_SESSION: "no_session"
     };
     var CodeChallengeMethodValues = {
-      PLAIN: "plain",
       S256: "S256"
     };
     var OAuthResponseType = {
@@ -41395,6 +41297,57 @@ var require_msal_node = __commonJS({
       HEX: "hex",
       UTF8: "utf-8"
     };
+    var CLIENT_ID = "client_id";
+    var REDIRECT_URI = "redirect_uri";
+    var RESPONSE_TYPE = "response_type";
+    var RESPONSE_MODE = "response_mode";
+    var GRANT_TYPE = "grant_type";
+    var CLAIMS = "claims";
+    var SCOPE = "scope";
+    var REFRESH_TOKEN = "refresh_token";
+    var STATE = "state";
+    var NONCE = "nonce";
+    var PROMPT = "prompt";
+    var CODE = "code";
+    var CODE_CHALLENGE = "code_challenge";
+    var CODE_CHALLENGE_METHOD = "code_challenge_method";
+    var CODE_VERIFIER = "code_verifier";
+    var CLIENT_REQUEST_ID = "client-request-id";
+    var X_CLIENT_SKU = "x-client-SKU";
+    var X_CLIENT_VER = "x-client-VER";
+    var X_CLIENT_OS = "x-client-OS";
+    var X_CLIENT_CPU = "x-client-CPU";
+    var X_CLIENT_CURR_TELEM = "x-client-current-telemetry";
+    var X_CLIENT_LAST_TELEM = "x-client-last-telemetry";
+    var X_MS_LIB_CAPABILITY = "x-ms-lib-capability";
+    var X_APP_NAME = "x-app-name";
+    var X_APP_VER = "x-app-ver";
+    var POST_LOGOUT_URI = "post_logout_redirect_uri";
+    var ID_TOKEN_HINT = "id_token_hint";
+    var DEVICE_CODE = "device_code";
+    var CLIENT_SECRET = "client_secret";
+    var CLIENT_ASSERTION = "client_assertion";
+    var CLIENT_ASSERTION_TYPE = "client_assertion_type";
+    var TOKEN_TYPE = "token_type";
+    var REQ_CNF = "req_cnf";
+    var OBO_ASSERTION = "assertion";
+    var REQUESTED_TOKEN_USE = "requested_token_use";
+    var ON_BEHALF_OF = "on_behalf_of";
+    var RETURN_SPA_CODE = "return_spa_code";
+    var LOGOUT_HINT = "logout_hint";
+    var SID = "sid";
+    var LOGIN_HINT = "login_hint";
+    var DOMAIN_HINT = "domain_hint";
+    var X_CLIENT_EXTRA_SKU = "x-client-xtra-sku";
+    var BROKER_CLIENT_ID = "brk_client_id";
+    var BROKER_REDIRECT_URI = "brk_redirect_uri";
+    var INSTANCE_AWARE = "instance_aware";
+    var RESOURCE = "resource";
+    var CLI_DATA = "clidata";
+    var USER_FEDERATED_IDENTITY_CREDENTIAL = "user_federated_identity_credential";
+    var USERNAME = "username";
+    var USER_ID = "user_id";
+    var FMI_PATH = "fmi_path";
     function getDefaultErrorMessage(code) {
       return `See https://aka.ms/msal.js.errors#${code} for details`;
     }
@@ -41414,6 +41367,85 @@ var require_msal_node = __commonJS({
     function createAuthError(code, correlationId, additionalMessage) {
       return new AuthError(code, correlationId, additionalMessage || getDefaultErrorMessage(code));
     }
+    var ClientConfigurationError = class _ClientConfigurationError extends AuthError {
+      constructor(errorCode, correlationId) {
+        super(errorCode, correlationId);
+        this.name = "ClientConfigurationError";
+        Object.setPrototypeOf(this, _ClientConfigurationError.prototype);
+      }
+    };
+    function createClientConfigurationError(errorCode, correlationId) {
+      return new ClientConfigurationError(errorCode, correlationId);
+    }
+    var StringUtils = class {
+      /**
+       * Check if stringified object is empty
+       * @param strObj
+       */
+      static isEmptyObj(strObj) {
+        if (strObj) {
+          try {
+            const obj = JSON.parse(strObj);
+            return Object.keys(obj).length === 0;
+          } catch (e) {
+          }
+        }
+        return true;
+      }
+      static startsWith(str, search) {
+        return str.indexOf(search) === 0;
+      }
+      static endsWith(str, search) {
+        return str.length >= search.length && str.lastIndexOf(search) === str.length - search.length;
+      }
+      /**
+       * Parses string into an object.
+       *
+       * @param query
+       */
+      static queryStringToObject(query) {
+        const obj = {};
+        const params = query.split("&");
+        const decode = (s) => decodeURIComponent(s.replace(/\+/g, " "));
+        params.forEach((pair) => {
+          if (pair.trim()) {
+            const [key, value] = pair.split(/=(.+)/g, 2);
+            if (key && value) {
+              obj[decode(key)] = decode(value);
+            }
+          }
+        });
+        return obj;
+      }
+      /**
+       * Trims entries in an array.
+       *
+       * @param arr
+       */
+      static trimArrayEntries(arr) {
+        return arr.map((entry) => entry.trim());
+      }
+      /**
+       * Removes empty strings from array
+       * @param arr
+       */
+      static removeEmptyStringsFromArray(arr) {
+        return arr.filter((entry) => {
+          return !!entry;
+        });
+      }
+      /**
+       * Attempts to parse a string into JSON
+       * @param str
+       */
+      static jsonParseHelper(str) {
+        try {
+          return JSON.parse(str);
+        } catch (e) {
+          return null;
+        }
+      }
+    };
     var ClientAuthError = class _ClientAuthError extends AuthError {
       constructor(errorCode, correlationId, additionalMessage) {
         super(errorCode, correlationId, additionalMessage);
@@ -41424,6 +41456,57 @@ var require_msal_node = __commonJS({
     function createClientAuthError(errorCode, correlationId, additionalMessage) {
       return new ClientAuthError(errorCode, correlationId, additionalMessage);
     }
+    var redirectUriEmpty = "redirect_uri_empty";
+    var claimsRequestParsingError = "claims_request_parsing_error";
+    var authorityUriInsecure = "authority_uri_insecure";
+    var urlParseError = "url_parse_error";
+    var urlEmptyError = "empty_url_error";
+    var emptyInputScopesError = "empty_input_scopes_error";
+    var invalidClaims = "invalid_claims";
+    var tokenRequestEmpty = "token_request_empty";
+    var logoutRequestEmpty = "logout_request_empty";
+    var invalidCodeChallengeMethod = "invalid_code_challenge_method";
+    var pkceParamsMissing = "pkce_params_missing";
+    var invalidCloudDiscoveryMetadata = "invalid_cloud_discovery_metadata";
+    var invalidAuthorityMetadata = "invalid_authority_metadata";
+    var untrustedAuthority = "untrusted_authority";
+    var missingSshJwk = "missing_ssh_jwk";
+    var missingSshKid = "missing_ssh_kid";
+    var missingNonceAuthenticationHeader = "missing_nonce_authentication_header";
+    var invalidAuthenticationHeader = "invalid_authentication_header";
+    var cannotSetOIDCOptions = "cannot_set_OIDCOptions";
+    var cannotAllowPlatformBroker = "cannot_allow_platform_broker";
+    var authorityMismatch = "authority_mismatch";
+    var invalidRequestMethodForEAR = "invalid_request_method_for_EAR";
+    var invalidPlatformBrokerConfiguration = "invalid_platform_broker_configuration";
+    var issuerValidationFailed = "issuer_validation_failed";
+    var ClientConfigurationErrorCodes = /* @__PURE__ */ Object.freeze({
+      __proto__: null,
+      authorityMismatch,
+      authorityUriInsecure,
+      cannotAllowPlatformBroker,
+      cannotSetOIDCOptions,
+      claimsRequestParsingError,
+      emptyInputScopesError,
+      invalidAuthenticationHeader,
+      invalidAuthorityMetadata,
+      invalidClaims,
+      invalidCloudDiscoveryMetadata,
+      invalidCodeChallengeMethod,
+      invalidPlatformBrokerConfiguration,
+      invalidRequestMethodForEAR,
+      issuerValidationFailed,
+      logoutRequestEmpty,
+      missingNonceAuthenticationHeader,
+      missingSshJwk,
+      missingSshKid,
+      pkceParamsMissing,
+      redirectUriEmpty,
+      tokenRequestEmpty,
+      untrustedAuthority,
+      urlEmptyError,
+      urlParseError
+    });
     var clientInfoDecodingError = "client_info_decoding_error";
     var clientInfoEmptyError = "client_info_empty_error";
     var tokenParsingError = "token_parsing_error";
@@ -41501,27 +41584,705 @@ var require_msal_node = __commonJS({
       unexpectedCredentialType,
       userCanceled
     });
-    function buildClientInfo(rawClientInfo, base64Decode) {
-      if (!rawClientInfo) {
-        throw createClientAuthError(clientInfoEmptyError, "");
+    var ScopeSet = class _ScopeSet {
+      constructor(inputScopes, correlationId) {
+        this.correlationId = correlationId;
+        const scopeArr = inputScopes ? StringUtils.trimArrayEntries([...inputScopes]) : [];
+        const filteredInput = scopeArr ? StringUtils.removeEmptyStringsFromArray(scopeArr) : [];
+        if (!filteredInput || !filteredInput.length) {
+          throw createClientConfigurationError(emptyInputScopesError, correlationId);
+        }
+        this.scopes = /* @__PURE__ */ new Set();
+        filteredInput.forEach((scope) => this.scopes.add(scope));
+      }
+      /**
+       * Factory method to create ScopeSet from space-delimited string
+       * @param inputScopeString
+       * @param appClientId
+       * @param scopesRequired
+       */
+      static fromString(inputScopeString, correlationId) {
+        const scopeString = inputScopeString || "";
+        const inputScopes = scopeString.split(" ");
+        return new _ScopeSet(inputScopes, correlationId);
+      }
+      /**
+       * Creates the set of scopes to search for in cache lookups
+       * @param inputScopeString
+       * @returns
+       */
+      static createSearchScopes(inputScopeString, correlationId) {
+        const scopesToUse = inputScopeString && inputScopeString.length > 0 ? inputScopeString : [...OIDC_DEFAULT_SCOPES];
+        const scopeSet = new _ScopeSet(scopesToUse, correlationId);
+        if (!scopeSet.containsOnlyOIDCScopes()) {
+          scopeSet.removeOIDCScopes();
+        } else {
+          scopeSet.removeScope(OFFLINE_ACCESS_SCOPE);
+        }
+        return scopeSet;
+      }
+      /**
+       * Check if a given scope is present in this set of scopes.
+       * @param scope
+       */
+      containsScope(scope) {
+        const lowerCaseScopes = this.printScopesLowerCase().split(" ");
+        const lowerCaseScopesSet = new _ScopeSet(lowerCaseScopes, this.correlationId);
+        return scope ? lowerCaseScopesSet.scopes.has(scope.toLowerCase()) : false;
+      }
+      /**
+       * Check if a set of scopes is present in this set of scopes.
+       * @param scopeSet
+       */
+      containsScopeSet(scopeSet) {
+        if (!scopeSet || scopeSet.scopes.size <= 0) {
+          return false;
+        }
+        return this.scopes.size >= scopeSet.scopes.size && scopeSet.asArray().every((scope) => this.containsScope(scope));
+      }
+      /**
+       * Check if set of scopes contains only the defaults
+       */
+      containsOnlyOIDCScopes() {
+        let defaultScopeCount = 0;
+        OIDC_SCOPES.forEach((defaultScope) => {
+          if (this.containsScope(defaultScope)) {
+            defaultScopeCount += 1;
+          }
+        });
+        return this.scopes.size === defaultScopeCount;
+      }
+      /**
+       * Appends single scope if passed
+       * @param newScope
+       */
+      appendScope(newScope) {
+        if (newScope) {
+          this.scopes.add(newScope.trim());
+        }
+      }
+      /**
+       * Appends multiple scopes if passed
+       * @param newScopes
+       */
+      appendScopes(newScopes) {
+        try {
+          newScopes.forEach((newScope) => this.appendScope(newScope));
+        } catch (e) {
+          throw createClientAuthError(cannotAppendScopeSet, this.correlationId);
+        }
+      }
+      /**
+       * Removes element from set of scopes.
+       * @param scope
+       */
+      removeScope(scope) {
+        if (!scope) {
+          throw createClientAuthError(cannotRemoveEmptyScope, this.correlationId);
+        }
+        this.scopes.delete(scope.trim());
+      }
+      /**
+       * Removes default scopes from set of scopes
+       * Primarily used to prevent cache misses if the default scopes are not returned from the server
+       */
+      removeOIDCScopes() {
+        OIDC_SCOPES.forEach((defaultScope) => {
+          this.scopes.delete(defaultScope);
+        });
+      }
+      /**
+       * Combines an array of scopes with the current set of scopes.
+       * @param otherScopes
+       */
+      unionScopeSets(otherScopes) {
+        if (!otherScopes) {
+          throw createClientAuthError(emptyInputScopeSet, this.correlationId);
+        }
+        const unionScopes = /* @__PURE__ */ new Set();
+        otherScopes.scopes.forEach((scope) => unionScopes.add(scope.toLowerCase()));
+        this.scopes.forEach((scope) => unionScopes.add(scope.toLowerCase()));
+        return unionScopes;
+      }
+      /**
+       * Check if scopes intersect between this set and another.
+       * @param otherScopes
+       */
+      intersectingScopeSets(otherScopes) {
+        if (!otherScopes) {
+          throw createClientAuthError(emptyInputScopeSet, this.correlationId);
+        }
+        if (!otherScopes.containsOnlyOIDCScopes()) {
+          otherScopes.removeOIDCScopes();
+        }
+        const unionScopes = this.unionScopeSets(otherScopes);
+        const sizeOtherScopes = otherScopes.getScopeCount();
+        const sizeThisScopes = this.getScopeCount();
+        const sizeUnionScopes = unionScopes.size;
+        return sizeUnionScopes < sizeThisScopes + sizeOtherScopes;
+      }
+      /**
+       * Returns size of set of scopes.
+       */
+      getScopeCount() {
+        return this.scopes.size;
+      }
+      /**
+       * Returns the scopes as an array of string values
+       */
+      asArray() {
+        const array = [];
+        this.scopes.forEach((val) => array.push(val));
+        return array;
+      }
+      /**
+       * Prints scopes into a space-delimited string
+       */
+      printScopes() {
+        if (this.scopes) {
+          const scopeArr = this.asArray();
+          return scopeArr.join(" ");
+        }
+        return "";
+      }
+      /**
+       * Prints scopes into a space-delimited lower-case string (used for caching)
+       */
+      printScopesLowerCase() {
+        return this.printScopes().toLowerCase();
+      }
+    };
+    function instrumentBrokerParams(parameters, correlationId, performanceClient) {
+      if (!correlationId) {
+        return;
+      }
+      const clientId = parameters.get(CLIENT_ID);
+      if (clientId && parameters.has(BROKER_CLIENT_ID)) {
+        performanceClient?.addFields({
+          embeddedClientId: clientId,
+          embeddedRedirectUri: parameters.get(REDIRECT_URI)
+        }, correlationId);
+      }
+    }
+    function addResponseType(parameters, responseType) {
+      parameters.set(RESPONSE_TYPE, responseType);
+    }
+    function addResponseMode(parameters, responseMode) {
+      parameters.set(RESPONSE_MODE, responseMode ? responseMode : ResponseMode$1.QUERY);
+    }
+    function addScopes(parameters, scopes, correlationId, addOidcScopes = true, defaultScopes = OIDC_DEFAULT_SCOPES) {
+      if (addOidcScopes && !defaultScopes.includes("openid") && !scopes.includes("openid")) {
+        defaultScopes.push("openid");
+      }
+      const requestScopes = addOidcScopes ? [...scopes || [], ...defaultScopes] : scopes || [];
+      const scopeSet = new ScopeSet(requestScopes, correlationId);
+      parameters.set(SCOPE, scopeSet.printScopes());
+    }
+    function addClientId(parameters, clientId) {
+      parameters.set(CLIENT_ID, clientId);
+    }
+    function addRedirectUri(parameters, redirectUri) {
+      parameters.set(REDIRECT_URI, redirectUri);
+    }
+    function addPostLogoutRedirectUri(parameters, redirectUri) {
+      parameters.set(POST_LOGOUT_URI, redirectUri);
+    }
+    function addIdTokenHint(parameters, idTokenHint) {
+      parameters.set(ID_TOKEN_HINT, idTokenHint);
+    }
+    function addDomainHint(parameters, domainHint) {
+      parameters.set(DOMAIN_HINT, domainHint);
+    }
+    function addLoginHint(parameters, loginHint) {
+      parameters.set(LOGIN_HINT, loginHint);
+    }
+    function addCcsUpn(parameters, loginHint) {
+      parameters.set(HeaderNames.CCS_HEADER, `UPN:${loginHint}`);
+    }
+    function addCcsOid(parameters, clientInfo) {
+      parameters.set(HeaderNames.CCS_HEADER, `Oid:${clientInfo.uid}@${clientInfo.utid}`);
+    }
+    function addSid(parameters, sid) {
+      parameters.set(SID, sid);
+    }
+    function addClaims(parameters, correlationId, claims, clientCapabilities, skipBrokerClaims) {
+      const configClaims = skipBrokerClaims && parameters.has(BROKER_CLIENT_ID) ? void 0 : clientCapabilities;
+      const mergedClaims = buildMergedClaims(claims, configClaims, correlationId);
+      parameters.set(CLAIMS, mergedClaims);
+    }
+    function addCorrelationId(parameters, correlationId) {
+      parameters.set(CLIENT_REQUEST_ID, correlationId);
+    }
+    function addLibraryInfo(parameters, libraryInfo) {
+      parameters.set(X_CLIENT_SKU, libraryInfo.sku);
+      parameters.set(X_CLIENT_VER, libraryInfo.version);
+      if (libraryInfo.os) {
+        parameters.set(X_CLIENT_OS, libraryInfo.os);
+      }
+      if (libraryInfo.cpu) {
+        parameters.set(X_CLIENT_CPU, libraryInfo.cpu);
+      }
+    }
+    function addApplicationTelemetry(parameters, appTelemetry) {
+      if (appTelemetry?.appName) {
+        parameters.set(X_APP_NAME, appTelemetry.appName);
+      }
+      if (appTelemetry?.appVersion) {
+        parameters.set(X_APP_VER, appTelemetry.appVersion);
+      }
+    }
+    function addPrompt(parameters, prompt) {
+      parameters.set(PROMPT, prompt);
+    }
+    function addState(parameters, state) {
+      if (state) {
+        parameters.set(STATE, state);
+      }
+    }
+    function addNonce(parameters, nonce) {
+      parameters.set(NONCE, nonce);
+    }
+    function addCodeChallengeParams(parameters, codeChallenge, codeChallengeMethod) {
+      if (codeChallenge && codeChallengeMethod) {
+        parameters.set(CODE_CHALLENGE, codeChallenge);
+        parameters.set(CODE_CHALLENGE_METHOD, codeChallengeMethod);
+      } else {
+        throw createClientConfigurationError(pkceParamsMissing, "");
+      }
+    }
+    function addAuthorizationCode(parameters, code) {
+      parameters.set(CODE, code);
+    }
+    function addDeviceCode(parameters, code) {
+      parameters.set(DEVICE_CODE, code);
+    }
+    function addRefreshToken(parameters, refreshToken) {
+      parameters.set(REFRESH_TOKEN, refreshToken);
+    }
+    function addCodeVerifier(parameters, codeVerifier) {
+      parameters.set(CODE_VERIFIER, codeVerifier);
+    }
+    function addClientSecret(parameters, clientSecret) {
+      parameters.set(CLIENT_SECRET, clientSecret);
+    }
+    function addClientAssertion(parameters, clientAssertion) {
+      if (clientAssertion) {
+        parameters.set(CLIENT_ASSERTION, clientAssertion);
+      }
+    }
+    function addClientAssertionType(parameters, clientAssertionType) {
+      if (clientAssertionType) {
+        parameters.set(CLIENT_ASSERTION_TYPE, clientAssertionType);
+      }
+    }
+    function addOboAssertion(parameters, oboAssertion) {
+      parameters.set(OBO_ASSERTION, oboAssertion);
+    }
+    function addRequestTokenUse(parameters, tokenUse) {
+      parameters.set(REQUESTED_TOKEN_USE, tokenUse);
+    }
+    function addGrantType(parameters, grantType) {
+      parameters.set(GRANT_TYPE, grantType);
+    }
+    function addClientInfo(parameters) {
+      parameters.set(CLIENT_INFO, "1");
+    }
+    function addCliData(parameters) {
+      parameters.set(CLI_DATA, "1");
+    }
+    function addInstanceAware(parameters) {
+      if (!parameters.has(INSTANCE_AWARE)) {
+        parameters.set(INSTANCE_AWARE, "true");
+      }
+    }
+    function addExtraParameters(parameters, extraParams) {
+      Object.entries(extraParams).forEach(([key, value]) => {
+        if (!parameters.has(key) && value) {
+          parameters.set(key, value);
+        }
+      });
+    }
+    var DEFAULT_ID_TOKEN_CLAIMS = {
+      [ClaimsRequestKeys.SIGNIN_STATE]: { essential: false },
+      [ClaimsRequestKeys.LOGIN_HINT]: { essential: false }
+    };
+    function buildMergedClaims(claims, clientCapabilities, correlationId = "") {
+      let mergedClaims;
+      if (!claims) {
+        mergedClaims = {};
+      } else {
+        try {
+          const parsed = JSON.parse(claims);
+          if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+            throw new Error("Claims must be a JSON object");
+          }
+          mergedClaims = parsed;
+        } catch (e) {
+          throw createClientConfigurationError(invalidClaims, correlationId);
+        }
+      }
+      if (!Object.prototype.hasOwnProperty.call(mergedClaims, ClaimsRequestKeys.ID_TOKEN)) {
+        mergedClaims[ClaimsRequestKeys.ID_TOKEN] = {};
+      }
+      const idTokenClaims = mergedClaims[ClaimsRequestKeys.ID_TOKEN];
+      for (const [key, value] of Object.entries(DEFAULT_ID_TOKEN_CLAIMS)) {
+        if (!(key in idTokenClaims)) {
+          idTokenClaims[key] = value;
+        }
+      }
+      if (clientCapabilities && clientCapabilities.length > 0) {
+        if (!Object.prototype.hasOwnProperty.call(mergedClaims, ClaimsRequestKeys.ACCESS_TOKEN)) {
+          mergedClaims[ClaimsRequestKeys.ACCESS_TOKEN] = {};
+        }
+        mergedClaims[ClaimsRequestKeys.ACCESS_TOKEN][ClaimsRequestKeys.XMS_CC] = {
+          values: clientCapabilities
+        };
+      }
+      return JSON.stringify(mergedClaims);
+    }
+    function addUsername(parameters, username) {
+      parameters.set(PasswordGrantConstants.username, username);
+    }
+    function addPassword(parameters, password) {
+      parameters.set(PasswordGrantConstants.password, password);
+    }
+    function addPopToken(parameters, cnfString) {
+      if (cnfString) {
+        parameters.set(TOKEN_TYPE, AuthenticationScheme.POP);
+        parameters.set(REQ_CNF, cnfString);
+      }
+    }
+    function addSshJwk(parameters, sshJwkString) {
+      if (sshJwkString) {
+        parameters.set(TOKEN_TYPE, AuthenticationScheme.SSH);
+        parameters.set(REQ_CNF, sshJwkString);
+      }
+    }
+    function addServerTelemetry(parameters, serverTelemetryManager) {
+      parameters.set(X_CLIENT_CURR_TELEM, serverTelemetryManager.generateCurrentRequestHeaderValue());
+      parameters.set(X_CLIENT_LAST_TELEM, serverTelemetryManager.generateLastRequestHeaderValue());
+    }
+    function addThrottling(parameters) {
+      parameters.set(X_MS_LIB_CAPABILITY, X_MS_LIB_CAPABILITY_VALUE);
+    }
+    function addLogoutHint(parameters, logoutHint) {
+      parameters.set(LOGOUT_HINT, logoutHint);
+    }
+    function addBrokerParameters(parameters, brokerClientId, brokerRedirectUri) {
+      if (!parameters.has(BROKER_CLIENT_ID)) {
+        parameters.set(BROKER_CLIENT_ID, brokerClientId);
+      }
+      if (!parameters.has(BROKER_REDIRECT_URI)) {
+        parameters.set(BROKER_REDIRECT_URI, brokerRedirectUri);
+      }
+    }
+    function addResource(parameters, resource) {
+      if (resource) {
+        parameters.set(RESOURCE, resource);
+      }
+    }
+    function stripLeadingHashOrQuery(responseString) {
+      if (responseString.startsWith("#/")) {
+        return responseString.substring(2);
+      } else if (responseString.startsWith("#") || responseString.startsWith("?")) {
+        return responseString.substring(1);
+      }
+      return responseString;
+    }
+    function getDeserializedResponse(responseString) {
+      if (!responseString || responseString.indexOf("=") < 0) {
+        return null;
       }
       try {
-        const decodedClientInfo = base64Decode(rawClientInfo);
-        return JSON.parse(decodedClientInfo);
+        const normalizedResponse = stripLeadingHashOrQuery(responseString);
+        const deserializedHash = Object.fromEntries(new URLSearchParams(normalizedResponse));
+        if (deserializedHash.code || deserializedHash.ear_jwe || deserializedHash.error || deserializedHash.error_description || deserializedHash.state) {
+          return deserializedHash;
+        }
       } catch (e) {
-        throw createClientAuthError(clientInfoDecodingError, "");
+        throw createClientAuthError(hashNotDeserialized, "");
+      }
+      return null;
+    }
+    function mapToQueryString(parameters) {
+      const queryParameterArray = new Array();
+      parameters.forEach((value, key) => {
+        queryParameterArray.push(`${key}=${encodeURIComponent(value)}`);
+      });
+      return queryParameterArray.join("&");
+    }
+    var DEFAULT_CRYPTO_IMPLEMENTATION = {
+      createNewGuid: () => {
+        throw createClientAuthError(methodNotImplemented, "");
+      },
+      base64Decode: () => {
+        throw createClientAuthError(methodNotImplemented, "");
+      },
+      base64Encode: () => {
+        throw createClientAuthError(methodNotImplemented, "");
+      },
+      base64UrlEncode: () => {
+        throw createClientAuthError(methodNotImplemented, "");
+      },
+      encodeKid: () => {
+        throw createClientAuthError(methodNotImplemented, "");
+      },
+      async getPublicKeyThumbprint() {
+        throw createClientAuthError(methodNotImplemented, "");
+      },
+      async removeTokenBindingKey() {
+        throw createClientAuthError(methodNotImplemented, "");
+      },
+      async clearKeystore() {
+        throw createClientAuthError(methodNotImplemented, "");
+      },
+      async signJwt() {
+        throw createClientAuthError(methodNotImplemented, "");
+      },
+      async hashString() {
+        throw createClientAuthError(methodNotImplemented, "");
+      }
+    };
+    exports2.LogLevel = void 0;
+    (function(LogLevel) {
+      LogLevel[LogLevel["Error"] = 0] = "Error";
+      LogLevel[LogLevel["Warning"] = 1] = "Warning";
+      LogLevel[LogLevel["Info"] = 2] = "Info";
+      LogLevel[LogLevel["Verbose"] = 3] = "Verbose";
+      LogLevel[LogLevel["Trace"] = 4] = "Trace";
+    })(exports2.LogLevel || (exports2.LogLevel = {}));
+    var CACHE_CAPACITY = 50;
+    var MAX_LOGS_PER_CORRELATION = 500;
+    var correlationCache = /* @__PURE__ */ new Map();
+    function markAsRecentlyUsed(correlationId, data) {
+      correlationCache.delete(correlationId);
+      correlationCache.set(correlationId, data);
+    }
+    function addLogToCache(correlationId, loggedMessage) {
+      const currentTime = Date.now();
+      let data = correlationCache.get(correlationId);
+      if (data) {
+        markAsRecentlyUsed(correlationId, data);
+      } else {
+        data = { logs: [], firstEventTime: currentTime };
+        correlationCache.set(correlationId, data);
+        if (correlationCache.size > CACHE_CAPACITY) {
+          const firstKey = correlationCache.keys().next().value;
+          if (firstKey !== void 0) {
+            correlationCache.delete(firstKey);
+          }
+        }
+      }
+      data.logs.push({
+        ...loggedMessage,
+        milliseconds: currentTime - data.firstEventTime
+      });
+      if (data.logs.length > MAX_LOGS_PER_CORRELATION) {
+        data.logs.shift();
       }
     }
-    function buildClientInfoFromHomeAccountId(homeAccountId) {
-      if (!homeAccountId) {
-        throw createClientAuthError(clientInfoDecodingError, "");
+    function getMessageHash(str) {
+      if (str.length < 6) {
+        return null;
       }
-      const clientInfoParts = homeAccountId.split(CLIENT_INFO_SEPARATOR, 2);
-      return {
-        uid: clientInfoParts[0],
-        utid: clientInfoParts.length < 2 ? "" : clientInfoParts[1]
-      };
+      if (str.length > 6 && str[6] !== " ") {
+        return null;
+      }
+      for (let i = 0; i < 6; i++) {
+        const char = str[i];
+        const isAlphaNumeric = char >= "a" && char <= "z" || char >= "A" && char <= "Z" || char >= "0" && char <= "9";
+        if (!isAlphaNumeric) {
+          return null;
+        }
+      }
+      return str.substring(0, 6);
     }
+    var Logger = class _Logger {
+      constructor(loggerOptions, packageName, packageVersion) {
+        this.level = exports2.LogLevel.Info;
+        const defaultLoggerCallback = () => {
+          return;
+        };
+        const setLoggerOptions = loggerOptions || _Logger.createDefaultLoggerOptions();
+        this.localCallback = setLoggerOptions.loggerCallback || defaultLoggerCallback;
+        this.piiLoggingEnabled = setLoggerOptions.piiLoggingEnabled || false;
+        this.level = typeof setLoggerOptions.logLevel === "number" ? setLoggerOptions.logLevel : exports2.LogLevel.Info;
+        this.packageName = packageName || "";
+        this.packageVersion = packageVersion || "";
+      }
+      static createDefaultLoggerOptions() {
+        return {
+          loggerCallback: () => {
+          },
+          piiLoggingEnabled: false,
+          logLevel: exports2.LogLevel.Info
+        };
+      }
+      /**
+       * Create new Logger with existing configurations.
+       */
+      clone(packageName, packageVersion) {
+        return new _Logger({
+          loggerCallback: this.localCallback,
+          piiLoggingEnabled: this.piiLoggingEnabled,
+          logLevel: this.level
+        }, packageName, packageVersion);
+      }
+      /**
+       * Log message with required options.
+       */
+      logMessage(logMessage, options) {
+        const correlationId = options.correlationId;
+        const messageHash = getMessageHash(logMessage);
+        if (messageHash) {
+          const loggedMessage = {
+            hash: messageHash,
+            level: options.logLevel,
+            containsPii: options.containsPii || false,
+            milliseconds: 0
+            // Will be calculated in addLogToCache
+          };
+          addLogToCache(correlationId, loggedMessage);
+        }
+        if (options.logLevel > this.level || !this.piiLoggingEnabled && options.containsPii) {
+          return;
+        }
+        const timestamp = (/* @__PURE__ */ new Date()).toUTCString();
+        const logHeader = `[${timestamp}] : [${correlationId}]`;
+        const log = `${logHeader} : ${this.packageName}@${this.packageVersion} : ${exports2.LogLevel[options.logLevel]} - ${logMessage}`;
+        this.executeCallback(options.logLevel, log, options.containsPii || false);
+      }
+      /**
+       * Execute callback with message.
+       */
+      executeCallback(level, message, containsPii) {
+        if (this.localCallback) {
+          this.localCallback(level, message, containsPii);
+        }
+      }
+      /**
+       * Logs error messages.
+       */
+      error(message, correlationId) {
+        this.logMessage(message, {
+          logLevel: exports2.LogLevel.Error,
+          containsPii: false,
+          correlationId
+        });
+      }
+      /**
+       * Logs error messages with PII.
+       */
+      errorPii(message, correlationId) {
+        this.logMessage(message, {
+          logLevel: exports2.LogLevel.Error,
+          containsPii: true,
+          correlationId
+        });
+      }
+      /**
+       * Logs warning messages.
+       */
+      warning(message, correlationId) {
+        this.logMessage(message, {
+          logLevel: exports2.LogLevel.Warning,
+          containsPii: false,
+          correlationId
+        });
+      }
+      /**
+       * Logs warning messages with PII.
+       */
+      warningPii(message, correlationId) {
+        this.logMessage(message, {
+          logLevel: exports2.LogLevel.Warning,
+          containsPii: true,
+          correlationId
+        });
+      }
+      /**
+       * Logs info messages.
+       */
+      info(message, correlationId) {
+        this.logMessage(message, {
+          logLevel: exports2.LogLevel.Info,
+          containsPii: false,
+          correlationId
+        });
+      }
+      /**
+       * Logs info messages with PII.
+       */
+      infoPii(message, correlationId) {
+        this.logMessage(message, {
+          logLevel: exports2.LogLevel.Info,
+          containsPii: true,
+          correlationId
+        });
+      }
+      /**
+       * Logs verbose messages.
+       */
+      verbose(message, correlationId) {
+        this.logMessage(message, {
+          logLevel: exports2.LogLevel.Verbose,
+          containsPii: false,
+          correlationId
+        });
+      }
+      /**
+       * Logs verbose messages with PII.
+       */
+      verbosePii(message, correlationId) {
+        this.logMessage(message, {
+          logLevel: exports2.LogLevel.Verbose,
+          containsPii: true,
+          correlationId
+        });
+      }
+      /**
+       * Logs trace messages.
+       */
+      trace(message, correlationId) {
+        this.logMessage(message, {
+          logLevel: exports2.LogLevel.Trace,
+          containsPii: false,
+          correlationId
+        });
+      }
+      /**
+       * Logs trace messages with PII.
+       */
+      tracePii(message, correlationId) {
+        this.logMessage(message, {
+          logLevel: exports2.LogLevel.Trace,
+          containsPii: true,
+          correlationId
+        });
+      }
+      /**
+       * Returns whether PII Logging is enabled or not.
+       */
+      isPiiLoggingEnabled() {
+        return this.piiLoggingEnabled || false;
+      }
+    };
+    var name$1 = "@azure/msal-common";
+    var version$1 = "16.11.0";
+    var AzureCloudInstance = {
+      // AzureCloudInstance is not specified.
+      None: "none",
+      // Microsoft Azure public cloud
+      AzurePublic: "https://login.microsoftonline.com",
+      // Microsoft PPE
+      AzurePpe: "https://login.windows-ppe.net",
+      // Microsoft Chinese national/regional cloud
+      AzureChina: "https://login.chinacloudapi.cn",
+      // Microsoft German national/regional cloud ("Black Forest")
+      AzureGermany: "https://login.microsoftonline.de",
+      // US Government cloud
+      AzureUsGovernment: "https://login.microsoftonline.us"
+    };
     function extractTokenClaims(encodedToken, base64Decode, correlationId) {
       const jswPayload = getJWSPayload(encodedToken, correlationId);
       try {
@@ -41595,278 +42356,6 @@ var require_msal_node = __commonJS({
       }
       return updatedAccountInfo;
     }
-    var AuthorityType = {
-      Default: 0,
-      Adfs: 1,
-      Dsts: 2,
-      Ciam: 3
-    };
-    function getTenantIdFromIdTokenClaims(idTokenClaims) {
-      if (idTokenClaims) {
-        const tenantId = idTokenClaims.tid || idTokenClaims.tfp || idTokenClaims.acr;
-        return tenantId || null;
-      }
-      return null;
-    }
-    var ProtocolMode = {
-      /**
-       * Auth Code + PKCE with Entra ID (formerly AAD) specific optimizations and features
-       */
-      AAD: "AAD",
-      /**
-       * Auth Code + PKCE without Entra ID specific optimizations and features. For use only with non-Microsoft owned authorities.
-       * Support is limited for this mode.
-       */
-      OIDC: "OIDC",
-      /**
-       * Encrypted Authorize Response (EAR) with Entra ID specific optimizations and features
-       */
-      EAR: "EAR"
-    };
-    function getAccountInfo(accountEntity) {
-      const tenantProfiles = accountEntity.tenantProfiles || [];
-      if (tenantProfiles.length === 0 && accountEntity.realm && accountEntity.localAccountId) {
-        tenantProfiles.push(buildTenantProfile(accountEntity.homeAccountId, accountEntity.localAccountId, accountEntity.realm, accountEntity.nativeAccountId));
-      }
-      const homeTenantProfile = tenantProfiles.find((tp) => tp.tenantId === accountEntity.realm);
-      const nativeAccountId = homeTenantProfile?.nativeAccountId || accountEntity.nativeAccountId;
-      return {
-        homeAccountId: accountEntity.homeAccountId,
-        environment: accountEntity.environment,
-        tenantId: accountEntity.realm,
-        username: accountEntity.username,
-        localAccountId: accountEntity.localAccountId,
-        loginHint: accountEntity.loginHint,
-        name: accountEntity.name,
-        nativeAccountId,
-        authorityType: accountEntity.authorityType,
-        // Deserialize tenant profiles array into a Map
-        tenantProfiles: new Map(tenantProfiles.map((tenantProfile) => {
-          return [tenantProfile.tenantId, tenantProfile];
-        })),
-        dataBoundary: accountEntity.dataBoundary
-      };
-    }
-    function createAccountEntity(accountDetails, authority, correlationId, base64Decode) {
-      let authorityType;
-      if (authority.authorityType === AuthorityType.Adfs) {
-        authorityType = CACHE_ACCOUNT_TYPE_ADFS;
-      } else if (authority.protocolMode === ProtocolMode.OIDC) {
-        authorityType = CACHE_ACCOUNT_TYPE_GENERIC;
-      } else {
-        authorityType = CACHE_ACCOUNT_TYPE_MSSTS;
-      }
-      let clientInfo;
-      let dataBoundary;
-      if (accountDetails.clientInfo && base64Decode) {
-        clientInfo = buildClientInfo(accountDetails.clientInfo, base64Decode);
-        if (clientInfo.xms_tdbr) {
-          dataBoundary = clientInfo.xms_tdbr === "EU" ? "EU" : "None";
-        }
-      }
-      const env = accountDetails.environment || authority && authority.getPreferredCache();
-      if (!env) {
-        throw createClientAuthError(invalidCacheEnvironment, correlationId);
-      }
-      const preferredUsername = accountDetails.idTokenClaims?.preferred_username || accountDetails.idTokenClaims?.upn;
-      const email = accountDetails.idTokenClaims?.emails ? accountDetails.idTokenClaims.emails[0] : null;
-      const username = preferredUsername || email || "";
-      const loginHint = accountDetails.idTokenClaims?.login_hint;
-      const realm = clientInfo?.utid || getTenantIdFromIdTokenClaims(accountDetails.idTokenClaims) || "";
-      const localAccountId = clientInfo?.uid || accountDetails.idTokenClaims?.oid || accountDetails.idTokenClaims?.sub || "";
-      let tenantProfiles;
-      if (accountDetails.tenantProfiles) {
-        tenantProfiles = accountDetails.tenantProfiles;
-      } else {
-        const tenantProfile = buildTenantProfile(accountDetails.homeAccountId, localAccountId, realm, accountDetails.nativeAccountId, accountDetails.idTokenClaims);
-        tenantProfiles = [tenantProfile];
-      }
-      return {
-        homeAccountId: accountDetails.homeAccountId,
-        environment: env,
-        realm,
-        localAccountId,
-        username,
-        authorityType,
-        loginHint,
-        clientInfo: accountDetails.clientInfo,
-        name: accountDetails.idTokenClaims?.name || "",
-        lastModificationTime: void 0,
-        lastModificationApp: void 0,
-        cloudGraphHostName: accountDetails.cloudGraphHostName,
-        msGraphHost: accountDetails.msGraphHost,
-        nativeAccountId: accountDetails.nativeAccountId,
-        tenantProfiles,
-        dataBoundary
-      };
-    }
-    function generateHomeAccountId(serverClientInfo, authType, logger, cryptoObj, correlationId, idTokenClaims) {
-      if (!(authType === AuthorityType.Adfs || authType === AuthorityType.Dsts)) {
-        if (serverClientInfo) {
-          try {
-            const clientInfo = buildClientInfo(serverClientInfo, cryptoObj.base64Decode);
-            if (clientInfo.uid && clientInfo.utid) {
-              return `${clientInfo.uid}.${clientInfo.utid}`;
-            }
-          } catch (e) {
-          }
-        }
-        logger.warning("No client info in response", correlationId);
-      }
-      return idTokenClaims?.sub || "";
-    }
-    function isAccountEntity(entity) {
-      if (!entity) {
-        return false;
-      }
-      return entity.hasOwnProperty("homeAccountId") && entity.hasOwnProperty("environment") && entity.hasOwnProperty("realm") && entity.hasOwnProperty("localAccountId") && entity.hasOwnProperty("username") && entity.hasOwnProperty("authorityType");
-    }
-    var unexpectedError = "unexpected_error";
-    var postRequestFailed = "post_request_failed";
-    var AuthErrorCodes = /* @__PURE__ */ Object.freeze({
-      __proto__: null,
-      postRequestFailed,
-      unexpectedError
-    });
-    var ClientConfigurationError = class _ClientConfigurationError extends AuthError {
-      constructor(errorCode, correlationId) {
-        super(errorCode, correlationId);
-        this.name = "ClientConfigurationError";
-        Object.setPrototypeOf(this, _ClientConfigurationError.prototype);
-      }
-    };
-    function createClientConfigurationError(errorCode, correlationId) {
-      return new ClientConfigurationError(errorCode, correlationId);
-    }
-    var redirectUriEmpty = "redirect_uri_empty";
-    var claimsRequestParsingError = "claims_request_parsing_error";
-    var authorityUriInsecure = "authority_uri_insecure";
-    var urlParseError = "url_parse_error";
-    var urlEmptyError = "empty_url_error";
-    var emptyInputScopesError = "empty_input_scopes_error";
-    var invalidClaims = "invalid_claims";
-    var tokenRequestEmpty = "token_request_empty";
-    var logoutRequestEmpty = "logout_request_empty";
-    var invalidCodeChallengeMethod = "invalid_code_challenge_method";
-    var pkceParamsMissing = "pkce_params_missing";
-    var invalidCloudDiscoveryMetadata = "invalid_cloud_discovery_metadata";
-    var invalidAuthorityMetadata = "invalid_authority_metadata";
-    var untrustedAuthority = "untrusted_authority";
-    var missingSshJwk = "missing_ssh_jwk";
-    var missingSshKid = "missing_ssh_kid";
-    var missingNonceAuthenticationHeader = "missing_nonce_authentication_header";
-    var invalidAuthenticationHeader = "invalid_authentication_header";
-    var cannotSetOIDCOptions = "cannot_set_OIDCOptions";
-    var cannotAllowPlatformBroker = "cannot_allow_platform_broker";
-    var authorityMismatch = "authority_mismatch";
-    var invalidRequestMethodForEAR = "invalid_request_method_for_EAR";
-    var invalidPlatformBrokerConfiguration = "invalid_platform_broker_configuration";
-    var issuerValidationFailed = "issuer_validation_failed";
-    var invalidResponseMode = "invalid_response_mode";
-    var invalidDpopHtm = "invalid_dpop_htm";
-    var invalidDpopHtu = "invalid_dpop_htu";
-    var ClientConfigurationErrorCodes = /* @__PURE__ */ Object.freeze({
-      __proto__: null,
-      authorityMismatch,
-      authorityUriInsecure,
-      cannotAllowPlatformBroker,
-      cannotSetOIDCOptions,
-      claimsRequestParsingError,
-      emptyInputScopesError,
-      invalidAuthenticationHeader,
-      invalidAuthorityMetadata,
-      invalidClaims,
-      invalidCloudDiscoveryMetadata,
-      invalidCodeChallengeMethod,
-      invalidDpopHtm,
-      invalidDpopHtu,
-      invalidPlatformBrokerConfiguration,
-      invalidRequestMethodForEAR,
-      invalidResponseMode,
-      issuerValidationFailed,
-      logoutRequestEmpty,
-      missingNonceAuthenticationHeader,
-      missingSshJwk,
-      missingSshKid,
-      pkceParamsMissing,
-      redirectUriEmpty,
-      tokenRequestEmpty,
-      untrustedAuthority,
-      urlEmptyError,
-      urlParseError
-    });
-    function isOpenIdConfigResponse(response) {
-      return response.hasOwnProperty("authorization_endpoint") && response.hasOwnProperty("token_endpoint") && response.hasOwnProperty("issuer") && response.hasOwnProperty("jwks_uri");
-    }
-    var StringUtils = class {
-      /**
-       * Check if stringified object is empty
-       * @param strObj
-       */
-      static isEmptyObj(strObj) {
-        if (strObj) {
-          try {
-            const obj = JSON.parse(strObj);
-            return Object.keys(obj).length === 0;
-          } catch (e) {
-          }
-        }
-        return true;
-      }
-      static startsWith(str, search) {
-        return str.indexOf(search) === 0;
-      }
-      static endsWith(str, search) {
-        return str.length >= search.length && str.lastIndexOf(search) === str.length - search.length;
-      }
-      /**
-       * Parses string into an object.
-       *
-       * @param query
-       */
-      static queryStringToObject(query) {
-        const obj = {};
-        const params = query.split("&");
-        const decode = (s) => decodeURIComponent(s.replace(/\+/g, " "));
-        params.forEach((pair) => {
-          if (pair.trim()) {
-            const [key, value] = pair.split(/=(.+)/g, 2);
-            if (key && value) {
-              obj[decode(key)] = decode(value);
-            }
-          }
-        });
-        return obj;
-      }
-      /**
-       * Trims entries in an array.
-       *
-       * @param arr
-       */
-      static trimArrayEntries(arr) {
-        return arr.map((entry) => entry.trim());
-      }
-      /**
-       * Removes empty strings from array
-       * @param arr
-       */
-      static removeEmptyStringsFromArray(arr) {
-        return arr.filter((entry) => {
-          return !!entry;
-        });
-      }
-      /**
-       * Attempts to parse a string into JSON
-       * @param str
-       */
-      static jsonParseHelper(str) {
-        try {
-          return JSON.parse(str);
-        } catch (e) {
-          return null;
-        }
-      }
-    };
     var UrlString = class _UrlString {
       get urlString() {
         return this._urlString;
@@ -42127,184 +42616,1325 @@ var require_msal_node = __commonJS({
       }
       return null;
     }
-    var AzureCloudInstance = {
-      // AzureCloudInstance is not specified.
-      None: "none",
-      // Microsoft Azure public cloud
-      AzurePublic: "https://login.microsoftonline.com",
-      // Microsoft PPE
-      AzurePpe: "https://login.windows-ppe.net",
-      // Microsoft Chinese national/regional cloud
-      AzureChina: "https://login.chinacloudapi.cn",
-      // Microsoft German national/regional cloud ("Black Forest")
-      AzureGermany: "https://login.microsoftonline.de",
-      // US Government cloud
-      AzureUsGovernment: "https://login.microsoftonline.us"
-    };
-    function isCloudInstanceDiscoveryResponse(response) {
-      return response.hasOwnProperty("tenant_discovery_endpoint") && response.hasOwnProperty("metadata");
-    }
-    function isCloudInstanceDiscoveryErrorResponse(response) {
-      return response.hasOwnProperty("error") && response.hasOwnProperty("error_description");
-    }
-    var NetworkClientSendPostRequestAsync = "networkClientSendPostRequestAsync";
-    var RefreshTokenClientExecutePostToTokenEndpoint = "refreshTokenClientExecutePostToTokenEndpoint";
-    var AuthorizationCodeClientExecutePostToTokenEndpoint = "authorizationCodeClientExecutePostToTokenEndpoint";
-    var RefreshTokenClientExecuteTokenRequest = "refreshTokenClientExecuteTokenRequest";
-    var RefreshTokenClientAcquireToken = "refreshTokenClientAcquireToken";
-    var RefreshTokenClientAcquireTokenWithCachedRefreshToken = "refreshTokenClientAcquireTokenWithCachedRefreshToken";
-    var RefreshTokenClientCreateTokenRequestBody = "refreshTokenClientCreateTokenRequestBody";
-    var SilentFlowClientGenerateResultFromCacheRecord = "silentFlowClientGenerateResultFromCacheRecord";
-    var AuthClientExecuteTokenRequest = "authClientExecuteTokenRequest";
-    var AuthClientCreateTokenRequestBody = "authClientCreateTokenRequestBody";
-    var UpdateTokenEndpointAuthority = "updateTokenEndpointAuthority";
-    var PopTokenGenerateCnf = "popTokenGenerateCnf";
-    var HandleServerTokenResponse = "handleServerTokenResponse";
-    var AuthorityResolveEndpointsAsync = "authorityResolveEndpointsAsync";
-    var AuthorityGetCloudDiscoveryMetadataFromNetwork = "authorityGetCloudDiscoveryMetadataFromNetwork";
-    var AuthorityUpdateCloudDiscoveryMetadata = "authorityUpdateCloudDiscoveryMetadata";
-    var AuthorityGetEndpointMetadataFromNetwork = "authorityGetEndpointMetadataFromNetwork";
-    var AuthorityUpdateEndpointMetadata = "authorityUpdateEndpointMetadata";
-    var AuthorityUpdateMetadataWithRegionalInformation = "authorityUpdateMetadataWithRegionalInformation";
-    var RegionDiscoveryDetectRegion = "regionDiscoveryDetectRegion";
-    var RegionDiscoveryGetRegionFromIMDS = "regionDiscoveryGetRegionFromIMDS";
-    var RegionDiscoveryGetCurrentVersion = "regionDiscoveryGetCurrentVersion";
-    var CacheManagerGetRefreshToken = "cacheManagerGetRefreshToken";
-    var invoke = (callback, eventName, logger, telemetryClient, correlationId) => {
-      return (...args) => {
-        logger.trace(`Executing function '${eventName}'`, correlationId);
-        const inProgressEvent = telemetryClient.startMeasurement(eventName, correlationId);
-        if (correlationId) {
-          telemetryClient.incrementFields({ [`ext.${eventName}CallCount`]: 1 }, correlationId);
-        }
-        try {
-          const result = callback(...args);
-          inProgressEvent.end({
-            success: true
-          });
-          logger.trace(`Returning result from '${eventName}'`, correlationId);
-          return result;
-        } catch (e) {
-          logger.trace(`Error occurred in '${eventName}'`, correlationId);
-          try {
-            logger.trace(JSON.stringify(e), correlationId);
-          } catch (e2) {
-            logger.trace("Unable to print error message.", correlationId);
-          }
-          inProgressEvent.end({
-            success: false
-          }, e);
-          throw e;
-        }
-      };
-    };
-    var invokeAsync = (callback, eventName, logger, telemetryClient, correlationId) => {
-      return (...args) => {
-        logger.trace(`Executing function '${eventName}'`, correlationId);
-        const inProgressEvent = telemetryClient.startMeasurement(eventName, correlationId);
-        if (correlationId) {
-          telemetryClient.incrementFields({ [`ext.${eventName}CallCount`]: 1 }, correlationId);
-        }
-        return callback(...args).then((response) => {
-          logger.trace(`Returning result from '${eventName}'`, correlationId);
-          inProgressEvent.end({
-            success: true
-          });
-          return response;
-        }).catch((e) => {
-          logger.trace(`Error occurred in '${eventName}'`, correlationId);
-          try {
-            logger.trace(JSON.stringify(e), correlationId);
-          } catch (e2) {
-            logger.trace("Unable to print error message.", correlationId);
-          }
-          inProgressEvent.end({
-            success: false
-          }, e);
-          throw e;
-        });
-      };
-    };
-    var RegionDiscovery = class _RegionDiscovery {
-      constructor(networkInterface, logger, performanceClient, correlationId) {
-        this.networkInterface = networkInterface;
-        this.logger = logger;
-        this.performanceClient = performanceClient;
-        this.correlationId = correlationId;
+    var cacheQuotaExceeded = "cache_quota_exceeded";
+    var cacheErrorUnknown = "cache_error_unknown";
+    var CacheError = class _CacheError extends Error {
+      constructor(errorCode, errorMessage) {
+        const message = errorMessage || getDefaultErrorMessage(errorCode);
+        super(message);
+        Object.setPrototypeOf(this, _CacheError.prototype);
+        this.name = "CacheError";
+        this.errorCode = errorCode;
+        this.errorMessage = message;
       }
+    };
+    function createCacheError(e) {
+      if (!(e instanceof Error)) {
+        return new CacheError(cacheErrorUnknown);
+      }
+      if (e.name === "QuotaExceededError" || e.name === "NS_ERROR_DOM_QUOTA_REACHED" || e.message.includes("exceeded the quota")) {
+        return new CacheError(cacheQuotaExceeded);
+      } else {
+        return new CacheError(e.name, e.message);
+      }
+    }
+    function buildClientInfo(rawClientInfo, base64Decode) {
+      if (!rawClientInfo) {
+        throw createClientAuthError(clientInfoEmptyError, "");
+      }
+      try {
+        const decodedClientInfo = base64Decode(rawClientInfo);
+        return JSON.parse(decodedClientInfo);
+      } catch (e) {
+        throw createClientAuthError(clientInfoDecodingError, "");
+      }
+    }
+    function buildClientInfoFromHomeAccountId(homeAccountId) {
+      if (!homeAccountId) {
+        throw createClientAuthError(clientInfoDecodingError, "");
+      }
+      const clientInfoParts = homeAccountId.split(CLIENT_INFO_SEPARATOR, 2);
+      return {
+        uid: clientInfoParts[0],
+        utid: clientInfoParts.length < 2 ? "" : clientInfoParts[1]
+      };
+    }
+    var AuthorityType = {
+      Default: 0,
+      Adfs: 1,
+      Dsts: 2,
+      Ciam: 3
+    };
+    function getTenantIdFromIdTokenClaims(idTokenClaims) {
+      if (idTokenClaims) {
+        const tenantId = idTokenClaims.tid || idTokenClaims.tfp || idTokenClaims.acr;
+        return tenantId || null;
+      }
+      return null;
+    }
+    var ProtocolMode = {
       /**
-       * Detect the region from the application's environment.
-       *
-       * @returns Promise<string | null>
+       * Auth Code + PKCE with Entra ID (formerly AAD) specific optimizations and features
        */
-      async detectRegion(environmentRegion, regionDiscoveryMetadata) {
-        let autodetectedRegionName = environmentRegion;
-        if (!autodetectedRegionName) {
-          const options = _RegionDiscovery.IMDS_OPTIONS;
+      AAD: "AAD",
+      /**
+       * Auth Code + PKCE without Entra ID specific optimizations and features. For use only with non-Microsoft owned authorities.
+       * Support is limited for this mode.
+       */
+      OIDC: "OIDC",
+      /**
+       * Encrypted Authorize Response (EAR) with Entra ID specific optimizations and features
+       */
+      EAR: "EAR"
+    };
+    function getAccountInfo(accountEntity) {
+      const tenantProfiles = accountEntity.tenantProfiles || [];
+      if (tenantProfiles.length === 0 && accountEntity.realm && accountEntity.localAccountId) {
+        tenantProfiles.push(buildTenantProfile(accountEntity.homeAccountId, accountEntity.localAccountId, accountEntity.realm, accountEntity.nativeAccountId));
+      }
+      const homeTenantProfile = tenantProfiles.find((tp) => tp.tenantId === accountEntity.realm);
+      const nativeAccountId = homeTenantProfile?.nativeAccountId || accountEntity.nativeAccountId;
+      return {
+        homeAccountId: accountEntity.homeAccountId,
+        environment: accountEntity.environment,
+        tenantId: accountEntity.realm,
+        username: accountEntity.username,
+        localAccountId: accountEntity.localAccountId,
+        loginHint: accountEntity.loginHint,
+        name: accountEntity.name,
+        nativeAccountId,
+        authorityType: accountEntity.authorityType,
+        // Deserialize tenant profiles array into a Map
+        tenantProfiles: new Map(tenantProfiles.map((tenantProfile) => {
+          return [tenantProfile.tenantId, tenantProfile];
+        })),
+        dataBoundary: accountEntity.dataBoundary
+      };
+    }
+    function createAccountEntity(accountDetails, authority, correlationId, base64Decode) {
+      let authorityType;
+      if (authority.authorityType === AuthorityType.Adfs) {
+        authorityType = CACHE_ACCOUNT_TYPE_ADFS;
+      } else if (authority.protocolMode === ProtocolMode.OIDC) {
+        authorityType = CACHE_ACCOUNT_TYPE_GENERIC;
+      } else {
+        authorityType = CACHE_ACCOUNT_TYPE_MSSTS;
+      }
+      let clientInfo;
+      let dataBoundary;
+      if (accountDetails.clientInfo && base64Decode) {
+        clientInfo = buildClientInfo(accountDetails.clientInfo, base64Decode);
+        if (clientInfo.xms_tdbr) {
+          dataBoundary = clientInfo.xms_tdbr === "EU" ? "EU" : "None";
+        }
+      }
+      const env = accountDetails.environment || authority && authority.getPreferredCache();
+      if (!env) {
+        throw createClientAuthError(invalidCacheEnvironment, correlationId);
+      }
+      const preferredUsername = accountDetails.idTokenClaims?.preferred_username || accountDetails.idTokenClaims?.upn;
+      const email = accountDetails.idTokenClaims?.emails ? accountDetails.idTokenClaims.emails[0] : null;
+      const username = preferredUsername || email || "";
+      const loginHint = accountDetails.idTokenClaims?.login_hint;
+      const realm = clientInfo?.utid || getTenantIdFromIdTokenClaims(accountDetails.idTokenClaims) || "";
+      const localAccountId = clientInfo?.uid || accountDetails.idTokenClaims?.oid || accountDetails.idTokenClaims?.sub || "";
+      let tenantProfiles;
+      if (accountDetails.tenantProfiles) {
+        tenantProfiles = accountDetails.tenantProfiles;
+      } else {
+        const tenantProfile = buildTenantProfile(accountDetails.homeAccountId, localAccountId, realm, accountDetails.nativeAccountId, accountDetails.idTokenClaims);
+        tenantProfiles = [tenantProfile];
+      }
+      return {
+        homeAccountId: accountDetails.homeAccountId,
+        environment: env,
+        realm,
+        localAccountId,
+        username,
+        authorityType,
+        loginHint,
+        clientInfo: accountDetails.clientInfo,
+        name: accountDetails.idTokenClaims?.name || "",
+        lastModificationTime: void 0,
+        lastModificationApp: void 0,
+        cloudGraphHostName: accountDetails.cloudGraphHostName,
+        msGraphHost: accountDetails.msGraphHost,
+        nativeAccountId: accountDetails.nativeAccountId,
+        tenantProfiles,
+        dataBoundary
+      };
+    }
+    function generateHomeAccountId(serverClientInfo, authType, logger, cryptoObj, correlationId, idTokenClaims) {
+      if (!(authType === AuthorityType.Adfs || authType === AuthorityType.Dsts)) {
+        if (serverClientInfo) {
           try {
-            const localIMDSVersionResponse = await invokeAsync(this.getRegionFromIMDS.bind(this), RegionDiscoveryGetRegionFromIMDS, this.logger, this.performanceClient, this.correlationId)(IMDS_VERSION, options);
-            if (localIMDSVersionResponse.status === HTTP_SUCCESS) {
-              autodetectedRegionName = localIMDSVersionResponse.body?.location;
-              if (autodetectedRegionName) {
-                regionDiscoveryMetadata.region_source = RegionDiscoverySources.IMDS;
-              }
-            }
-            if (localIMDSVersionResponse.status === HTTP_BAD_REQUEST) {
-              const currentIMDSVersion = await invokeAsync(this.getCurrentVersion.bind(this), RegionDiscoveryGetCurrentVersion, this.logger, this.performanceClient, this.correlationId)(options);
-              if (!currentIMDSVersion) {
-                regionDiscoveryMetadata.region_source = RegionDiscoverySources.FAILED_AUTO_DETECTION;
-                return null;
-              }
-              const currentIMDSVersionResponse = await invokeAsync(this.getRegionFromIMDS.bind(this), RegionDiscoveryGetRegionFromIMDS, this.logger, this.performanceClient, this.correlationId)(currentIMDSVersion, options);
-              if (currentIMDSVersionResponse.status === HTTP_SUCCESS) {
-                autodetectedRegionName = currentIMDSVersionResponse.body?.location;
-                if (autodetectedRegionName) {
-                  regionDiscoveryMetadata.region_source = RegionDiscoverySources.IMDS;
-                }
-              }
+            const clientInfo = buildClientInfo(serverClientInfo, cryptoObj.base64Decode);
+            if (clientInfo.uid && clientInfo.utid) {
+              return `${clientInfo.uid}.${clientInfo.utid}`;
             }
           } catch (e) {
-            regionDiscoveryMetadata.region_source = RegionDiscoverySources.FAILED_AUTO_DETECTION;
+          }
+        }
+        logger.warning("No client info in response", correlationId);
+      }
+      return idTokenClaims?.sub || "";
+    }
+    function isAccountEntity(entity) {
+      if (!entity) {
+        return false;
+      }
+      return entity.hasOwnProperty("homeAccountId") && entity.hasOwnProperty("environment") && entity.hasOwnProperty("realm") && entity.hasOwnProperty("localAccountId") && entity.hasOwnProperty("username") && entity.hasOwnProperty("authorityType");
+    }
+    var CacheManager = class {
+      constructor(clientId, cryptoImpl, logger, performanceClient, staticAuthorityOptions) {
+        this.clientId = clientId;
+        this.cryptoImpl = cryptoImpl;
+        this.commonLogger = logger.clone(name$1, version$1);
+        this.staticAuthorityOptions = staticAuthorityOptions;
+        this.performanceClient = performanceClient;
+      }
+      /**
+       * Returns all the accounts in the cache that match the optional filter. If no filter is provided, all accounts are returned.
+       * @param accountFilter - (Optional) filter to narrow down the accounts returned
+       * @returns Array of AccountInfo objects in cache
+       */
+      getAllAccounts(accountFilter = {}, correlationId) {
+        return this.buildTenantProfiles(this.getAccountsFilteredBy(accountFilter, correlationId), correlationId, accountFilter);
+      }
+      /**
+       * Gets first tenanted AccountInfo object found based on provided filters
+       */
+      getAccountInfoFilteredBy(accountFilter, correlationId) {
+        if (Object.keys(accountFilter).length === 0 || Object.values(accountFilter).every((value) => value === null || value === void 0 || value === "")) {
+          this.commonLogger.warning("getAccountInfoFilteredBy: Account filter is empty or invalid, returning null", correlationId);
+          return null;
+        }
+        const allAccounts = this.getAllAccounts(accountFilter, correlationId);
+        if (allAccounts.length > 1) {
+          const sortedAccounts = allAccounts.sort((a, b) => {
+            const aHasClaims = a.idTokenClaims ? 1 : 0;
+            const bHasClaims = b.idTokenClaims ? 1 : 0;
+            return bHasClaims - aHasClaims;
+          });
+          return sortedAccounts[0];
+        } else if (allAccounts.length === 1) {
+          return allAccounts[0];
+        } else {
+          return null;
+        }
+      }
+      /**
+       * Returns a single matching
+       * @param accountFilter
+       * @returns
+       */
+      getBaseAccountInfo(accountFilter, correlationId) {
+        const accountEntities = this.getAccountsFilteredBy(accountFilter, correlationId);
+        if (accountEntities.length > 0) {
+          return getAccountInfo(accountEntities[0]);
+        } else {
+          return null;
+        }
+      }
+      /**
+       * Matches filtered account entities with cached ID tokens that match the tenant profile-specific account filters
+       * and builds the account info objects from the matching ID token's claims
+       * @param cachedAccounts
+       * @param accountFilter
+       * @returns Array of AccountInfo objects that match account and tenant profile filters
+       */
+      buildTenantProfiles(cachedAccounts, correlationId, accountFilter) {
+        return cachedAccounts.flatMap((accountEntity) => {
+          return this.getTenantProfilesFromAccountEntity(accountEntity, correlationId, accountFilter?.tenantId, accountFilter);
+        });
+      }
+      getTenantedAccountInfoByFilter(accountInfo, tokenKeys, tenantProfile, correlationId, tenantProfileFilter) {
+        let tenantedAccountInfo = null;
+        let idTokenClaims;
+        if (tenantProfileFilter) {
+          if (!this.tenantProfileMatchesFilter(tenantProfile, tenantProfileFilter)) {
             return null;
           }
-        } else {
-          regionDiscoveryMetadata.region_source = RegionDiscoverySources.ENVIRONMENT_VARIABLE;
         }
-        if (!autodetectedRegionName) {
-          regionDiscoveryMetadata.region_source = RegionDiscoverySources.FAILED_AUTO_DETECTION;
-        }
-        return autodetectedRegionName || null;
-      }
-      /**
-       * Make the call to the IMDS endpoint
-       *
-       * @param version
-       * @param options
-       * @returns Promise<NetworkResponse<ImdsComputeResponse>>
-       */
-      async getRegionFromIMDS(version2, options) {
-        return this.networkInterface.sendGetRequestAsync(`${IMDS_ENDPOINT}?api-version=${version2}`, options, IMDS_TIMEOUT);
-      }
-      /**
-       * Get the most recent version of the IMDS endpoint available
-       *
-       * @returns Promise<string | null>
-       */
-      async getCurrentVersion(options) {
-        try {
-          const response = await this.networkInterface.sendGetRequestAsync(`${IMDS_ENDPOINT}?format=json`, options);
-          if (response.status === HTTP_BAD_REQUEST && response.body && response.body["newest-versions"] && response.body["newest-versions"].length > 0) {
-            return response.body["newest-versions"][0];
+        const idToken = this.getIdToken(accountInfo, correlationId, tokenKeys, tenantProfile.tenantId);
+        if (idToken) {
+          idTokenClaims = extractTokenClaims(idToken.secret, this.cryptoImpl.base64Decode, correlationId);
+          if (!this.idTokenClaimsMatchTenantProfileFilter(idTokenClaims, tenantProfileFilter)) {
+            return null;
           }
-          return null;
+        }
+        tenantedAccountInfo = updateAccountTenantProfileData(accountInfo, tenantProfile, idTokenClaims, idToken?.secret);
+        return tenantedAccountInfo;
+      }
+      getTenantProfilesFromAccountEntity(accountEntity, correlationId, targetTenantId, tenantProfileFilter) {
+        const accountInfo = getAccountInfo(accountEntity);
+        let searchTenantProfiles = accountInfo.tenantProfiles || /* @__PURE__ */ new Map();
+        const tokenKeys = this.getTokenKeys();
+        if (targetTenantId) {
+          const tenantProfile = searchTenantProfiles.get(targetTenantId);
+          if (tenantProfile) {
+            searchTenantProfiles = /* @__PURE__ */ new Map([
+              [targetTenantId, tenantProfile]
+            ]);
+          } else {
+            return [];
+          }
+        }
+        const matchingTenantProfiles = [];
+        searchTenantProfiles.forEach((tenantProfile) => {
+          const tenantedAccountInfo = this.getTenantedAccountInfoByFilter(accountInfo, tokenKeys, tenantProfile, correlationId, tenantProfileFilter);
+          if (tenantedAccountInfo) {
+            matchingTenantProfiles.push(tenantedAccountInfo);
+          }
+        });
+        return matchingTenantProfiles;
+      }
+      tenantProfileMatchesFilter(tenantProfile, tenantProfileFilter) {
+        if (!!tenantProfileFilter.localAccountId && !this.matchLocalAccountIdFromTenantProfile(tenantProfile, tenantProfileFilter.localAccountId)) {
+          return false;
+        }
+        if (!!tenantProfileFilter.name && !(tenantProfile.name === tenantProfileFilter.name)) {
+          return false;
+        }
+        if (tenantProfileFilter.isHomeTenant !== void 0 && !(tenantProfile.isHomeTenant === tenantProfileFilter.isHomeTenant)) {
+          return false;
+        }
+        if (!!tenantProfileFilter.username && !this.matchUsername(tenantProfile.username, tenantProfileFilter.username) && !this.matchUsername(tenantProfile.upn, tenantProfileFilter.username)) {
+          return false;
+        }
+        if (!!tenantProfileFilter.loginHint && !this.matchLoginHintWithTenantProfile(tenantProfile, tenantProfileFilter.loginHint)) {
+          return false;
+        }
+        if (!!tenantProfileFilter.upn && !(tenantProfile.upn === tenantProfileFilter.upn)) {
+          return false;
+        }
+        if (!!tenantProfileFilter.nativeAccountId && tenantProfile.nativeAccountId !== tenantProfileFilter.nativeAccountId) {
+          return false;
+        }
+        return true;
+      }
+      idTokenClaimsMatchTenantProfileFilter(idTokenClaims, tenantProfileFilter) {
+        if (tenantProfileFilter) {
+          if (!!tenantProfileFilter.localAccountId && !this.matchLocalAccountIdFromTokenClaims(idTokenClaims, tenantProfileFilter.localAccountId)) {
+            return false;
+          }
+          if (!!tenantProfileFilter.loginHint && !this.matchLoginHintFromTokenClaims(idTokenClaims, tenantProfileFilter.loginHint)) {
+            return false;
+          }
+          if (!!tenantProfileFilter.username && !this.matchUsername(idTokenClaims.preferred_username, tenantProfileFilter.username) && !this.matchUsername(idTokenClaims.upn, tenantProfileFilter.username)) {
+            return false;
+          }
+          if (!!tenantProfileFilter.name && !this.matchName(idTokenClaims, tenantProfileFilter.name)) {
+            return false;
+          }
+          if (!!tenantProfileFilter.sid && !this.matchSid(idTokenClaims, tenantProfileFilter.sid)) {
+            return false;
+          }
+        }
+        return true;
+      }
+      /**
+       * saves a cache record
+       * @param cacheRecord {CacheRecord}
+       * @param storeInCache {?StoreInCache}
+       * @param correlationId {?string} correlation id
+       */
+      async saveCacheRecord(cacheRecord, correlationId, kmsi, apiId, storeInCache) {
+        if (!cacheRecord) {
+          throw createClientAuthError(invalidCacheRecord, correlationId);
+        }
+        try {
+          if (!!cacheRecord.account) {
+            await this.setAccount(cacheRecord.account, correlationId, kmsi, apiId);
+          }
+          if (!!cacheRecord.idToken && storeInCache?.idToken !== false) {
+            await this.setIdTokenCredential(cacheRecord.idToken, correlationId, kmsi);
+          }
+          if (!!cacheRecord.accessToken && storeInCache?.accessToken !== false) {
+            await this.saveAccessToken(cacheRecord.accessToken, correlationId, kmsi);
+          }
+          if (!!cacheRecord.refreshToken && storeInCache?.refreshToken !== false) {
+            await this.setRefreshTokenCredential(cacheRecord.refreshToken, correlationId, kmsi);
+          }
+          if (!!cacheRecord.appMetadata) {
+            this.setAppMetadata(cacheRecord.appMetadata, correlationId);
+          }
         } catch (e) {
+          this.commonLogger?.error(`CacheManager.saveCacheRecord: failed`, correlationId);
+          if (e instanceof AuthError) {
+            throw e;
+          } else {
+            throw createCacheError(e);
+          }
+        }
+      }
+      /**
+       * saves access token credential
+       * @param credential
+       */
+      async saveAccessToken(credential, correlationId, kmsi) {
+        const accessTokenFilter = {
+          clientId: credential.clientId,
+          credentialType: credential.credentialType,
+          environment: credential.environment,
+          homeAccountId: credential.homeAccountId,
+          realm: credential.realm,
+          tokenType: credential.tokenType
+        };
+        const tokenKeys = this.getTokenKeys();
+        const currentScopes = ScopeSet.fromString(credential.target, correlationId);
+        tokenKeys.accessToken.forEach((key) => {
+          if (!this.accessTokenKeyMatchesFilter(key, accessTokenFilter, false)) {
+            return;
+          }
+          const tokenEntity = this.getAccessTokenCredential(key, correlationId);
+          if (tokenEntity && this.credentialMatchesFilter(tokenEntity, accessTokenFilter, correlationId)) {
+            const tokenScopeSet = ScopeSet.fromString(tokenEntity.target, correlationId);
+            if (tokenScopeSet.intersectingScopeSets(currentScopes)) {
+              this.removeAccessToken(key, correlationId);
+            }
+          }
+        });
+        await this.setAccessTokenCredential(credential, correlationId, kmsi);
+      }
+      /**
+       * Retrieve account entities matching all provided tenant-agnostic filters; if no filter is set, get all account entities in the cache
+       * Not checking for casing as keys are all generated in lower case, remember to convert to lower case if object properties are compared
+       * @param accountFilter - An object containing Account properties to filter by
+       */
+      getAccountsFilteredBy(accountFilter, correlationId) {
+        const allAccountKeys = this.getAccountKeys();
+        const matchingAccounts = [];
+        allAccountKeys.forEach((cacheKey) => {
+          const entity = this.getAccount(cacheKey, correlationId);
+          if (!entity) {
+            return;
+          }
+          if (!!accountFilter.homeAccountId && !this.matchHomeAccountId(entity, accountFilter.homeAccountId)) {
+            return;
+          }
+          if (!!accountFilter.environment && !this.matchEnvironment(entity, accountFilter.environment, correlationId)) {
+            return;
+          }
+          if (!!accountFilter.realm && !this.matchRealm(entity, accountFilter.realm)) {
+            return;
+          }
+          if (!!accountFilter.authorityType && !this.matchAuthorityType(entity, accountFilter.authorityType)) {
+            return;
+          }
+          const tenantProfileFilter = {
+            localAccountId: accountFilter?.localAccountId,
+            name: accountFilter?.name,
+            username: accountFilter?.username,
+            loginHint: accountFilter?.loginHint,
+            upn: accountFilter?.upn,
+            nativeAccountId: accountFilter?.nativeAccountId
+          };
+          const matchingTenantProfiles = entity.tenantProfiles?.filter((tenantProfile) => {
+            return this.tenantProfileMatchesFilter(tenantProfile, tenantProfileFilter);
+          });
+          if (matchingTenantProfiles && matchingTenantProfiles.length === 0) {
+            return;
+          }
+          matchingAccounts.push(entity);
+        });
+        return matchingAccounts;
+      }
+      /**
+       * Returns whether or not the given credential entity matches the filter
+       * @param entity
+       * @param filter
+       * @param correlationId
+       * @returns
+       */
+      credentialMatchesFilter(entity, filter, correlationId) {
+        if (!!filter.clientId && !this.matchClientId(entity, filter.clientId)) {
+          return false;
+        }
+        if (!!filter.userAssertionHash && !this.matchUserAssertionHash(entity, filter.userAssertionHash)) {
+          return false;
+        }
+        if (typeof filter.homeAccountId === "string" && !this.matchHomeAccountId(entity, filter.homeAccountId)) {
+          return false;
+        }
+        if (!!filter.environment && !this.matchEnvironment(entity, filter.environment, correlationId)) {
+          return false;
+        }
+        if (!!filter.realm && !this.matchRealm(entity, filter.realm)) {
+          return false;
+        }
+        if (!!filter.credentialType && !this.matchCredentialType(entity, filter.credentialType)) {
+          return false;
+        }
+        if (!!filter.familyId && !this.matchFamilyId(entity, filter.familyId)) {
+          return false;
+        }
+        if (!!filter.target && !this.matchTarget(entity, filter.target, correlationId)) {
+          return false;
+        }
+        if (entity.credentialType === CredentialType.ACCESS_TOKEN_WITH_AUTH_SCHEME) {
+          if (!!filter.tokenType && !this.matchTokenType(entity, filter.tokenType)) {
+            return false;
+          }
+          if (filter.tokenType === AuthenticationScheme.SSH) {
+            if (filter.keyId && !this.matchKeyId(entity, filter.keyId)) {
+              return false;
+            }
+          }
+        }
+        const entityComponents = entity.additionalCacheKeyComponents;
+        const filterComponents = filter.additionalCacheKeyComponents;
+        const entityHasComponents = !!entityComponents && Object.keys(entityComponents).length > 0;
+        const filterHasComponents = !!filterComponents && Object.keys(filterComponents).length > 0;
+        if (entityHasComponents !== filterHasComponents) {
+          return false;
+        }
+        if (entityHasComponents && filterHasComponents) {
+          const entityKeys = Object.keys(entityComponents).sort();
+          const filterKeys = Object.keys(filterComponents).sort();
+          if (entityKeys.length !== filterKeys.length) {
+            return false;
+          }
+          for (let i = 0; i < entityKeys.length; i++) {
+            if (entityKeys[i] !== filterKeys[i] || entityComponents[entityKeys[i]] !== filterComponents[filterKeys[i]]) {
+              return false;
+            }
+          }
+        }
+        return true;
+      }
+      /**
+       * retrieve appMetadata matching all provided filters; if no filter is set, get all appMetadata
+       * @param filter
+       * @param correlationId
+       */
+      getAppMetadataFilteredBy(filter, correlationId) {
+        const allCacheKeys = this.getKeys();
+        const matchingAppMetadata = {};
+        allCacheKeys.forEach((cacheKey) => {
+          if (!this.isAppMetadata(cacheKey)) {
+            return;
+          }
+          const entity = this.getAppMetadata(cacheKey, correlationId);
+          if (!entity) {
+            return;
+          }
+          if (!!filter.environment && !this.matchEnvironment(entity, filter.environment, correlationId)) {
+            return;
+          }
+          if (!!filter.clientId && !this.matchClientId(entity, filter.clientId)) {
+            return;
+          }
+          matchingAppMetadata[cacheKey] = entity;
+        });
+        return matchingAppMetadata;
+      }
+      /**
+       * retrieve authorityMetadata that contains a matching alias
+       * @param host
+       * @param correlationId
+       */
+      getAuthorityMetadataByAlias(host, correlationId) {
+        const allCacheKeys = this.getAuthorityMetadataKeys();
+        let matchedEntity = null;
+        allCacheKeys.forEach((cacheKey) => {
+          if (!this.isAuthorityMetadata(cacheKey) || cacheKey.indexOf(this.clientId) === -1) {
+            return;
+          }
+          const entity = this.getAuthorityMetadata(cacheKey, correlationId);
+          if (!entity) {
+            return;
+          }
+          if (entity.aliases.indexOf(host) === -1) {
+            return;
+          }
+          matchedEntity = entity;
+        });
+        return matchedEntity;
+      }
+      /**
+       * Removes all accounts and related tokens from cache.
+       */
+      removeAllAccounts(correlationId) {
+        const accounts = this.getAllAccounts({}, correlationId);
+        accounts.forEach((account) => {
+          this.removeAccount(account, correlationId);
+        });
+      }
+      /**
+       * Removes the account and related tokens for a given account key
+       * @param account
+       */
+      removeAccount(account, correlationId) {
+        this.removeAccountContext(account, correlationId);
+        const accountKeys = this.getAccountKeys();
+        const keyFilter = (key) => {
+          return key.includes(account.homeAccountId) && key.includes(account.environment);
+        };
+        accountKeys.filter(keyFilter).forEach((key) => {
+          this.removeItem(key, correlationId);
+          this.performanceClient.incrementFields({ accountsRemoved: 1 }, correlationId);
+        });
+      }
+      /**
+       * Removes credentials associated with the provided account
+       * @param account
+       */
+      removeAccountContext(account, correlationId) {
+        const allTokenKeys = this.getTokenKeys();
+        const keyFilter = (key) => {
+          return key.includes(account.homeAccountId) && key.includes(account.environment);
+        };
+        allTokenKeys.idToken.filter(keyFilter).forEach((key) => {
+          this.removeIdToken(key, correlationId);
+        });
+        allTokenKeys.accessToken.filter(keyFilter).forEach((key) => {
+          this.removeAccessToken(key, correlationId);
+        });
+        allTokenKeys.refreshToken.filter(keyFilter).forEach((key) => {
+          this.removeRefreshToken(key, correlationId);
+        });
+      }
+      /**
+       * returns a boolean if the given credential is removed
+       * @param key
+       * @param correlationId
+       */
+      removeAccessToken(key, correlationId) {
+        const credential = this.getAccessTokenCredential(key, correlationId);
+        if (!credential) {
+          return;
+        }
+        this.removeItem(key, correlationId);
+        this.performanceClient.incrementFields({ accessTokensRemoved: 1 }, correlationId);
+        if (credential.credentialType.toLowerCase() === CredentialType.ACCESS_TOKEN_WITH_AUTH_SCHEME.toLowerCase()) {
+          if (credential.tokenType === AuthenticationScheme.POP) {
+            const accessTokenWithAuthSchemeEntity = credential;
+            const kid = accessTokenWithAuthSchemeEntity.keyId;
+            if (kid) {
+              void this.cryptoImpl.removeTokenBindingKey(kid, correlationId).catch(() => {
+                this.commonLogger.error(`Failed to remove token binding key '${kid}'`, correlationId);
+                this.performanceClient?.incrementFields({ removeTokenBindingKeyFailure: 1 }, correlationId);
+              });
+            }
+          }
+        }
+      }
+      /**
+       * Removes all app metadata objects from cache.
+       */
+      removeAppMetadata(correlationId) {
+        const allCacheKeys = this.getKeys();
+        allCacheKeys.forEach((cacheKey) => {
+          if (this.isAppMetadata(cacheKey)) {
+            this.removeItem(cacheKey, correlationId);
+          }
+        });
+        return true;
+      }
+      /**
+       * Retrieve IdTokenEntity from cache
+       * @param account {AccountInfo}
+       * @param tokenKeys {?TokenKeys}
+       * @param targetRealm {?string}
+       * @param performanceClient {?IPerformanceClient}
+       * @param correlationId {?string}
+       */
+      getIdToken(account, correlationId, tokenKeys, targetRealm) {
+        this.commonLogger.trace("CacheManager - getIdToken called", correlationId);
+        const idTokenFilter = {
+          homeAccountId: account.homeAccountId,
+          environment: account.environment,
+          credentialType: CredentialType.ID_TOKEN,
+          clientId: this.clientId,
+          realm: targetRealm
+        };
+        const idTokenMap = this.getIdTokensByFilter(idTokenFilter, correlationId, tokenKeys);
+        const numIdTokens = idTokenMap.size;
+        if (numIdTokens < 1) {
+          this.commonLogger.info("CacheManager:getIdToken - No token found", correlationId);
+          return null;
+        } else if (numIdTokens > 1) {
+          let tokensToBeRemoved = idTokenMap;
+          if (!targetRealm) {
+            const homeIdTokenMap = /* @__PURE__ */ new Map();
+            idTokenMap.forEach((idToken, key) => {
+              if (idToken.realm === account.tenantId) {
+                homeIdTokenMap.set(key, idToken);
+              }
+            });
+            const numHomeIdTokens = homeIdTokenMap.size;
+            if (numHomeIdTokens < 1) {
+              this.commonLogger.info("CacheManager:getIdToken - Multiple ID tokens found for account but none match account entity tenant id, returning first result", correlationId);
+              return idTokenMap.values().next().value ?? null;
+            } else if (numHomeIdTokens === 1) {
+              this.commonLogger.info("CacheManager:getIdToken - Multiple ID tokens found for account, defaulting to home tenant profile", correlationId);
+              return homeIdTokenMap.values().next().value ?? null;
+            } else {
+              tokensToBeRemoved = homeIdTokenMap;
+            }
+          }
+          this.commonLogger.info("CacheManager:getIdToken - Multiple matching ID tokens found, clearing them", correlationId);
+          tokensToBeRemoved.forEach((idToken, key) => {
+            this.removeIdToken(key, correlationId);
+          });
+          this.performanceClient.addFields({ multiMatchedID: idTokenMap.size }, correlationId);
           return null;
         }
+        this.commonLogger.info("CacheManager:getIdToken - Returning ID token", correlationId);
+        return idTokenMap.values().next().value ?? null;
+      }
+      /**
+       * Gets all idTokens matching the given filter
+       * @param filter
+       * @returns
+       */
+      getIdTokensByFilter(filter, correlationId, tokenKeys) {
+        const idTokenKeys = tokenKeys && tokenKeys.idToken || this.getTokenKeys().idToken;
+        const idTokens = /* @__PURE__ */ new Map();
+        idTokenKeys.forEach((key) => {
+          if (!this.idTokenKeyMatchesFilter(key, {
+            clientId: this.clientId,
+            ...filter
+          })) {
+            return;
+          }
+          const idToken = this.getIdTokenCredential(key, correlationId);
+          if (idToken && this.credentialMatchesFilter(idToken, filter, correlationId)) {
+            idTokens.set(key, idToken);
+          }
+        });
+        return idTokens;
+      }
+      /**
+       * Validate the cache key against filter before retrieving and parsing cache value
+       * @param key
+       * @param filter
+       * @returns
+       */
+      idTokenKeyMatchesFilter(inputKey, filter) {
+        const key = inputKey.toLowerCase();
+        if (filter.clientId && key.indexOf(filter.clientId.toLowerCase()) === -1) {
+          return false;
+        }
+        if (filter.homeAccountId && key.indexOf(filter.homeAccountId.toLowerCase()) === -1) {
+          return false;
+        }
+        return true;
+      }
+      /**
+       * Removes idToken from the cache
+       * @param key
+       */
+      removeIdToken(key, correlationId) {
+        this.removeItem(key, correlationId);
+      }
+      /**
+       * Removes refresh token from the cache
+       * @param key
+       */
+      removeRefreshToken(key, correlationId) {
+        this.removeItem(key, correlationId);
+      }
+      /**
+       * Retrieve AccessTokenEntity from cache
+       * @param account {AccountInfo}
+       * @param request {BaseAuthRequest}
+       * @param tokenKeys {?TokenKeys}
+       * @param performanceClient {?IPerformanceClient}
+       */
+      getAccessToken(account, request, tokenKeys, targetRealm) {
+        const correlationId = request.correlationId;
+        this.commonLogger.trace("CacheManager - getAccessToken called", correlationId);
+        const scopes = ScopeSet.createSearchScopes(request.scopes, correlationId);
+        const authScheme = request.authenticationScheme || AuthenticationScheme.BEARER;
+        const credentialType = authScheme.toLowerCase() !== AuthenticationScheme.BEARER.toLowerCase() ? CredentialType.ACCESS_TOKEN_WITH_AUTH_SCHEME : CredentialType.ACCESS_TOKEN;
+        const accessTokenFilter = {
+          homeAccountId: account.homeAccountId,
+          environment: account.environment,
+          credentialType,
+          clientId: this.clientId,
+          realm: targetRealm || account.tenantId,
+          target: scopes,
+          tokenType: authScheme,
+          keyId: request.sshKid
+        };
+        const accessTokenKeys = tokenKeys && tokenKeys.accessToken || this.getTokenKeys().accessToken;
+        const accessTokens = [];
+        accessTokenKeys.forEach((key) => {
+          if (this.accessTokenKeyMatchesFilter(key, accessTokenFilter, true)) {
+            const accessToken = this.getAccessTokenCredential(key, correlationId);
+            if (accessToken && this.credentialMatchesFilter(accessToken, accessTokenFilter, correlationId)) {
+              accessTokens.push(accessToken);
+            }
+          }
+        });
+        const numAccessTokens = accessTokens.length;
+        if (numAccessTokens < 1) {
+          this.commonLogger.info("CacheManager:getAccessToken - No token found", correlationId);
+          return null;
+        } else if (numAccessTokens > 1) {
+          this.commonLogger.info("CacheManager:getAccessToken - Multiple access tokens found, clearing them", correlationId);
+          accessTokens.forEach((accessToken) => {
+            this.removeAccessToken(this.generateCredentialKey(accessToken), correlationId);
+          });
+          this.performanceClient.addFields({ multiMatchedAT: accessTokens.length }, correlationId);
+          return null;
+        }
+        this.commonLogger.info("CacheManager:getAccessToken - Returning access token", correlationId);
+        return accessTokens[0];
+      }
+      /**
+       * Validate the cache key against filter before retrieving and parsing cache value
+       * @param key
+       * @param filter
+       * @param keyMustContainAllScopes
+       * @returns
+       */
+      accessTokenKeyMatchesFilter(inputKey, filter, keyMustContainAllScopes) {
+        const key = inputKey.toLowerCase();
+        if (filter.clientId && key.indexOf(filter.clientId.toLowerCase()) === -1) {
+          return false;
+        }
+        if (filter.homeAccountId && key.indexOf(filter.homeAccountId.toLowerCase()) === -1) {
+          return false;
+        }
+        if (filter.realm && key.indexOf(filter.realm.toLowerCase()) === -1) {
+          return false;
+        }
+        if (filter.target) {
+          const scopes = filter.target.asArray();
+          for (let i = 0; i < scopes.length; i++) {
+            if (keyMustContainAllScopes && !key.includes(scopes[i].toLowerCase())) {
+              return false;
+            } else if (!keyMustContainAllScopes && key.includes(scopes[i].toLowerCase())) {
+              return true;
+            }
+          }
+        }
+        return true;
+      }
+      /**
+       * Gets all access tokens matching the filter
+       * @param filter
+       * @returns
+       */
+      getAccessTokensByFilter(filter, correlationId) {
+        const tokenKeys = this.getTokenKeys();
+        const accessTokens = [];
+        tokenKeys.accessToken.forEach((key) => {
+          if (!this.accessTokenKeyMatchesFilter(key, filter, true)) {
+            return;
+          }
+          const accessToken = this.getAccessTokenCredential(key, correlationId);
+          if (accessToken && this.credentialMatchesFilter(accessToken, filter, correlationId)) {
+            accessTokens.push(accessToken);
+          }
+        });
+        return accessTokens;
+      }
+      /**
+       * Helper to retrieve the appropriate refresh token from cache
+       * @param account {AccountInfo}
+       * @param familyRT {boolean}
+       * @param tokenKeys {?TokenKeys}
+       * @param performanceClient {?IPerformanceClient}
+       * @param correlationId {?string}
+       */
+      getRefreshToken(account, familyRT, correlationId, tokenKeys) {
+        this.commonLogger.trace("CacheManager - getRefreshToken called", correlationId);
+        const id = familyRT ? THE_FAMILY_ID : void 0;
+        const refreshTokenFilter = {
+          homeAccountId: account.homeAccountId,
+          environment: account.environment,
+          credentialType: CredentialType.REFRESH_TOKEN,
+          clientId: this.clientId,
+          familyId: id
+        };
+        const refreshTokenKeys = tokenKeys && tokenKeys.refreshToken || this.getTokenKeys().refreshToken;
+        const refreshTokens = [];
+        refreshTokenKeys.forEach((key) => {
+          if (this.refreshTokenKeyMatchesFilter(key, refreshTokenFilter)) {
+            const refreshToken = this.getRefreshTokenCredential(key, correlationId);
+            if (refreshToken && this.credentialMatchesFilter(refreshToken, refreshTokenFilter, correlationId)) {
+              refreshTokens.push(refreshToken);
+            }
+          }
+        });
+        const numRefreshTokens = refreshTokens.length;
+        if (numRefreshTokens < 1) {
+          this.commonLogger.info("CacheManager:getRefreshToken - No refresh token found.", correlationId);
+          return null;
+        }
+        if (numRefreshTokens > 1) {
+          this.performanceClient.addFields({ multiMatchedRT: numRefreshTokens }, correlationId);
+        }
+        this.commonLogger.info("CacheManager:getRefreshToken - returning refresh token", correlationId);
+        return refreshTokens[0];
+      }
+      /**
+       * Validate the cache key against filter before retrieving and parsing cache value
+       * @param key
+       * @param filter
+       */
+      refreshTokenKeyMatchesFilter(inputKey, filter) {
+        const key = inputKey.toLowerCase();
+        if (filter.familyId && key.indexOf(filter.familyId.toLowerCase()) === -1) {
+          return false;
+        }
+        if (!filter.familyId && filter.clientId && key.indexOf(filter.clientId.toLowerCase()) === -1) {
+          return false;
+        }
+        if (filter.homeAccountId && key.indexOf(filter.homeAccountId.toLowerCase()) === -1) {
+          return false;
+        }
+        return true;
+      }
+      /**
+       * Retrieve AppMetadataEntity from cache
+       */
+      readAppMetadataFromCache(environment, correlationId) {
+        const appMetadataFilter = {
+          environment,
+          clientId: this.clientId
+        };
+        const appMetadata = this.getAppMetadataFilteredBy(appMetadataFilter, correlationId);
+        const appMetadataEntries = Object.keys(appMetadata).map((key) => appMetadata[key]);
+        const numAppMetadata = appMetadataEntries.length;
+        if (numAppMetadata < 1) {
+          return null;
+        } else if (numAppMetadata > 1) {
+          throw createClientAuthError(multipleMatchingAppMetadata, correlationId);
+        }
+        return appMetadataEntries[0];
+      }
+      /**
+       * Return the family_id value associated  with FOCI
+       * @param environment
+       * @param clientId
+       */
+      isAppMetadataFOCI(environment, correlationId) {
+        const appMetadata = this.readAppMetadataFromCache(environment, correlationId);
+        return !!(appMetadata && appMetadata.familyId === THE_FAMILY_ID);
+      }
+      /**
+       * helper to match account ids
+       * @param value
+       * @param homeAccountId
+       */
+      matchHomeAccountId(entity, homeAccountId) {
+        return !!(typeof entity.homeAccountId === "string" && homeAccountId === entity.homeAccountId);
+      }
+      /**
+       * helper to match account ids
+       * @param entity
+       * @param localAccountId
+       * @returns
+       */
+      matchLocalAccountIdFromTokenClaims(tokenClaims, localAccountId) {
+        const idTokenLocalAccountId = tokenClaims.oid || tokenClaims.sub;
+        return localAccountId === idTokenLocalAccountId;
+      }
+      matchLocalAccountIdFromTenantProfile(tenantProfile, localAccountId) {
+        return tenantProfile.localAccountId === localAccountId;
+      }
+      /**
+       * helper to match names
+       * @param entity
+       * @param name
+       * @returns true if the downcased name properties are present and match in the filter and the entity
+       */
+      matchName(claims, name2) {
+        return !!(name2.toLowerCase() === claims.name?.toLowerCase());
+      }
+      /**
+       * helper to match usernames
+       * @param entity
+       * @param username
+       * @returns
+       */
+      matchUsername(cachedUsername, filterUsername) {
+        return !!(cachedUsername && typeof cachedUsername === "string" && filterUsername?.toLowerCase() === cachedUsername.toLowerCase());
+      }
+      /**
+       * helper to match loginhints
+       * @param entity
+       * @param loginHint
+       * @returns
+       */
+      matchLoginHintWithTenantProfile(tenantProfile, loginHintFilter) {
+        return tenantProfile.loginHint === loginHintFilter || tenantProfile.username === loginHintFilter || tenantProfile.upn === loginHintFilter;
+      }
+      /**
+       * helper to match assertion
+       * @param value
+       * @param oboAssertion
+       */
+      matchUserAssertionHash(entity, userAssertionHash) {
+        return !!(entity.userAssertionHash && userAssertionHash === entity.userAssertionHash);
+      }
+      /**
+       * helper to match environment
+       * @param value
+       * @param environment
+       */
+      matchEnvironment(entity, environment, correlationId) {
+        if (this.staticAuthorityOptions) {
+          const staticAliases = getAliasesFromStaticSources(this.staticAuthorityOptions, this.commonLogger, correlationId);
+          if (staticAliases.includes(environment) && staticAliases.includes(entity.environment)) {
+            return true;
+          }
+        }
+        const cloudMetadata = this.getAuthorityMetadataByAlias(environment, correlationId);
+        if (cloudMetadata && cloudMetadata.aliases.indexOf(entity.environment) > -1) {
+          return true;
+        }
+        return false;
+      }
+      /**
+       * helper to match credential type
+       * @param entity
+       * @param credentialType
+       */
+      matchCredentialType(entity, credentialType) {
+        return entity.credentialType && credentialType.toLowerCase() === entity.credentialType.toLowerCase();
+      }
+      /**
+       * helper to match client ids
+       * @param entity
+       * @param clientId
+       */
+      matchClientId(entity, clientId) {
+        return !!(entity.clientId && clientId === entity.clientId);
+      }
+      /**
+       * helper to match family ids
+       * @param entity
+       * @param familyId
+       */
+      matchFamilyId(entity, familyId) {
+        return !!(entity.familyId && familyId === entity.familyId);
+      }
+      /**
+       * helper to match realm
+       * @param entity
+       * @param realm
+       */
+      matchRealm(entity, realm) {
+        return !!(entity.realm?.toLowerCase() === realm.toLowerCase());
+      }
+      /**
+       * helper to match loginHint which can be either:
+       * 1. login_hint ID token claim
+       * 2. username in cached account object
+       * 3. upn in ID token claims
+       * @param entity
+       * @param loginHint
+       * @returns
+       */
+      matchLoginHintFromTokenClaims(tokenClaims, loginHint) {
+        if (tokenClaims.login_hint === loginHint) {
+          return true;
+        }
+        if (tokenClaims.preferred_username === loginHint) {
+          return true;
+        }
+        if (tokenClaims.upn === loginHint) {
+          return true;
+        }
+        if (tokenClaims.emails && tokenClaims.emails.includes(loginHint)) {
+          return true;
+        }
+        return false;
+      }
+      /**
+       * Helper to match sid
+       * @param entity
+       * @param sid
+       * @returns true if the sid claim is present and matches the filter
+       */
+      matchSid(idTokenClaims, sid) {
+        return idTokenClaims.sid === sid;
+      }
+      matchAuthorityType(entity, authorityType) {
+        return !!(entity.authorityType && authorityType.toLowerCase() === entity.authorityType.toLowerCase());
+      }
+      /**
+       * Returns true if the target scopes are a subset of the current entity's scopes, false otherwise.
+       * @param entity
+       * @param target
+       */
+      matchTarget(entity, target, correlationId) {
+        const isNotAccessTokenCredential = entity.credentialType !== CredentialType.ACCESS_TOKEN && entity.credentialType !== CredentialType.ACCESS_TOKEN_WITH_AUTH_SCHEME;
+        if (isNotAccessTokenCredential || !entity.target) {
+          return false;
+        }
+        const entityScopeSet = ScopeSet.fromString(entity.target, correlationId);
+        return entityScopeSet.containsScopeSet(target);
+      }
+      /**
+       * Returns true if the credential's tokenType or Authentication Scheme matches the one in the request, false otherwise
+       * @param entity
+       * @param tokenType
+       */
+      matchTokenType(entity, tokenType) {
+        return !!(entity.tokenType && entity.tokenType === tokenType);
+      }
+      /**
+       * Returns true if the credential's keyId matches the one in the request, false otherwise
+       * @param entity
+       * @param keyId
+       */
+      matchKeyId(entity, keyId) {
+        return !!(entity.keyId && entity.keyId === keyId);
+      }
+      /**
+       * returns if a given cache entity is of the type appmetadata
+       * @param key
+       */
+      isAppMetadata(key) {
+        return key.indexOf(APP_METADATA) !== -1;
+      }
+      /**
+       * returns if a given cache entity is of the type authoritymetadata
+       * @param key
+       */
+      isAuthorityMetadata(key) {
+        return key.indexOf(AUTHORITY_METADATA_CACHE_KEY) !== -1;
+      }
+      /**
+       * returns cache key used for cloud instance metadata
+       */
+      generateAuthorityMetadataCacheKey(authority) {
+        return `${AUTHORITY_METADATA_CACHE_KEY}-${this.clientId}-${authority}`;
+      }
+      /**
+       * Helper to convert serialized data to object
+       * @param obj
+       * @param json
+       */
+      static toObject(obj, json) {
+        for (const propertyName in json) {
+          obj[propertyName] = json[propertyName];
+        }
+        return obj;
       }
     };
-    RegionDiscovery.IMDS_OPTIONS = {
-      headers: {
-        Metadata: "true"
+    var DefaultStorageClass = class extends CacheManager {
+      async setAccount() {
+        throw createClientAuthError(methodNotImplemented, "");
+      }
+      getAccount() {
+        throw createClientAuthError(methodNotImplemented, "");
+      }
+      async setIdTokenCredential() {
+        throw createClientAuthError(methodNotImplemented, "");
+      }
+      getIdTokenCredential() {
+        throw createClientAuthError(methodNotImplemented, "");
+      }
+      async setAccessTokenCredential() {
+        throw createClientAuthError(methodNotImplemented, "");
+      }
+      getAccessTokenCredential() {
+        throw createClientAuthError(methodNotImplemented, "");
+      }
+      async setRefreshTokenCredential() {
+        throw createClientAuthError(methodNotImplemented, "");
+      }
+      getRefreshTokenCredential() {
+        throw createClientAuthError(methodNotImplemented, "");
+      }
+      setAppMetadata() {
+        throw createClientAuthError(methodNotImplemented, "");
+      }
+      getAppMetadata() {
+        throw createClientAuthError(methodNotImplemented, "");
+      }
+      setServerTelemetry() {
+        throw createClientAuthError(methodNotImplemented, "");
+      }
+      getServerTelemetry() {
+        throw createClientAuthError(methodNotImplemented, "");
+      }
+      setAuthorityMetadata() {
+        throw createClientAuthError(methodNotImplemented, "");
+      }
+      getAuthorityMetadata() {
+        throw createClientAuthError(methodNotImplemented, "");
+      }
+      getAuthorityMetadataKeys() {
+        throw createClientAuthError(methodNotImplemented, "");
+      }
+      setThrottlingCache() {
+        throw createClientAuthError(methodNotImplemented, "");
+      }
+      getThrottlingCache() {
+        throw createClientAuthError(methodNotImplemented, "");
+      }
+      removeItem() {
+        throw createClientAuthError(methodNotImplemented, "");
+      }
+      getKeys() {
+        throw createClientAuthError(methodNotImplemented, "");
+      }
+      getAccountKeys() {
+        throw createClientAuthError(methodNotImplemented, "");
+      }
+      getTokenKeys() {
+        throw createClientAuthError(methodNotImplemented, "");
+      }
+      generateCredentialKey() {
+        throw createClientAuthError(methodNotImplemented, "");
+      }
+      generateAccountKey() {
+        throw createClientAuthError(methodNotImplemented, "");
+      }
+    };
+    var PerformanceEventStatus = {
+      InProgress: 1
+    };
+    var StubPerformanceClient = class {
+      generateId() {
+        return "callback-id";
+      }
+      startMeasurement(measureName, correlationId) {
+        return {
+          end: () => null,
+          discard: () => {
+          },
+          add: () => {
+          },
+          increment: () => {
+          },
+          event: {
+            eventId: this.generateId(),
+            status: PerformanceEventStatus.InProgress,
+            authority: "",
+            libraryName: "",
+            libraryVersion: "",
+            clientId: "",
+            name: measureName,
+            startTimeMs: Date.now(),
+            correlationId: correlationId || ""
+          }
+        };
+      }
+      endMeasurement() {
+        return null;
+      }
+      discardMeasurements() {
+        return;
+      }
+      removePerformanceCallback() {
+        return true;
+      }
+      addPerformanceCallback() {
+        return "";
+      }
+      emitEvents() {
+        return;
+      }
+      addFields() {
+        return;
+      }
+      addGlobalFields() {
+        return;
+      }
+      incrementFields() {
+        return;
+      }
+      cacheEventByCorrelationId() {
+        return;
+      }
+    };
+    var DEFAULT_SYSTEM_OPTIONS$1 = {
+      tokenRenewalOffsetSeconds: DEFAULT_TOKEN_RENEWAL_OFFSET_SEC,
+      preventCorsPreflight: false
+    };
+    var DEFAULT_LOGGER_IMPLEMENTATION = {
+      loggerCallback: () => {
+      },
+      piiLoggingEnabled: false,
+      logLevel: exports2.LogLevel.Info,
+      correlationId: ""
+    };
+    var DEFAULT_NETWORK_IMPLEMENTATION = {
+      async sendGetRequestAsync() {
+        throw createClientAuthError(methodNotImplemented, "");
+      },
+      async sendPostRequestAsync() {
+        throw createClientAuthError(methodNotImplemented, "");
+      }
+    };
+    var DEFAULT_LIBRARY_INFO = {
+      sku: SKU,
+      version: version$1,
+      cpu: "",
+      os: ""
+    };
+    var DEFAULT_CLIENT_CREDENTIALS = {
+      clientSecret: "",
+      clientAssertion: void 0
+    };
+    var DEFAULT_AZURE_CLOUD_OPTIONS = {
+      azureCloudInstance: AzureCloudInstance.None,
+      tenant: `${DEFAULT_COMMON_TENANT}`
+    };
+    var DEFAULT_TELEMETRY_OPTIONS$1 = {
+      application: {
+        appName: "",
+        appVersion: ""
+      }
+    };
+    function buildClientConfiguration({ authOptions: userAuthOptions, systemOptions: userSystemOptions, loggerOptions: userLoggerOption, storageInterface: storageImplementation, networkInterface: networkImplementation, cryptoInterface: cryptoImplementation, clientCredentials, libraryInfo, telemetry, serverTelemetryManager, persistencePlugin, serializableCache }) {
+      const loggerOptions = {
+        ...DEFAULT_LOGGER_IMPLEMENTATION,
+        ...userLoggerOption
+      };
+      return {
+        authOptions: buildAuthOptions(userAuthOptions),
+        systemOptions: { ...DEFAULT_SYSTEM_OPTIONS$1, ...userSystemOptions },
+        loggerOptions,
+        storageInterface: storageImplementation || new DefaultStorageClass(userAuthOptions.clientId, DEFAULT_CRYPTO_IMPLEMENTATION, new Logger(loggerOptions, name$1, version$1), new StubPerformanceClient()),
+        networkInterface: networkImplementation || DEFAULT_NETWORK_IMPLEMENTATION,
+        cryptoInterface: cryptoImplementation || DEFAULT_CRYPTO_IMPLEMENTATION,
+        clientCredentials: clientCredentials || DEFAULT_CLIENT_CREDENTIALS,
+        libraryInfo: { ...DEFAULT_LIBRARY_INFO, ...libraryInfo },
+        telemetry: { ...DEFAULT_TELEMETRY_OPTIONS$1, ...telemetry },
+        serverTelemetryManager: serverTelemetryManager || null,
+        persistencePlugin: persistencePlugin || null,
+        serializableCache: serializableCache || null
+      };
+    }
+    function buildAuthOptions(authOptions) {
+      return {
+        clientCapabilities: [],
+        azureCloudOptions: DEFAULT_AZURE_CLOUD_OPTIONS,
+        instanceAware: false,
+        isMcp: false,
+        ...authOptions
+      };
+    }
+    function isOidcProtocolMode(config) {
+      return config.authOptions.authority.options.protocolMode === ProtocolMode.OIDC;
+    }
+    var TokenCacheContext = class {
+      constructor(tokenCache, hasChanged) {
+        this.cache = tokenCache;
+        this.hasChanged = hasChanged;
+      }
+      /**
+       * boolean which indicates the changes in cache
+       */
+      get cacheHasChanged() {
+        return this.hasChanged;
+      }
+      /**
+       * function to retrieve the token cache
+       */
+      get tokenCache() {
+        return this.cache;
       }
     };
     function nowSeconds() {
@@ -42325,7 +43955,7 @@ var require_msal_node = __commonJS({
       const cachedAtSec = Number(cachedAt);
       return cachedAtSec > nowSeconds();
     }
-    function delay2(t, value) {
+    function delay(t, value) {
       return new Promise((resolve) => setTimeout(() => resolve(value), t));
     }
     function createIdTokenEntity(homeAccountId, environment, idToken, clientId, tenantId) {
@@ -42482,12 +44112,799 @@ var require_msal_node = __commonJS({
     function isAuthorityMetadataExpired(metadata) {
       return metadata.expiresAt <= nowSeconds();
     }
-    function serializeAttributeTokens(attributeTokens) {
-      if (!attributeTokens || attributeTokens.length === 0) {
-        return void 0;
+    var NetworkClientSendPostRequestAsync = "networkClientSendPostRequestAsync";
+    var RefreshTokenClientExecutePostToTokenEndpoint = "refreshTokenClientExecutePostToTokenEndpoint";
+    var AuthorizationCodeClientExecutePostToTokenEndpoint = "authorizationCodeClientExecutePostToTokenEndpoint";
+    var RefreshTokenClientExecuteTokenRequest = "refreshTokenClientExecuteTokenRequest";
+    var RefreshTokenClientAcquireToken = "refreshTokenClientAcquireToken";
+    var RefreshTokenClientAcquireTokenWithCachedRefreshToken = "refreshTokenClientAcquireTokenWithCachedRefreshToken";
+    var RefreshTokenClientCreateTokenRequestBody = "refreshTokenClientCreateTokenRequestBody";
+    var SilentFlowClientGenerateResultFromCacheRecord = "silentFlowClientGenerateResultFromCacheRecord";
+    var AuthClientExecuteTokenRequest = "authClientExecuteTokenRequest";
+    var AuthClientCreateTokenRequestBody = "authClientCreateTokenRequestBody";
+    var UpdateTokenEndpointAuthority = "updateTokenEndpointAuthority";
+    var PopTokenGenerateCnf = "popTokenGenerateCnf";
+    var HandleServerTokenResponse = "handleServerTokenResponse";
+    var AuthorityResolveEndpointsAsync = "authorityResolveEndpointsAsync";
+    var AuthorityGetCloudDiscoveryMetadataFromNetwork = "authorityGetCloudDiscoveryMetadataFromNetwork";
+    var AuthorityUpdateCloudDiscoveryMetadata = "authorityUpdateCloudDiscoveryMetadata";
+    var AuthorityGetEndpointMetadataFromNetwork = "authorityGetEndpointMetadataFromNetwork";
+    var AuthorityUpdateEndpointMetadata = "authorityUpdateEndpointMetadata";
+    var AuthorityUpdateMetadataWithRegionalInformation = "authorityUpdateMetadataWithRegionalInformation";
+    var RegionDiscoveryDetectRegion = "regionDiscoveryDetectRegion";
+    var RegionDiscoveryGetRegionFromIMDS = "regionDiscoveryGetRegionFromIMDS";
+    var RegionDiscoveryGetCurrentVersion = "regionDiscoveryGetCurrentVersion";
+    var CacheManagerGetRefreshToken = "cacheManagerGetRefreshToken";
+    var invoke = (callback, eventName, logger, telemetryClient, correlationId) => {
+      return (...args) => {
+        logger.trace(`Executing function '${eventName}'`, correlationId);
+        const inProgressEvent = telemetryClient.startMeasurement(eventName, correlationId);
+        if (correlationId) {
+          telemetryClient.incrementFields({ [`ext.${eventName}CallCount`]: 1 }, correlationId);
+        }
+        try {
+          const result = callback(...args);
+          inProgressEvent.end({
+            success: true
+          });
+          logger.trace(`Returning result from '${eventName}'`, correlationId);
+          return result;
+        } catch (e) {
+          logger.trace(`Error occurred in '${eventName}'`, correlationId);
+          try {
+            logger.trace(JSON.stringify(e), correlationId);
+          } catch (e2) {
+            logger.trace("Unable to print error message.", correlationId);
+          }
+          inProgressEvent.end({
+            success: false
+          }, e);
+          throw e;
+        }
+      };
+    };
+    var invokeAsync = (callback, eventName, logger, telemetryClient, correlationId) => {
+      return (...args) => {
+        logger.trace(`Executing function '${eventName}'`, correlationId);
+        const inProgressEvent = telemetryClient.startMeasurement(eventName, correlationId);
+        if (correlationId) {
+          telemetryClient.incrementFields({ [`ext.${eventName}CallCount`]: 1 }, correlationId);
+        }
+        return callback(...args).then((response) => {
+          logger.trace(`Returning result from '${eventName}'`, correlationId);
+          inProgressEvent.end({
+            success: true
+          });
+          return response;
+        }).catch((e) => {
+          logger.trace(`Error occurred in '${eventName}'`, correlationId);
+          try {
+            logger.trace(JSON.stringify(e), correlationId);
+          } catch (e2) {
+            logger.trace("Unable to print error message.", correlationId);
+          }
+          inProgressEvent.end({
+            success: false
+          }, e);
+          throw e;
+        });
+      };
+    };
+    var KeyLocation = {
+      SW: "sw"
+    };
+    var PopTokenGenerator = class {
+      constructor(cryptoUtils, performanceClient) {
+        this.cryptoUtils = cryptoUtils;
+        this.performanceClient = performanceClient;
       }
-      return [...attributeTokens].sort().join(" ");
+      /**
+       * Generates the req_cnf validated at the RP in the POP protocol for SHR parameters
+       * and returns an object containing the keyid, the full req_cnf string and the req_cnf string hash
+       * @param request
+       * @returns
+       */
+      async generateCnf(request, logger) {
+        const reqCnf = await invokeAsync(this.generateKid.bind(this), PopTokenGenerateCnf, logger, this.performanceClient, request.correlationId)(request);
+        const reqCnfString = this.cryptoUtils.base64UrlEncode(JSON.stringify(reqCnf));
+        return {
+          kid: reqCnf.kid,
+          reqCnfString
+        };
+      }
+      /**
+       * Generates key_id for a SHR token request
+       * @param request
+       * @returns
+       */
+      async generateKid(request) {
+        const kidThumbprint = await this.cryptoUtils.getPublicKeyThumbprint(request);
+        return {
+          kid: kidThumbprint,
+          xms_ksl: KeyLocation.SW
+        };
+      }
+      /**
+       * Signs the POP access_token with the local generated key-pair
+       * @param accessToken
+       * @param request
+       * @returns
+       */
+      async signPopToken(accessToken, keyId, request) {
+        return this.signPayload(accessToken, keyId, request);
+      }
+      /**
+       * Utility function to generate the signed JWT for an access_token
+       * @param payload
+       * @param kid
+       * @param request
+       * @param claims
+       * @returns
+       */
+      async signPayload(payload, keyId, request, claims) {
+        const { resourceRequestMethod, resourceRequestUri, shrClaims, shrNonce, shrOptions } = request;
+        const resourceUrlString = resourceRequestUri ? new UrlString(resourceRequestUri, request.correlationId) : void 0;
+        const resourceUrlComponents = resourceUrlString?.getUrlComponents();
+        return this.cryptoUtils.signJwt({
+          at: payload,
+          ts: nowSeconds(),
+          m: resourceRequestMethod?.toUpperCase(),
+          u: resourceUrlComponents?.HostNameAndPort,
+          nonce: shrNonce || this.cryptoUtils.createNewGuid(),
+          p: resourceUrlComponents?.AbsolutePath,
+          q: resourceUrlComponents?.QueryString ? [[], resourceUrlComponents.QueryString] : void 0,
+          client_claims: shrClaims || void 0,
+          ...claims
+        }, keyId, shrOptions, request.correlationId);
+      }
+    };
+    var noTokensFound = "no_tokens_found";
+    var nativeAccountUnavailable = "native_account_unavailable";
+    var refreshTokenExpired = "refresh_token_expired";
+    var uiNotAllowed = "ui_not_allowed";
+    var interactionRequired = "interaction_required";
+    var consentRequired = "consent_required";
+    var loginRequired = "login_required";
+    var badToken = "bad_token";
+    var interruptedUser = "interrupted_user";
+    var InteractionRequiredAuthErrorCodes = /* @__PURE__ */ Object.freeze({
+      __proto__: null,
+      badToken,
+      consentRequired,
+      interactionRequired,
+      interruptedUser,
+      loginRequired,
+      nativeAccountUnavailable,
+      noTokensFound,
+      refreshTokenExpired,
+      uiNotAllowed
+    });
+    var InteractionRequiredServerErrorMessage = [
+      interactionRequired,
+      consentRequired,
+      loginRequired,
+      badToken,
+      uiNotAllowed,
+      interruptedUser
+    ];
+    var InteractionRequiredAuthSubErrorMessage = [
+      "message_only",
+      "additional_action",
+      "basic_action",
+      "user_password_expired",
+      "consent_required",
+      "bad_token",
+      "ui_not_allowed",
+      "interrupted_user"
+    ];
+    var InteractionRequiredAuthError = class _InteractionRequiredAuthError extends AuthError {
+      constructor(errorCode, correlationId, errorMessage, subError, timestamp, traceId, claims, errorNo) {
+        super(errorCode, correlationId, errorMessage, subError);
+        Object.setPrototypeOf(this, _InteractionRequiredAuthError.prototype);
+        this.timestamp = timestamp || "";
+        this.traceId = traceId || "";
+        this.claims = claims || "";
+        this.name = "InteractionRequiredAuthError";
+        this.errorNo = errorNo;
+      }
+    };
+    function isInteractionRequiredError(errorCode, errorString, subError) {
+      const isInteractionRequiredErrorCode = !!errorCode && InteractionRequiredServerErrorMessage.indexOf(errorCode) > -1;
+      const isInteractionRequiredSubError = !!subError && InteractionRequiredAuthSubErrorMessage.indexOf(subError) > -1;
+      const isInteractionRequiredErrorDesc = !!errorString && InteractionRequiredServerErrorMessage.some((irErrorCode) => {
+        return errorString.indexOf(irErrorCode) > -1;
+      });
+      return isInteractionRequiredErrorCode || isInteractionRequiredErrorDesc || isInteractionRequiredSubError;
     }
+    function createInteractionRequiredAuthError(errorCode, correlationId, errorMessage) {
+      return new InteractionRequiredAuthError(errorCode, correlationId, errorMessage);
+    }
+    var ServerError = class _ServerError extends AuthError {
+      constructor(errorCode, correlationId, errorMessage, subError, errorNo, status) {
+        super(errorCode, correlationId, errorMessage, subError);
+        this.name = "ServerError";
+        this.errorNo = errorNo;
+        this.status = status;
+        Object.setPrototypeOf(this, _ServerError.prototype);
+      }
+    };
+    function parseRequestState(base64Decode, state, correlationId) {
+      if (!base64Decode) {
+        throw createClientAuthError(noCryptoObject, correlationId);
+      }
+      if (!state) {
+        throw createClientAuthError(invalidState, correlationId);
+      }
+      try {
+        const splitState = state.split(RESOURCE_DELIM);
+        const libraryState = splitState[0];
+        const userState = splitState.length > 1 ? splitState.slice(1).join(RESOURCE_DELIM) : "";
+        const libraryStateString = base64Decode(libraryState);
+        const libraryStateObj = JSON.parse(libraryStateString);
+        return {
+          userRequestState: userState || "",
+          libraryState: libraryStateObj
+        };
+      } catch (e) {
+        throw createClientAuthError(invalidState, correlationId);
+      }
+    }
+    var ResponseHandler = class _ResponseHandler {
+      constructor(clientId, cacheStorage, cryptoObj, logger, performanceClient, serializableCache, persistencePlugin) {
+        this.clientId = clientId;
+        this.cacheStorage = cacheStorage;
+        this.cryptoObj = cryptoObj;
+        this.logger = logger;
+        this.performanceClient = performanceClient;
+        this.serializableCache = serializableCache;
+        this.persistencePlugin = persistencePlugin;
+      }
+      /**
+       * Function which validates server authorization token response.
+       * @param serverResponse
+       * @param correlationId
+       * @param refreshAccessToken
+       */
+      validateTokenResponse(serverResponse, correlationId, refreshAccessToken) {
+        if (serverResponse.error || serverResponse.error_description || serverResponse.suberror) {
+          const errString = `Error(s): ${serverResponse.error_codes || NOT_AVAILABLE} - Timestamp: ${serverResponse.timestamp || NOT_AVAILABLE} - Description: ${serverResponse.error_description || NOT_AVAILABLE} - Correlation ID: ${serverResponse.correlation_id || NOT_AVAILABLE} - Trace ID: ${serverResponse.trace_id || NOT_AVAILABLE}`;
+          const serverErrorNo = serverResponse.error_codes?.length ? serverResponse.error_codes[0] : void 0;
+          const serverError = new ServerError(serverResponse.error || "", serverResponse.correlation_id || "", errString, serverResponse.suberror, serverErrorNo, serverResponse.status);
+          if (refreshAccessToken && serverResponse.status && serverResponse.status >= HTTP_SERVER_ERROR_RANGE_START && serverResponse.status <= HTTP_SERVER_ERROR_RANGE_END) {
+            this.logger.warning(`executeTokenRequest:validateTokenResponse - AAD is currently unavailable and the access token is unable to be refreshed.
+${serverError}`, correlationId);
+            return;
+          } else if (refreshAccessToken && serverResponse.status && serverResponse.status >= HTTP_CLIENT_ERROR_RANGE_START && serverResponse.status <= HTTP_CLIENT_ERROR_RANGE_END) {
+            this.logger.warning(`executeTokenRequest:validateTokenResponse - AAD is currently available but is unable to refresh the access token.
+${serverError}`, correlationId);
+            return;
+          }
+          if (isInteractionRequiredError(serverResponse.error, serverResponse.error_description, serverResponse.suberror)) {
+            throw new InteractionRequiredAuthError(serverResponse.error || "", serverResponse.correlation_id || "", serverResponse.error_description, serverResponse.suberror, serverResponse.timestamp || "", serverResponse.trace_id || "", serverResponse.claims || "", serverErrorNo);
+          }
+          throw serverError;
+        }
+      }
+      /**
+       * Returns a constructed token response based on given string. Also manages the cache updates and cleanups.
+       * @param serverTokenResponse
+       * @param authority
+       */
+      async handleServerTokenResponse(serverTokenResponse, authority, reqTimestamp, request, apiId, authCodePayload, userAssertionHash, handlingRefreshTokenResponse, forceCacheRefreshTokenResponse, serverRequestId, additionalCacheKeyComponents) {
+        let idTokenClaims;
+        if (serverTokenResponse.id_token) {
+          idTokenClaims = extractTokenClaims(serverTokenResponse.id_token || "", this.cryptoObj.base64Decode, request.correlationId);
+          if (authCodePayload && authCodePayload.nonce) {
+            if (idTokenClaims.nonce !== authCodePayload.nonce) {
+              throw createClientAuthError(nonceMismatch, request.correlationId);
+            }
+          }
+        }
+        this.homeAccountIdentifier = generateHomeAccountId(serverTokenResponse.client_info || "", authority.authorityType, this.logger, this.cryptoObj, request.correlationId, idTokenClaims);
+        let requestStateObj;
+        if (!!authCodePayload && !!authCodePayload.state) {
+          requestStateObj = parseRequestState(this.cryptoObj.base64Decode, authCodePayload.state, request.correlationId);
+        }
+        serverTokenResponse.key_id = serverTokenResponse.key_id || request.sshKid || void 0;
+        const cacheRecord = this.generateCacheRecord(serverTokenResponse, authority, reqTimestamp, request, idTokenClaims, userAssertionHash, authCodePayload, additionalCacheKeyComponents);
+        let cacheContext;
+        try {
+          if (this.persistencePlugin && this.serializableCache) {
+            this.logger.verbose("Persistence enabled, calling beforeCacheAccess", request.correlationId);
+            cacheContext = new TokenCacheContext(this.serializableCache, true);
+            await this.persistencePlugin.beforeCacheAccess(cacheContext);
+          }
+          if (handlingRefreshTokenResponse && !forceCacheRefreshTokenResponse && cacheRecord.account) {
+            const cachedAccounts = this.cacheStorage.getAllAccounts({
+              homeAccountId: cacheRecord.account.homeAccountId,
+              environment: cacheRecord.account.environment
+            }, request.correlationId);
+            if (cachedAccounts.length < 1) {
+              this.logger.warning("Account used to refresh tokens not in persistence, refreshed tokens will not be stored in the cache", request.correlationId);
+              this.performanceClient?.addFields({
+                acntLoggedOut: true
+              }, request.correlationId);
+              return await _ResponseHandler.generateAuthenticationResult(this.cryptoObj, authority, cacheRecord, false, request, this.performanceClient, idTokenClaims, requestStateObj, void 0, serverRequestId);
+            }
+          }
+          await this.cacheStorage.saveCacheRecord(cacheRecord, request.correlationId, isKmsi(idTokenClaims || {}), apiId, request.storeInCache);
+        } finally {
+          if (this.persistencePlugin && this.serializableCache && cacheContext) {
+            this.logger.verbose("Persistence enabled, calling afterCacheAccess", request.correlationId);
+            await this.persistencePlugin.afterCacheAccess(cacheContext);
+          }
+        }
+        return _ResponseHandler.generateAuthenticationResult(this.cryptoObj, authority, cacheRecord, false, request, this.performanceClient, idTokenClaims, requestStateObj, serverTokenResponse, serverRequestId);
+      }
+      /**
+       * Generates CacheRecord
+       * @param serverTokenResponse
+       * @param idTokenObj
+       * @param authority
+       */
+      generateCacheRecord(serverTokenResponse, authority, reqTimestamp, request, idTokenClaims, userAssertionHash, authCodePayload, additionalCacheKeyComponents) {
+        const env = authority.getPreferredCache();
+        if (!env) {
+          throw createClientAuthError(invalidCacheEnvironment, request.correlationId);
+        }
+        const claimsTenantId = getTenantIdFromIdTokenClaims(idTokenClaims);
+        let cachedIdToken;
+        let cachedAccount;
+        if (serverTokenResponse.id_token && !!idTokenClaims) {
+          cachedIdToken = createIdTokenEntity(this.homeAccountIdentifier, env, serverTokenResponse.id_token, this.clientId, claimsTenantId || "");
+          cachedAccount = buildAccountToCache(
+            this.cacheStorage,
+            authority,
+            this.homeAccountIdentifier,
+            this.cryptoObj.base64Decode,
+            request.correlationId,
+            idTokenClaims,
+            serverTokenResponse.client_info,
+            env,
+            claimsTenantId,
+            authCodePayload,
+            void 0,
+            // nativeAccountId
+            this.logger,
+            this.performanceClient
+          );
+        }
+        let cachedAccessToken = null;
+        if (serverTokenResponse.access_token) {
+          const responseScopes = serverTokenResponse.scope ? ScopeSet.fromString(serverTokenResponse.scope, request.correlationId) : new ScopeSet(request.scopes || [], request.correlationId);
+          const expiresIn = (typeof serverTokenResponse.expires_in === "string" ? parseInt(serverTokenResponse.expires_in, 10) : serverTokenResponse.expires_in) || 0;
+          const extExpiresIn = (typeof serverTokenResponse.ext_expires_in === "string" ? parseInt(serverTokenResponse.ext_expires_in, 10) : serverTokenResponse.ext_expires_in) || 0;
+          const refreshIn = (typeof serverTokenResponse.refresh_in === "string" ? parseInt(serverTokenResponse.refresh_in, 10) : serverTokenResponse.refresh_in) || void 0;
+          const tokenExpirationSeconds = reqTimestamp + expiresIn;
+          const extendedTokenExpirationSeconds = tokenExpirationSeconds + extExpiresIn;
+          const refreshOnSeconds = refreshIn && refreshIn > 0 ? reqTimestamp + refreshIn : void 0;
+          cachedAccessToken = createAccessTokenEntity(this.homeAccountIdentifier, env, serverTokenResponse.access_token, this.clientId, claimsTenantId || authority.tenant || "", responseScopes.printScopes(), tokenExpirationSeconds, extendedTokenExpirationSeconds, this.cryptoObj.base64Decode, request.correlationId, refreshOnSeconds, serverTokenResponse.token_type, userAssertionHash, serverTokenResponse.key_id, additionalCacheKeyComponents);
+          const resource = request.resource || null;
+          if (resource) {
+            cachedAccessToken.resource = resource;
+          }
+        }
+        let cachedRefreshToken = null;
+        if (serverTokenResponse.refresh_token) {
+          let rtExpiresOn;
+          if (serverTokenResponse.refresh_token_expires_in) {
+            const rtExpiresIn = typeof serverTokenResponse.refresh_token_expires_in === "string" ? parseInt(serverTokenResponse.refresh_token_expires_in, 10) : serverTokenResponse.refresh_token_expires_in;
+            rtExpiresOn = reqTimestamp + rtExpiresIn;
+            this.performanceClient?.addFields({ ntwkRtExpiresOnSeconds: rtExpiresOn }, request.correlationId);
+          }
+          cachedRefreshToken = createRefreshTokenEntity(this.homeAccountIdentifier, env, serverTokenResponse.refresh_token, this.clientId, serverTokenResponse.foci, userAssertionHash, rtExpiresOn);
+        }
+        let cachedAppMetadata = null;
+        if (serverTokenResponse.foci) {
+          cachedAppMetadata = {
+            clientId: this.clientId,
+            environment: env,
+            familyId: serverTokenResponse.foci
+          };
+        }
+        return {
+          account: cachedAccount,
+          idToken: cachedIdToken,
+          accessToken: cachedAccessToken,
+          refreshToken: cachedRefreshToken,
+          appMetadata: cachedAppMetadata
+        };
+      }
+      /**
+       * Creates an @AuthenticationResult from @CacheRecord , @IdToken , and a boolean that states whether or not the result is from cache.
+       *
+       * Optionally takes a state string that is set as-is in the response.
+       *
+       * @param cacheRecord
+       * @param idTokenObj
+       * @param fromTokenCache
+       * @param stateString
+       */
+      static async generateAuthenticationResult(cryptoObj, authority, cacheRecord, fromTokenCache, request, performanceClient, idTokenClaims, requestState, serverTokenResponse, requestId) {
+        let accessToken = "";
+        let responseScopes = [];
+        let expiresOn = null;
+        let extExpiresOn;
+        let refreshOn;
+        let familyId = "";
+        if (cacheRecord.accessToken) {
+          if (cacheRecord.accessToken.tokenType === AuthenticationScheme.POP && !request.popKid) {
+            const popTokenGenerator = new PopTokenGenerator(cryptoObj, performanceClient);
+            const { secret, keyId } = cacheRecord.accessToken;
+            if (!keyId) {
+              throw createClientAuthError(keyIdMissing, request.correlationId);
+            }
+            accessToken = await popTokenGenerator.signPopToken(secret, keyId, request);
+          } else {
+            accessToken = cacheRecord.accessToken.secret;
+          }
+          responseScopes = ScopeSet.fromString(cacheRecord.accessToken.target, request.correlationId).asArray();
+          expiresOn = toDateFromSeconds(cacheRecord.accessToken.expiresOn);
+          extExpiresOn = toDateFromSeconds(cacheRecord.accessToken.extendedExpiresOn);
+          if (cacheRecord.accessToken.refreshOn) {
+            refreshOn = toDateFromSeconds(cacheRecord.accessToken.refreshOn);
+          }
+        }
+        if (cacheRecord.appMetadata) {
+          familyId = cacheRecord.appMetadata.familyId === THE_FAMILY_ID ? THE_FAMILY_ID : "";
+        }
+        const uid = idTokenClaims?.oid || idTokenClaims?.sub || "";
+        const tid = idTokenClaims?.tid || "";
+        if (serverTokenResponse?.spa_accountid && !!cacheRecord.account) {
+          cacheRecord.account.nativeAccountId = serverTokenResponse?.spa_accountid;
+          const targetTenantId = tid || cacheRecord.account.realm;
+          if (cacheRecord.account.tenantProfiles) {
+            const matchingProfile = cacheRecord.account.tenantProfiles.find((tp) => tp.tenantId === targetTenantId);
+            if (matchingProfile) {
+              matchingProfile.nativeAccountId = serverTokenResponse.spa_accountid;
+            }
+          }
+        }
+        const accountInfo = cacheRecord.account ? updateAccountTenantProfileData(
+          getAccountInfo(cacheRecord.account),
+          void 0,
+          // tenantProfile optional
+          idTokenClaims,
+          cacheRecord.idToken?.secret
+        ) : null;
+        return {
+          authority: authority.canonicalAuthority,
+          uniqueId: uid,
+          tenantId: tid,
+          scopes: responseScopes,
+          account: accountInfo,
+          idToken: cacheRecord?.idToken?.secret || "",
+          idTokenClaims: idTokenClaims || {},
+          accessToken,
+          fromCache: fromTokenCache,
+          expiresOn,
+          extExpiresOn,
+          refreshOn,
+          correlationId: request.correlationId,
+          requestId: requestId || "",
+          familyId,
+          tokenType: cacheRecord.accessToken?.tokenType || "",
+          state: requestState ? requestState.userRequestState : "",
+          cloudGraphHostName: cacheRecord.account?.cloudGraphHostName || "",
+          msGraphHost: cacheRecord.account?.msGraphHost || "",
+          code: serverTokenResponse?.spa_code,
+          fromPlatformBroker: false
+        };
+      }
+    };
+    function buildAccountToCache(cacheStorage, authority, homeAccountId, base64Decode, correlationId, idTokenClaims, clientInfo, environment, claimsTenantId, authCodePayload, nativeAccountId, logger, performanceClient) {
+      logger?.verbose("setCachedAccount called", correlationId);
+      const accountEnvironment = environment || authority.getPreferredCache();
+      const matchedAccounts = cacheStorage.getAccountsFilteredBy({ homeAccountId, environment: accountEnvironment }, correlationId);
+      performanceClient?.addFields({ cacheMatchedAccounts: matchedAccounts.length }, correlationId);
+      if (matchedAccounts.length > 1) {
+        logger?.warning("Multiple base accounts matched homeAccountId. Ignoring cached account and creating a new base account.", correlationId);
+      }
+      const cachedAccount = matchedAccounts.length === 1 ? matchedAccounts[0] : null;
+      const baseAccount = cachedAccount || createAccountEntity({
+        homeAccountId,
+        idTokenClaims,
+        clientInfo,
+        environment,
+        cloudGraphHostName: authCodePayload?.cloud_graph_host_name,
+        msGraphHost: authCodePayload?.msgraph_host,
+        nativeAccountId
+      }, authority, correlationId, base64Decode);
+      const tenantProfiles = baseAccount.tenantProfiles || [];
+      const tenantId = claimsTenantId || baseAccount.realm;
+      if (tenantId && !tenantProfiles.find((tenantProfile) => {
+        return tenantProfile.tenantId === tenantId;
+      })) {
+        const newTenantProfile = buildTenantProfile(homeAccountId, baseAccount.localAccountId, tenantId, nativeAccountId, idTokenClaims);
+        tenantProfiles.push(newTenantProfile);
+      }
+      baseAccount.tenantProfiles = tenantProfiles;
+      return baseAccount;
+    }
+    var CcsCredentialType = {
+      HOME_ACCOUNT_ID: "home_account_id",
+      UPN: "UPN"
+    };
+    async function getClientAssertion(clientAssertion, clientId, tokenEndpoint, fmiPath) {
+      if (typeof clientAssertion === "string") {
+        return clientAssertion;
+      } else {
+        const config = {
+          clientId,
+          tokenEndpoint,
+          fmiPath
+        };
+        return clientAssertion(config);
+      }
+    }
+    function getRequestThumbprint(clientId, request, homeAccountId) {
+      return {
+        clientId,
+        authority: request.authority,
+        scopes: request.scopes,
+        homeAccountIdentifier: homeAccountId,
+        claims: request.claims,
+        authenticationScheme: request.authenticationScheme,
+        resourceRequestMethod: request.resourceRequestMethod,
+        resourceRequestUri: request.resourceRequestUri,
+        shrClaims: request.shrClaims,
+        sshKid: request.sshKid,
+        embeddedClientId: request.embeddedClientId || request.extraParameters?.clientId,
+        resource: request.resource
+      };
+    }
+    var ThrottlingUtils = class _ThrottlingUtils {
+      /**
+       * Prepares a RequestThumbprint to be stored as a key.
+       * @param thumbprint
+       */
+      static generateThrottlingStorageKey(thumbprint) {
+        return `${THROTTLING_PREFIX}.${JSON.stringify(thumbprint)}`;
+      }
+      /**
+       * Performs necessary throttling checks before a network request.
+       * @param cacheManager
+       * @param thumbprint
+       */
+      static preProcess(cacheManager, thumbprint, correlationId) {
+        const key = _ThrottlingUtils.generateThrottlingStorageKey(thumbprint);
+        const value = cacheManager.getThrottlingCache(key, correlationId);
+        if (value) {
+          if (value.throttleTime < Date.now()) {
+            cacheManager.removeItem(key, correlationId);
+            return;
+          }
+          throw new ServerError(value.errorCodes?.join(" ") || "", correlationId, value.errorMessage, value.subError);
+        }
+      }
+      /**
+       * Performs necessary throttling checks after a network request.
+       * @param cacheManager
+       * @param thumbprint
+       * @param response
+       */
+      static postProcess(cacheManager, thumbprint, response, correlationId) {
+        if (_ThrottlingUtils.checkResponseStatus(response) || _ThrottlingUtils.checkResponseForRetryAfter(response)) {
+          const thumbprintValue = {
+            throttleTime: _ThrottlingUtils.calculateThrottleTime(parseInt(response.headers[HeaderNames.RETRY_AFTER])),
+            error: response.body.error,
+            errorCodes: response.body.error_codes,
+            errorMessage: response.body.error_description,
+            subError: response.body.suberror
+          };
+          cacheManager.setThrottlingCache(_ThrottlingUtils.generateThrottlingStorageKey(thumbprint), thumbprintValue, correlationId);
+        }
+      }
+      /**
+       * Checks a NetworkResponse object's status codes against 429 or 5xx
+       * @param response
+       */
+      static checkResponseStatus(response) {
+        return response.status === 429 || response.status >= 500 && response.status < 600;
+      }
+      /**
+       * Checks a NetworkResponse object's RetryAfter header
+       * @param response
+       */
+      static checkResponseForRetryAfter(response) {
+        if (response.headers) {
+          return response.headers.hasOwnProperty(HeaderNames.RETRY_AFTER) && (response.status < 200 || response.status >= 300);
+        }
+        return false;
+      }
+      /**
+       * Calculates the Unix-time value for a throttle to expire given throttleTime in seconds.
+       * @param throttleTime
+       */
+      static calculateThrottleTime(throttleTime) {
+        const time = throttleTime <= 0 ? 0 : throttleTime;
+        const currentSeconds = Date.now() / 1e3;
+        return Math.floor(Math.min(currentSeconds + (time || DEFAULT_THROTTLE_TIME_SECONDS), currentSeconds + DEFAULT_MAX_THROTTLE_TIME_SECONDS) * 1e3);
+      }
+      static removeThrottle(cacheManager, clientId, request, homeAccountIdentifier) {
+        const thumbprint = getRequestThumbprint(clientId, request, homeAccountIdentifier);
+        const key = this.generateThrottlingStorageKey(thumbprint);
+        cacheManager.removeItem(key, request.correlationId);
+      }
+    };
+    var NetworkError = class _NetworkError extends AuthError {
+      constructor(error, httpStatus, responseHeaders) {
+        super(error.errorCode, error.correlationId, error.errorMessage, error.subError);
+        Object.setPrototypeOf(this, _NetworkError.prototype);
+        this.name = "NetworkError";
+        this.error = error;
+        this.httpStatus = httpStatus;
+        this.responseHeaders = responseHeaders;
+      }
+    };
+    function createNetworkError(error, httpStatus, responseHeaders, additionalError) {
+      error.errorMessage = `${error.errorMessage}, additionalErrorInfo: error.name:${additionalError?.name}, error.message:${additionalError?.message}`;
+      return new NetworkError(error, httpStatus, responseHeaders);
+    }
+    function createTokenRequestHeaders(logger, preventCorsPreflight, ccsCred) {
+      const headers = {};
+      headers[HeaderNames.CONTENT_TYPE] = URL_FORM_CONTENT_TYPE;
+      if (!preventCorsPreflight && ccsCred) {
+        switch (ccsCred.type) {
+          case CcsCredentialType.HOME_ACCOUNT_ID:
+            try {
+              const clientInfo = buildClientInfoFromHomeAccountId(ccsCred.credential);
+              headers[HeaderNames.CCS_HEADER] = `Oid:${clientInfo.uid}@${clientInfo.utid}`;
+            } catch (e) {
+              logger.verbose(`Could not parse home account ID for CCS Header: '${e}'`, "");
+            }
+            break;
+          case CcsCredentialType.UPN:
+            headers[HeaderNames.CCS_HEADER] = `UPN: ${ccsCred.credential}`;
+            break;
+        }
+      }
+      return headers;
+    }
+    function createTokenQueryParameters(request, clientId, redirectUri, performanceClient) {
+      const parameters = /* @__PURE__ */ new Map();
+      if (request.embeddedClientId) {
+        addBrokerParameters(parameters, clientId, redirectUri);
+      }
+      if (request.extraQueryParameters) {
+        addExtraParameters(parameters, request.extraQueryParameters);
+      }
+      addCorrelationId(parameters, request.correlationId);
+      instrumentBrokerParams(parameters, request.correlationId, performanceClient);
+      return mapToQueryString(parameters);
+    }
+    async function executePostToTokenEndpoint(tokenEndpoint, queryString, headers, thumbprint, correlationId, cacheManager, networkClient, logger, performanceClient, serverTelemetryManager) {
+      const response = await sendPostRequest(thumbprint, tokenEndpoint, { body: queryString, headers }, correlationId, cacheManager, networkClient, logger, performanceClient);
+      if (serverTelemetryManager && response.status < 500 && response.status !== 429) {
+        serverTelemetryManager.clearTelemetryCache();
+      }
+      return response;
+    }
+    async function sendPostRequest(thumbprint, tokenEndpoint, options, correlationId, cacheManager, networkClient, logger, performanceClient) {
+      ThrottlingUtils.preProcess(cacheManager, thumbprint, correlationId);
+      let response;
+      try {
+        response = await invokeAsync(networkClient.sendPostRequestAsync.bind(networkClient), NetworkClientSendPostRequestAsync, logger, performanceClient, correlationId)(tokenEndpoint, options);
+        const responseHeaders = response.headers || {};
+        performanceClient?.addFields({
+          refreshTokenSize: response.body.refresh_token?.length || 0,
+          httpVerToken: responseHeaders[HeaderNames.X_MS_HTTP_VERSION] || "",
+          requestId: responseHeaders[HeaderNames.X_MS_REQUEST_ID] || ""
+        }, correlationId);
+      } catch (e) {
+        if (e instanceof NetworkError) {
+          const responseHeaders = e.responseHeaders;
+          if (responseHeaders) {
+            performanceClient?.addFields({
+              httpVerToken: responseHeaders[HeaderNames.X_MS_HTTP_VERSION] || "",
+              requestId: responseHeaders[HeaderNames.X_MS_REQUEST_ID] || "",
+              contentTypeHeader: responseHeaders[HeaderNames.CONTENT_TYPE] || void 0,
+              contentLengthHeader: responseHeaders[HeaderNames.CONTENT_LENGTH] || void 0,
+              httpStatus: e.httpStatus
+            }, correlationId);
+          }
+          throw e.error;
+        }
+        if (e instanceof AuthError) {
+          throw e;
+        } else {
+          throw createClientAuthError(networkError, correlationId);
+        }
+      }
+      ThrottlingUtils.postProcess(cacheManager, thumbprint, response, correlationId);
+      return response;
+    }
+    function isOpenIdConfigResponse(response) {
+      return response.hasOwnProperty("authorization_endpoint") && response.hasOwnProperty("token_endpoint") && response.hasOwnProperty("issuer") && response.hasOwnProperty("jwks_uri");
+    }
+    function isCloudInstanceDiscoveryResponse(response) {
+      return response.hasOwnProperty("tenant_discovery_endpoint") && response.hasOwnProperty("metadata");
+    }
+    function isCloudInstanceDiscoveryErrorResponse(response) {
+      return response.hasOwnProperty("error") && response.hasOwnProperty("error_description");
+    }
+    var RegionDiscovery = class _RegionDiscovery {
+      constructor(networkInterface, logger, performanceClient, correlationId) {
+        this.networkInterface = networkInterface;
+        this.logger = logger;
+        this.performanceClient = performanceClient;
+        this.correlationId = correlationId;
+      }
+      /**
+       * Detect the region from the application's environment.
+       *
+       * @returns Promise<string | null>
+       */
+      async detectRegion(environmentRegion, regionDiscoveryMetadata) {
+        let autodetectedRegionName = environmentRegion;
+        if (!autodetectedRegionName) {
+          const options = _RegionDiscovery.IMDS_OPTIONS;
+          try {
+            const localIMDSVersionResponse = await invokeAsync(this.getRegionFromIMDS.bind(this), RegionDiscoveryGetRegionFromIMDS, this.logger, this.performanceClient, this.correlationId)(IMDS_VERSION, options);
+            if (localIMDSVersionResponse.status === HTTP_SUCCESS) {
+              autodetectedRegionName = localIMDSVersionResponse.body?.location;
+              if (autodetectedRegionName) {
+                regionDiscoveryMetadata.region_source = RegionDiscoverySources.IMDS;
+              }
+            }
+            if (localIMDSVersionResponse.status === HTTP_BAD_REQUEST) {
+              const currentIMDSVersion = await invokeAsync(this.getCurrentVersion.bind(this), RegionDiscoveryGetCurrentVersion, this.logger, this.performanceClient, this.correlationId)(options);
+              if (!currentIMDSVersion) {
+                regionDiscoveryMetadata.region_source = RegionDiscoverySources.FAILED_AUTO_DETECTION;
+                return null;
+              }
+              const currentIMDSVersionResponse = await invokeAsync(this.getRegionFromIMDS.bind(this), RegionDiscoveryGetRegionFromIMDS, this.logger, this.performanceClient, this.correlationId)(currentIMDSVersion, options);
+              if (currentIMDSVersionResponse.status === HTTP_SUCCESS) {
+                autodetectedRegionName = currentIMDSVersionResponse.body?.location;
+                if (autodetectedRegionName) {
+                  regionDiscoveryMetadata.region_source = RegionDiscoverySources.IMDS;
+                }
+              }
+            }
+          } catch (e) {
+            regionDiscoveryMetadata.region_source = RegionDiscoverySources.FAILED_AUTO_DETECTION;
+            return null;
+          }
+        } else {
+          regionDiscoveryMetadata.region_source = RegionDiscoverySources.ENVIRONMENT_VARIABLE;
+        }
+        if (!autodetectedRegionName) {
+          regionDiscoveryMetadata.region_source = RegionDiscoverySources.FAILED_AUTO_DETECTION;
+        }
+        return autodetectedRegionName || null;
+      }
+      /**
+       * Make the call to the IMDS endpoint
+       *
+       * @param version
+       * @param options
+       * @returns Promise<NetworkResponse<ImdsComputeResponse>>
+       */
+      async getRegionFromIMDS(version2, options) {
+        return this.networkInterface.sendGetRequestAsync(`${IMDS_ENDPOINT}?api-version=${version2}`, options, IMDS_TIMEOUT);
+      }
+      /**
+       * Get the most recent version of the IMDS endpoint available
+       *
+       * @returns Promise<string | null>
+       */
+      async getCurrentVersion(options) {
+        try {
+          const response = await this.networkInterface.sendGetRequestAsync(`${IMDS_ENDPOINT}?format=json`, options);
+          if (response.status === HTTP_BAD_REQUEST && response.body && response.body["newest-versions"] && response.body["newest-versions"].length > 0) {
+            return response.body["newest-versions"][0];
+          }
+          return null;
+        } catch (e) {
+          return null;
+        }
+      }
+    };
+    RegionDiscovery.IMDS_OPTIONS = {
+      headers: {
+        Metadata: "true"
+      }
+    };
     var Authority = class _Authority {
       constructor(authority, networkInterface, cacheManager, authorityOptions, logger, correlationId, performanceClient, managedIdentity) {
         this.canonicalAuthority = authority;
@@ -43302,2532 +45719,6 @@ Error Description: '${typedError.message}'`, this.correlationId);
         throw createClientAuthError(endpointResolutionError, correlationId);
       }
     }
-    var ScopeSet = class _ScopeSet {
-      constructor(inputScopes, correlationId) {
-        this.correlationId = correlationId;
-        const scopeArr = inputScopes ? StringUtils.trimArrayEntries([...inputScopes]) : [];
-        const filteredInput = scopeArr ? StringUtils.removeEmptyStringsFromArray(scopeArr) : [];
-        if (!filteredInput || !filteredInput.length) {
-          throw createClientConfigurationError(emptyInputScopesError, correlationId);
-        }
-        this.scopes = /* @__PURE__ */ new Set();
-        filteredInput.forEach((scope) => this.scopes.add(scope));
-      }
-      /**
-       * Factory method to create ScopeSet from space-delimited string
-       * @param inputScopeString
-       * @param appClientId
-       * @param scopesRequired
-       */
-      static fromString(inputScopeString, correlationId) {
-        const scopeString = inputScopeString || "";
-        const inputScopes = scopeString.split(" ");
-        return new _ScopeSet(inputScopes, correlationId);
-      }
-      /**
-       * Creates the set of scopes to search for in cache lookups
-       * @param inputScopeString
-       * @returns
-       */
-      static createSearchScopes(inputScopeString, correlationId) {
-        const scopesToUse = inputScopeString && inputScopeString.length > 0 ? inputScopeString : [...OIDC_DEFAULT_SCOPES];
-        const scopeSet = new _ScopeSet(scopesToUse, correlationId);
-        if (!scopeSet.containsOnlyOIDCScopes()) {
-          scopeSet.removeOIDCScopes();
-        } else {
-          scopeSet.removeScope(OFFLINE_ACCESS_SCOPE);
-        }
-        return scopeSet;
-      }
-      /**
-       * Check if a given scope is present in this set of scopes.
-       * @param scope
-       */
-      containsScope(scope) {
-        const lowerCaseScopes = this.printScopesLowerCase().split(" ");
-        const lowerCaseScopesSet = new _ScopeSet(lowerCaseScopes, this.correlationId);
-        return scope ? lowerCaseScopesSet.scopes.has(scope.toLowerCase()) : false;
-      }
-      /**
-       * Check if a set of scopes is present in this set of scopes.
-       * @param scopeSet
-       */
-      containsScopeSet(scopeSet) {
-        if (!scopeSet || scopeSet.scopes.size <= 0) {
-          return false;
-        }
-        return this.scopes.size >= scopeSet.scopes.size && scopeSet.asArray().every((scope) => this.containsScope(scope));
-      }
-      /**
-       * Check if set of scopes contains only the defaults
-       */
-      containsOnlyOIDCScopes() {
-        let defaultScopeCount = 0;
-        OIDC_SCOPES.forEach((defaultScope) => {
-          if (this.containsScope(defaultScope)) {
-            defaultScopeCount += 1;
-          }
-        });
-        return this.scopes.size === defaultScopeCount;
-      }
-      /**
-       * Appends single scope if passed
-       * @param newScope
-       */
-      appendScope(newScope) {
-        if (newScope) {
-          this.scopes.add(newScope.trim());
-        }
-      }
-      /**
-       * Appends multiple scopes if passed
-       * @param newScopes
-       */
-      appendScopes(newScopes) {
-        try {
-          newScopes.forEach((newScope) => this.appendScope(newScope));
-        } catch (e) {
-          throw createClientAuthError(cannotAppendScopeSet, this.correlationId);
-        }
-      }
-      /**
-       * Removes element from set of scopes.
-       * @param scope
-       */
-      removeScope(scope) {
-        if (!scope) {
-          throw createClientAuthError(cannotRemoveEmptyScope, this.correlationId);
-        }
-        this.scopes.delete(scope.trim());
-      }
-      /**
-       * Removes default scopes from set of scopes
-       * Primarily used to prevent cache misses if the default scopes are not returned from the server
-       */
-      removeOIDCScopes() {
-        OIDC_SCOPES.forEach((defaultScope) => {
-          this.scopes.delete(defaultScope);
-        });
-      }
-      /**
-       * Combines an array of scopes with the current set of scopes.
-       * @param otherScopes
-       */
-      unionScopeSets(otherScopes) {
-        if (!otherScopes) {
-          throw createClientAuthError(emptyInputScopeSet, this.correlationId);
-        }
-        const unionScopes = /* @__PURE__ */ new Set();
-        otherScopes.scopes.forEach((scope) => unionScopes.add(scope.toLowerCase()));
-        this.scopes.forEach((scope) => unionScopes.add(scope.toLowerCase()));
-        return unionScopes;
-      }
-      /**
-       * Check if scopes intersect between this set and another.
-       * @param otherScopes
-       */
-      intersectingScopeSets(otherScopes) {
-        if (!otherScopes) {
-          throw createClientAuthError(emptyInputScopeSet, this.correlationId);
-        }
-        if (!otherScopes.containsOnlyOIDCScopes()) {
-          otherScopes.removeOIDCScopes();
-        }
-        const unionScopes = this.unionScopeSets(otherScopes);
-        const sizeOtherScopes = otherScopes.getScopeCount();
-        const sizeThisScopes = this.getScopeCount();
-        const sizeUnionScopes = unionScopes.size;
-        return sizeUnionScopes < sizeThisScopes + sizeOtherScopes;
-      }
-      /**
-       * Returns size of set of scopes.
-       */
-      getScopeCount() {
-        return this.scopes.size;
-      }
-      /**
-       * Returns the scopes as an array of string values
-       */
-      asArray() {
-        const array = [];
-        this.scopes.forEach((val) => array.push(val));
-        return array;
-      }
-      /**
-       * Prints scopes into a space-delimited string
-       */
-      printScopes() {
-        if (this.scopes) {
-          const scopeArr = this.asArray();
-          return scopeArr.join(" ");
-        }
-        return "";
-      }
-      /**
-       * Prints scopes into a space-delimited lower-case string (used for caching)
-       */
-      printScopesLowerCase() {
-        return this.printScopes().toLowerCase();
-      }
-    };
-    function instrumentBrokerParams(parameters, correlationId, performanceClient) {
-      if (!correlationId) {
-        return;
-      }
-      const clientId = parameters.get(CLIENT_ID);
-      if (clientId && parameters.has(BROKER_CLIENT_ID)) {
-        performanceClient?.addFields({
-          embeddedClientId: clientId,
-          embeddedRedirectUri: parameters.get(REDIRECT_URI)
-        }, correlationId);
-      }
-    }
-    function addResponseType(parameters, responseType) {
-      parameters.set(RESPONSE_TYPE, responseType);
-    }
-    function addResponseMode(parameters, responseMode) {
-      parameters.set(RESPONSE_MODE, responseMode ? responseMode : ResponseMode$1.QUERY);
-    }
-    function addScopes(parameters, scopes, correlationId, addOidcScopes = true, defaultScopes = OIDC_DEFAULT_SCOPES) {
-      if (addOidcScopes && !defaultScopes.includes("openid") && !scopes.includes("openid")) {
-        defaultScopes.push("openid");
-      }
-      const requestScopes = addOidcScopes ? [...scopes || [], ...defaultScopes] : scopes || [];
-      const scopeSet = new ScopeSet(requestScopes, correlationId);
-      parameters.set(SCOPE, scopeSet.printScopes());
-    }
-    function addClientId(parameters, clientId) {
-      parameters.set(CLIENT_ID, clientId);
-    }
-    function addRedirectUri(parameters, redirectUri) {
-      parameters.set(REDIRECT_URI, redirectUri);
-    }
-    function addPostLogoutRedirectUri(parameters, redirectUri) {
-      parameters.set(POST_LOGOUT_URI, redirectUri);
-    }
-    function addIdTokenHint(parameters, idTokenHint) {
-      parameters.set(ID_TOKEN_HINT, idTokenHint);
-    }
-    function addDomainHint(parameters, domainHint) {
-      parameters.set(DOMAIN_HINT, domainHint);
-    }
-    function addLoginHint(parameters, loginHint) {
-      parameters.set(LOGIN_HINT, loginHint);
-    }
-    function addCcsUpn(parameters, loginHint) {
-      parameters.set(HeaderNames.CCS_HEADER, `UPN:${loginHint}`);
-    }
-    function addCcsOid(parameters, clientInfo) {
-      parameters.set(HeaderNames.CCS_HEADER, `Oid:${clientInfo.uid}@${clientInfo.utid}`);
-    }
-    function addSid(parameters, sid) {
-      parameters.set(SID, sid);
-    }
-    function addClaims(parameters, correlationId, claims, clientCapabilities, skipBrokerClaims, claimsToMerge) {
-      const configClaims = skipBrokerClaims && parameters.has(BROKER_CLIENT_ID) ? void 0 : clientCapabilities;
-      const mergedClaims = buildMergedClaims(claims, configClaims, correlationId, claimsToMerge);
-      parameters.set(CLAIMS, mergedClaims);
-    }
-    function addCorrelationId(parameters, correlationId) {
-      parameters.set(CLIENT_REQUEST_ID, correlationId);
-    }
-    function addLibraryInfo(parameters, libraryInfo) {
-      parameters.set(X_CLIENT_SKU, libraryInfo.sku);
-      parameters.set(X_CLIENT_VER, libraryInfo.version);
-      if (libraryInfo.os) {
-        parameters.set(X_CLIENT_OS, libraryInfo.os);
-      }
-      if (libraryInfo.cpu) {
-        parameters.set(X_CLIENT_CPU, libraryInfo.cpu);
-      }
-    }
-    function addApplicationTelemetry(parameters, appTelemetry) {
-      if (appTelemetry?.appName) {
-        parameters.set(X_APP_NAME, appTelemetry.appName);
-      }
-      if (appTelemetry?.appVersion) {
-        parameters.set(X_APP_VER, appTelemetry.appVersion);
-      }
-    }
-    function addPrompt(parameters, prompt) {
-      parameters.set(PROMPT, prompt);
-    }
-    function addState(parameters, state) {
-      if (state) {
-        parameters.set(STATE, state);
-      }
-    }
-    function addNonce(parameters, nonce) {
-      parameters.set(NONCE, nonce);
-    }
-    function addCodeChallengeParams(parameters, codeChallenge, codeChallengeMethod) {
-      if (codeChallenge && codeChallengeMethod) {
-        parameters.set(CODE_CHALLENGE, codeChallenge);
-        parameters.set(CODE_CHALLENGE_METHOD, codeChallengeMethod);
-      } else {
-        throw createClientConfigurationError(pkceParamsMissing, "");
-      }
-    }
-    function addAuthorizationCode(parameters, code) {
-      parameters.set(CODE, code);
-    }
-    function addDeviceCode(parameters, code) {
-      parameters.set(DEVICE_CODE, code);
-    }
-    function addRefreshToken(parameters, refreshToken) {
-      parameters.set(REFRESH_TOKEN, refreshToken);
-    }
-    function addCodeVerifier(parameters, codeVerifier) {
-      parameters.set(CODE_VERIFIER, codeVerifier);
-    }
-    function addClientSecret(parameters, clientSecret) {
-      parameters.set(CLIENT_SECRET, clientSecret);
-    }
-    function addClientAssertion(parameters, clientAssertion) {
-      if (clientAssertion) {
-        parameters.set(CLIENT_ASSERTION, clientAssertion);
-      }
-    }
-    function addClientAssertionType(parameters, clientAssertionType) {
-      if (clientAssertionType) {
-        parameters.set(CLIENT_ASSERTION_TYPE, clientAssertionType);
-      }
-    }
-    function addOboAssertion(parameters, oboAssertion) {
-      parameters.set(OBO_ASSERTION, oboAssertion);
-    }
-    function addRequestTokenUse(parameters, tokenUse) {
-      parameters.set(REQUESTED_TOKEN_USE, tokenUse);
-    }
-    function addGrantType(parameters, grantType) {
-      parameters.set(GRANT_TYPE, grantType);
-    }
-    function addClientInfo(parameters) {
-      parameters.set(CLIENT_INFO, "1");
-    }
-    function addCliData(parameters) {
-      parameters.set(CLI_DATA, "1");
-    }
-    function addInstanceAware(parameters) {
-      if (!parameters.has(INSTANCE_AWARE)) {
-        parameters.set(INSTANCE_AWARE, "true");
-      }
-    }
-    function addExtraParameters(parameters, extraParams) {
-      Object.entries(extraParams).forEach(([key, value]) => {
-        if (!parameters.has(key) && value) {
-          parameters.set(key, value);
-        }
-      });
-    }
-    var DEFAULT_ID_TOKEN_CLAIMS = {
-      [ClaimsRequestKeys.SIGNIN_STATE]: { essential: false },
-      [ClaimsRequestKeys.LOGIN_HINT]: { essential: false }
-    };
-    function parseClaims(claims, correlationId = "") {
-      let parsed;
-      try {
-        parsed = JSON.parse(claims);
-      } catch (e) {
-        throw createClientConfigurationError(invalidClaims, correlationId);
-      }
-      if (!isPlainObject(parsed)) {
-        throw createClientConfigurationError(invalidClaims, correlationId);
-      }
-      return parsed;
-    }
-    function isPlainObject(value) {
-      return typeof value === "object" && value !== null && !Array.isArray(value);
-    }
-    function deepMergeClaims(baseClaims, claimsToMerge) {
-      const merged = { ...baseClaims };
-      for (const [key, mergeInValue] of Object.entries(claimsToMerge)) {
-        const baseValue = merged[key];
-        if (isPlainObject(baseValue) && isPlainObject(mergeInValue)) {
-          merged[key] = deepMergeClaims(baseValue, mergeInValue);
-        } else {
-          merged[key] = mergeInValue;
-        }
-      }
-      return merged;
-    }
-    function buildMergedClaims(claims, clientCapabilities, correlationId = "", claimsToMerge) {
-      let mergedClaims = claims ? parseClaims(claims, correlationId) : {};
-      if (claimsToMerge?.trim()) {
-        mergedClaims = deepMergeClaims(mergedClaims, parseClaims(claimsToMerge, correlationId));
-      }
-      if (!Object.prototype.hasOwnProperty.call(mergedClaims, ClaimsRequestKeys.ID_TOKEN)) {
-        mergedClaims[ClaimsRequestKeys.ID_TOKEN] = {};
-      }
-      const idTokenClaims = mergedClaims[ClaimsRequestKeys.ID_TOKEN];
-      for (const [key, value] of Object.entries(DEFAULT_ID_TOKEN_CLAIMS)) {
-        if (!(key in idTokenClaims)) {
-          idTokenClaims[key] = value;
-        }
-      }
-      if (clientCapabilities && clientCapabilities.length > 0) {
-        if (!Object.prototype.hasOwnProperty.call(mergedClaims, ClaimsRequestKeys.ACCESS_TOKEN)) {
-          mergedClaims[ClaimsRequestKeys.ACCESS_TOKEN] = {};
-        }
-        mergedClaims[ClaimsRequestKeys.ACCESS_TOKEN][ClaimsRequestKeys.XMS_CC] = {
-          values: clientCapabilities
-        };
-      }
-      return JSON.stringify(mergedClaims);
-    }
-    function addUsername(parameters, username) {
-      parameters.set(PasswordGrantConstants.username, username);
-    }
-    function addPassword(parameters, password) {
-      parameters.set(PasswordGrantConstants.password, password);
-    }
-    function addPopToken(parameters, cnfString) {
-      if (cnfString) {
-        parameters.set(TOKEN_TYPE, AuthenticationScheme.POP);
-        parameters.set(REQ_CNF, cnfString);
-      }
-    }
-    function addSshJwk(parameters, sshJwkString) {
-      if (sshJwkString) {
-        parameters.set(TOKEN_TYPE, AuthenticationScheme.SSH);
-        parameters.set(REQ_CNF, sshJwkString);
-      }
-    }
-    function addServerTelemetry(parameters, serverTelemetryManager) {
-      parameters.set(X_CLIENT_CURR_TELEM, serverTelemetryManager.generateCurrentRequestHeaderValue());
-      parameters.set(X_CLIENT_LAST_TELEM, serverTelemetryManager.generateLastRequestHeaderValue());
-    }
-    function addThrottling(parameters) {
-      parameters.set(X_MS_LIB_CAPABILITY, X_MS_LIB_CAPABILITY_VALUE);
-    }
-    function addLogoutHint(parameters, logoutHint) {
-      parameters.set(LOGOUT_HINT, logoutHint);
-    }
-    function addBrokerParameters(parameters, brokerClientId, brokerRedirectUri) {
-      if (!parameters.has(BROKER_CLIENT_ID)) {
-        parameters.set(BROKER_CLIENT_ID, brokerClientId);
-      }
-      if (!parameters.has(BROKER_REDIRECT_URI)) {
-        parameters.set(BROKER_REDIRECT_URI, brokerRedirectUri);
-      }
-    }
-    function addResource(parameters, resource) {
-      if (resource) {
-        parameters.set(RESOURCE, resource);
-      }
-    }
-    function addAttributeTokens(parameters, attributeTokens) {
-      const serialized = serializeAttributeTokens(attributeTokens);
-      if (serialized) {
-        parameters.set(ATTRIBUTE_TOKENS, serialized);
-      } else {
-        parameters.delete(ATTRIBUTE_TOKENS);
-      }
-    }
-    function stripLeadingHashOrQuery(responseString) {
-      if (responseString.startsWith("#/")) {
-        return responseString.substring(2);
-      } else if (responseString.startsWith("#") || responseString.startsWith("?")) {
-        return responseString.substring(1);
-      }
-      return responseString;
-    }
-    function getDeserializedResponse(responseString) {
-      if (!responseString || responseString.indexOf("=") < 0) {
-        return null;
-      }
-      try {
-        const normalizedResponse = stripLeadingHashOrQuery(responseString);
-        const deserializedHash = Object.fromEntries(new URLSearchParams(normalizedResponse));
-        if (deserializedHash.code || deserializedHash.ear_jwe || deserializedHash.error || deserializedHash.error_description || deserializedHash.state) {
-          return deserializedHash;
-        }
-      } catch (e) {
-        throw createClientAuthError(hashNotDeserialized, "");
-      }
-      return null;
-    }
-    function mapToQueryString(parameters) {
-      const queryParameterArray = new Array();
-      parameters.forEach((value, key) => {
-        queryParameterArray.push(`${key}=${encodeURIComponent(value)}`);
-      });
-      return queryParameterArray.join("&");
-    }
-    var DEFAULT_CRYPTO_IMPLEMENTATION = {
-      createNewGuid: () => {
-        throw createClientAuthError(methodNotImplemented, "");
-      },
-      base64Decode: () => {
-        throw createClientAuthError(methodNotImplemented, "");
-      },
-      base64Encode: () => {
-        throw createClientAuthError(methodNotImplemented, "");
-      },
-      base64UrlEncode: () => {
-        throw createClientAuthError(methodNotImplemented, "");
-      },
-      encodeKid: () => {
-        throw createClientAuthError(methodNotImplemented, "");
-      },
-      async getPublicKeyThumbprint() {
-        throw createClientAuthError(methodNotImplemented, "");
-      },
-      async removeTokenBindingKey() {
-        throw createClientAuthError(methodNotImplemented, "");
-      },
-      async clearKeystore() {
-        throw createClientAuthError(methodNotImplemented, "");
-      },
-      async signJwt() {
-        throw createClientAuthError(methodNotImplemented, "");
-      },
-      async hashString() {
-        throw createClientAuthError(methodNotImplemented, "");
-      }
-    };
-    exports2.LogLevel = void 0;
-    (function(LogLevel) {
-      LogLevel[LogLevel["Error"] = 0] = "Error";
-      LogLevel[LogLevel["Warning"] = 1] = "Warning";
-      LogLevel[LogLevel["Info"] = 2] = "Info";
-      LogLevel[LogLevel["Verbose"] = 3] = "Verbose";
-      LogLevel[LogLevel["Trace"] = 4] = "Trace";
-    })(exports2.LogLevel || (exports2.LogLevel = {}));
-    var CACHE_CAPACITY = 50;
-    var MAX_LOGS_PER_CORRELATION = 500;
-    var correlationCache = /* @__PURE__ */ new Map();
-    function markAsRecentlyUsed(correlationId, data) {
-      correlationCache.delete(correlationId);
-      correlationCache.set(correlationId, data);
-    }
-    function addLogToCache(correlationId, loggedMessage) {
-      const currentTime = Date.now();
-      let data = correlationCache.get(correlationId);
-      if (data) {
-        markAsRecentlyUsed(correlationId, data);
-      } else {
-        data = { logs: [], firstEventTime: currentTime };
-        correlationCache.set(correlationId, data);
-        if (correlationCache.size > CACHE_CAPACITY) {
-          const firstKey = correlationCache.keys().next().value;
-          if (firstKey !== void 0) {
-            correlationCache.delete(firstKey);
-          }
-        }
-      }
-      data.logs.push({
-        ...loggedMessage,
-        milliseconds: currentTime - data.firstEventTime
-      });
-      if (data.logs.length > MAX_LOGS_PER_CORRELATION) {
-        data.logs.shift();
-      }
-    }
-    function getMessageHash(str) {
-      if (str.length < 6) {
-        return null;
-      }
-      if (str.length > 6 && str[6] !== " ") {
-        return null;
-      }
-      for (let i = 0; i < 6; i++) {
-        const char = str[i];
-        const isAlphaNumeric = char >= "a" && char <= "z" || char >= "A" && char <= "Z" || char >= "0" && char <= "9";
-        if (!isAlphaNumeric) {
-          return null;
-        }
-      }
-      return str.substring(0, 6);
-    }
-    var Logger = class _Logger {
-      constructor(loggerOptions, packageName, packageVersion) {
-        this.level = exports2.LogLevel.Info;
-        const defaultLoggerCallback = () => {
-          return;
-        };
-        const setLoggerOptions = loggerOptions || _Logger.createDefaultLoggerOptions();
-        this.localCallback = setLoggerOptions.loggerCallback || defaultLoggerCallback;
-        this.piiLoggingEnabled = setLoggerOptions.piiLoggingEnabled || false;
-        this.level = typeof setLoggerOptions.logLevel === "number" ? setLoggerOptions.logLevel : exports2.LogLevel.Info;
-        this.packageName = packageName || "";
-        this.packageVersion = packageVersion || "";
-      }
-      static createDefaultLoggerOptions() {
-        return {
-          loggerCallback: () => {
-          },
-          piiLoggingEnabled: false,
-          logLevel: exports2.LogLevel.Info
-        };
-      }
-      /**
-       * Create new Logger with existing configurations.
-       */
-      clone(packageName, packageVersion) {
-        return new _Logger({
-          loggerCallback: this.localCallback,
-          piiLoggingEnabled: this.piiLoggingEnabled,
-          logLevel: this.level
-        }, packageName, packageVersion);
-      }
-      /**
-       * Log message with required options.
-       */
-      logMessage(logMessage, options) {
-        const correlationId = options.correlationId;
-        const messageHash = getMessageHash(logMessage);
-        if (messageHash) {
-          const loggedMessage = {
-            hash: messageHash,
-            level: options.logLevel,
-            containsPii: options.containsPii || false,
-            milliseconds: 0
-            // Will be calculated in addLogToCache
-          };
-          addLogToCache(correlationId, loggedMessage);
-        }
-        if (options.logLevel > this.level || !this.piiLoggingEnabled && options.containsPii) {
-          return;
-        }
-        const timestamp = (/* @__PURE__ */ new Date()).toUTCString();
-        const logHeader = `[${timestamp}] : [${correlationId}]`;
-        const log = `${logHeader} : ${this.packageName}@${this.packageVersion} : ${exports2.LogLevel[options.logLevel]} - ${logMessage}`;
-        this.executeCallback(options.logLevel, log, options.containsPii || false);
-      }
-      /**
-       * Execute callback with message.
-       */
-      executeCallback(level, message, containsPii) {
-        if (this.localCallback) {
-          this.localCallback(level, message, containsPii);
-        }
-      }
-      /**
-       * Logs error messages.
-       */
-      error(message, correlationId) {
-        this.logMessage(message, {
-          logLevel: exports2.LogLevel.Error,
-          containsPii: false,
-          correlationId
-        });
-      }
-      /**
-       * Logs error messages with PII.
-       */
-      errorPii(message, correlationId) {
-        this.logMessage(message, {
-          logLevel: exports2.LogLevel.Error,
-          containsPii: true,
-          correlationId
-        });
-      }
-      /**
-       * Logs warning messages.
-       */
-      warning(message, correlationId) {
-        this.logMessage(message, {
-          logLevel: exports2.LogLevel.Warning,
-          containsPii: false,
-          correlationId
-        });
-      }
-      /**
-       * Logs warning messages with PII.
-       */
-      warningPii(message, correlationId) {
-        this.logMessage(message, {
-          logLevel: exports2.LogLevel.Warning,
-          containsPii: true,
-          correlationId
-        });
-      }
-      /**
-       * Logs info messages.
-       */
-      info(message, correlationId) {
-        this.logMessage(message, {
-          logLevel: exports2.LogLevel.Info,
-          containsPii: false,
-          correlationId
-        });
-      }
-      /**
-       * Logs info messages with PII.
-       */
-      infoPii(message, correlationId) {
-        this.logMessage(message, {
-          logLevel: exports2.LogLevel.Info,
-          containsPii: true,
-          correlationId
-        });
-      }
-      /**
-       * Logs verbose messages.
-       */
-      verbose(message, correlationId) {
-        this.logMessage(message, {
-          logLevel: exports2.LogLevel.Verbose,
-          containsPii: false,
-          correlationId
-        });
-      }
-      /**
-       * Logs verbose messages with PII.
-       */
-      verbosePii(message, correlationId) {
-        this.logMessage(message, {
-          logLevel: exports2.LogLevel.Verbose,
-          containsPii: true,
-          correlationId
-        });
-      }
-      /**
-       * Logs trace messages.
-       */
-      trace(message, correlationId) {
-        this.logMessage(message, {
-          logLevel: exports2.LogLevel.Trace,
-          containsPii: false,
-          correlationId
-        });
-      }
-      /**
-       * Logs trace messages with PII.
-       */
-      tracePii(message, correlationId) {
-        this.logMessage(message, {
-          logLevel: exports2.LogLevel.Trace,
-          containsPii: true,
-          correlationId
-        });
-      }
-      /**
-       * Returns whether PII Logging is enabled or not.
-       */
-      isPiiLoggingEnabled() {
-        return this.piiLoggingEnabled || false;
-      }
-    };
-    var name$1 = "@azure/msal-common";
-    var version$1 = "16.12.0";
-    var cacheQuotaExceeded = "cache_quota_exceeded";
-    var cacheErrorUnknown = "cache_error_unknown";
-    var CacheError = class _CacheError extends Error {
-      constructor(errorCode, errorMessage) {
-        const message = errorMessage || getDefaultErrorMessage(errorCode);
-        super(message);
-        Object.setPrototypeOf(this, _CacheError.prototype);
-        this.name = "CacheError";
-        this.errorCode = errorCode;
-        this.errorMessage = message;
-      }
-    };
-    function createCacheError(e) {
-      if (!(e instanceof Error)) {
-        return new CacheError(cacheErrorUnknown);
-      }
-      if (e.name === "QuotaExceededError" || e.name === "NS_ERROR_DOM_QUOTA_REACHED" || e.message.includes("exceeded the quota")) {
-        return new CacheError(cacheQuotaExceeded);
-      } else {
-        return new CacheError(e.name, e.message);
-      }
-    }
-    var CacheManager = class {
-      constructor(clientId, cryptoImpl, logger, performanceClient, staticAuthorityOptions) {
-        this.clientId = clientId;
-        this.cryptoImpl = cryptoImpl;
-        this.commonLogger = logger.clone(name$1, version$1);
-        this.staticAuthorityOptions = staticAuthorityOptions;
-        this.performanceClient = performanceClient;
-      }
-      /**
-       * Returns all the accounts in the cache that match the optional filter. If no filter is provided, all accounts are returned.
-       * @param accountFilter - (Optional) filter to narrow down the accounts returned
-       * @returns Array of AccountInfo objects in cache
-       */
-      getAllAccounts(accountFilter = {}, correlationId) {
-        return this.buildTenantProfiles(this.getAccountsFilteredBy(accountFilter, correlationId), correlationId, accountFilter);
-      }
-      /**
-       * Gets first tenanted AccountInfo object found based on provided filters
-       */
-      getAccountInfoFilteredBy(accountFilter, correlationId) {
-        if (Object.keys(accountFilter).length === 0 || Object.values(accountFilter).every((value) => value === null || value === void 0 || value === "")) {
-          this.commonLogger.warning("getAccountInfoFilteredBy: Account filter is empty or invalid, returning null", correlationId);
-          return null;
-        }
-        const allAccounts = this.getAllAccounts(accountFilter, correlationId);
-        if (allAccounts.length > 1) {
-          const sortedAccounts = allAccounts.sort((a, b) => {
-            const aHasClaims = a.idTokenClaims ? 1 : 0;
-            const bHasClaims = b.idTokenClaims ? 1 : 0;
-            return bHasClaims - aHasClaims;
-          });
-          return sortedAccounts[0];
-        } else if (allAccounts.length === 1) {
-          return allAccounts[0];
-        } else {
-          return null;
-        }
-      }
-      /**
-       * Returns a single matching
-       * @param accountFilter
-       * @returns
-       */
-      getBaseAccountInfo(accountFilter, correlationId) {
-        const accountEntities = this.getAccountsFilteredBy(accountFilter, correlationId);
-        if (accountEntities.length > 0) {
-          return getAccountInfo(accountEntities[0]);
-        } else {
-          return null;
-        }
-      }
-      /**
-       * Matches filtered account entities with cached ID tokens that match the tenant profile-specific account filters
-       * and builds the account info objects from the matching ID token's claims
-       * @param cachedAccounts
-       * @param accountFilter
-       * @returns Array of AccountInfo objects that match account and tenant profile filters
-       */
-      buildTenantProfiles(cachedAccounts, correlationId, accountFilter) {
-        return cachedAccounts.flatMap((accountEntity) => {
-          return this.getTenantProfilesFromAccountEntity(accountEntity, correlationId, accountFilter?.tenantId, accountFilter);
-        });
-      }
-      getTenantedAccountInfoByFilter(accountInfo, tokenKeys, tenantProfile, correlationId, tenantProfileFilter) {
-        let tenantedAccountInfo = null;
-        let idTokenClaims;
-        if (tenantProfileFilter) {
-          if (!this.tenantProfileMatchesFilter(tenantProfile, tenantProfileFilter)) {
-            return null;
-          }
-        }
-        const idToken = this.getIdToken(accountInfo, correlationId, tokenKeys, tenantProfile.tenantId);
-        if (idToken) {
-          idTokenClaims = extractTokenClaims(idToken.secret, this.cryptoImpl.base64Decode, correlationId);
-          if (!this.idTokenClaimsMatchTenantProfileFilter(idTokenClaims, tenantProfileFilter)) {
-            return null;
-          }
-        }
-        tenantedAccountInfo = updateAccountTenantProfileData(accountInfo, tenantProfile, idTokenClaims, idToken?.secret);
-        return tenantedAccountInfo;
-      }
-      getTenantProfilesFromAccountEntity(accountEntity, correlationId, targetTenantId, tenantProfileFilter) {
-        const accountInfo = getAccountInfo(accountEntity);
-        let searchTenantProfiles = accountInfo.tenantProfiles || /* @__PURE__ */ new Map();
-        const tokenKeys = this.getTokenKeys();
-        if (targetTenantId) {
-          const tenantProfile = searchTenantProfiles.get(targetTenantId);
-          if (tenantProfile) {
-            searchTenantProfiles = /* @__PURE__ */ new Map([
-              [targetTenantId, tenantProfile]
-            ]);
-          } else {
-            return [];
-          }
-        }
-        const matchingTenantProfiles = [];
-        searchTenantProfiles.forEach((tenantProfile) => {
-          const tenantedAccountInfo = this.getTenantedAccountInfoByFilter(accountInfo, tokenKeys, tenantProfile, correlationId, tenantProfileFilter);
-          if (tenantedAccountInfo) {
-            matchingTenantProfiles.push(tenantedAccountInfo);
-          }
-        });
-        return matchingTenantProfiles;
-      }
-      tenantProfileMatchesFilter(tenantProfile, tenantProfileFilter) {
-        if (!!tenantProfileFilter.localAccountId && !this.matchLocalAccountIdFromTenantProfile(tenantProfile, tenantProfileFilter.localAccountId)) {
-          return false;
-        }
-        if (!!tenantProfileFilter.name && !(tenantProfile.name === tenantProfileFilter.name)) {
-          return false;
-        }
-        if (tenantProfileFilter.isHomeTenant !== void 0 && !(tenantProfile.isHomeTenant === tenantProfileFilter.isHomeTenant)) {
-          return false;
-        }
-        if (!!tenantProfileFilter.username && !this.matchUsername(tenantProfile.username, tenantProfileFilter.username) && !this.matchUsername(tenantProfile.upn, tenantProfileFilter.username)) {
-          return false;
-        }
-        if (!!tenantProfileFilter.loginHint && !this.matchLoginHintWithTenantProfile(tenantProfile, tenantProfileFilter.loginHint)) {
-          return false;
-        }
-        if (!!tenantProfileFilter.upn && !(tenantProfile.upn === tenantProfileFilter.upn)) {
-          return false;
-        }
-        if (!!tenantProfileFilter.nativeAccountId && tenantProfile.nativeAccountId !== tenantProfileFilter.nativeAccountId) {
-          return false;
-        }
-        return true;
-      }
-      idTokenClaimsMatchTenantProfileFilter(idTokenClaims, tenantProfileFilter) {
-        if (tenantProfileFilter) {
-          if (!!tenantProfileFilter.localAccountId && !this.matchLocalAccountIdFromTokenClaims(idTokenClaims, tenantProfileFilter.localAccountId)) {
-            return false;
-          }
-          if (!!tenantProfileFilter.loginHint && !this.matchLoginHintFromTokenClaims(idTokenClaims, tenantProfileFilter.loginHint)) {
-            return false;
-          }
-          if (!!tenantProfileFilter.username && !this.matchUsername(idTokenClaims.preferred_username, tenantProfileFilter.username) && !this.matchUsername(idTokenClaims.upn, tenantProfileFilter.username)) {
-            return false;
-          }
-          if (!!tenantProfileFilter.name && !this.matchName(idTokenClaims, tenantProfileFilter.name)) {
-            return false;
-          }
-          if (!!tenantProfileFilter.sid && !this.matchSid(idTokenClaims, tenantProfileFilter.sid)) {
-            return false;
-          }
-        }
-        return true;
-      }
-      /**
-       * saves a cache record
-       * @param cacheRecord {CacheRecord}
-       * @param storeInCache {?StoreInCache}
-       * @param correlationId {?string} correlation id
-       */
-      async saveCacheRecord(cacheRecord, correlationId, kmsi, apiId, storeInCache) {
-        if (!cacheRecord) {
-          throw createClientAuthError(invalidCacheRecord, correlationId);
-        }
-        try {
-          if (!!cacheRecord.account) {
-            await this.setAccount(cacheRecord.account, correlationId, kmsi, apiId);
-          }
-          if (!!cacheRecord.idToken && storeInCache?.idToken !== false) {
-            await this.setIdTokenCredential(cacheRecord.idToken, correlationId, kmsi);
-          }
-          if (!!cacheRecord.accessToken && storeInCache?.accessToken !== false) {
-            await this.saveAccessToken(cacheRecord.accessToken, correlationId, kmsi);
-          }
-          if (!!cacheRecord.refreshToken && storeInCache?.refreshToken !== false) {
-            await this.setRefreshTokenCredential(cacheRecord.refreshToken, correlationId, kmsi);
-          }
-          if (!!cacheRecord.appMetadata) {
-            this.setAppMetadata(cacheRecord.appMetadata, correlationId);
-          }
-        } catch (e) {
-          this.commonLogger?.error(`CacheManager.saveCacheRecord: failed`, correlationId);
-          if (e instanceof AuthError) {
-            throw e;
-          } else {
-            throw createCacheError(e);
-          }
-        }
-      }
-      /**
-       * saves access token credential
-       * @param credential - the access token entity to save
-       * @param correlationId - unique identifier for the request
-       * @param kmsi - keep me signed in flag
-       */
-      async saveAccessToken(credential, correlationId, kmsi) {
-        let additionalCacheKeyHash;
-        if (credential.additionalCacheKeyComponents && Object.keys(credential.additionalCacheKeyComponents).length > 0) {
-          additionalCacheKeyHash = await this.cryptoImpl.hashString(JSON.stringify(credential.additionalCacheKeyComponents));
-        }
-        const accessTokenFilter = {
-          clientId: credential.clientId,
-          credentialType: credential.credentialType,
-          environment: credential.environment,
-          homeAccountId: credential.homeAccountId,
-          realm: credential.realm,
-          tokenType: credential.tokenType
-        };
-        const tokenKeys = this.getTokenKeys();
-        const currentScopes = ScopeSet.fromString(credential.target, correlationId);
-        tokenKeys.accessToken.forEach((key) => {
-          if (!this.accessTokenKeyMatchesFilter(key, accessTokenFilter, false)) {
-            return;
-          }
-          const tokenEntity = this.getAccessTokenCredential(key, correlationId);
-          if (tokenEntity && this.credentialMatchesFilter(tokenEntity, accessTokenFilter, correlationId)) {
-            const tokenScopeSet = ScopeSet.fromString(tokenEntity.target, correlationId);
-            if (tokenScopeSet.intersectingScopeSets(currentScopes)) {
-              this.removeAccessToken(key, correlationId);
-            }
-          }
-        });
-        await this.setAccessTokenCredential(credential, correlationId, kmsi, additionalCacheKeyHash);
-      }
-      /**
-       * Retrieve account entities matching all provided tenant-agnostic filters; if no filter is set, get all account entities in the cache
-       * Not checking for casing as keys are all generated in lower case, remember to convert to lower case if object properties are compared
-       * @param accountFilter - An object containing Account properties to filter by
-       */
-      getAccountsFilteredBy(accountFilter, correlationId) {
-        const allAccountKeys = this.getAccountKeys();
-        const matchingAccounts = [];
-        allAccountKeys.forEach((cacheKey) => {
-          const entity = this.getAccount(cacheKey, correlationId);
-          if (!entity) {
-            return;
-          }
-          if (!!accountFilter.homeAccountId && !this.matchHomeAccountId(entity, accountFilter.homeAccountId)) {
-            return;
-          }
-          if (!!accountFilter.environment && !this.matchEnvironment(entity, accountFilter.environment, correlationId)) {
-            return;
-          }
-          if (!!accountFilter.realm && !this.matchRealm(entity, accountFilter.realm)) {
-            return;
-          }
-          if (!!accountFilter.authorityType && !this.matchAuthorityType(entity, accountFilter.authorityType)) {
-            return;
-          }
-          const tenantProfileFilter = {
-            localAccountId: accountFilter?.localAccountId,
-            name: accountFilter?.name,
-            username: accountFilter?.username,
-            loginHint: accountFilter?.loginHint,
-            upn: accountFilter?.upn,
-            nativeAccountId: accountFilter?.nativeAccountId
-          };
-          const matchingTenantProfiles = entity.tenantProfiles?.filter((tenantProfile) => {
-            return this.tenantProfileMatchesFilter(tenantProfile, tenantProfileFilter);
-          });
-          if (matchingTenantProfiles && matchingTenantProfiles.length === 0) {
-            return;
-          }
-          matchingAccounts.push(entity);
-        });
-        return matchingAccounts;
-      }
-      /**
-       * Returns whether or not the given credential entity matches the filter
-       * @param entity
-       * @param filter
-       * @param correlationId
-       * @returns
-       */
-      credentialMatchesFilter(entity, filter, correlationId) {
-        if (!!filter.clientId && !this.matchClientId(entity, filter.clientId)) {
-          return false;
-        }
-        if (!!filter.userAssertionHash && !this.matchUserAssertionHash(entity, filter.userAssertionHash)) {
-          return false;
-        }
-        if (typeof filter.homeAccountId === "string" && !this.matchHomeAccountId(entity, filter.homeAccountId)) {
-          return false;
-        }
-        if (!!filter.environment && !this.matchEnvironment(entity, filter.environment, correlationId)) {
-          return false;
-        }
-        if (!!filter.realm && !this.matchRealm(entity, filter.realm)) {
-          return false;
-        }
-        if (!!filter.credentialType && !this.matchCredentialType(entity, filter.credentialType)) {
-          return false;
-        }
-        if (!!filter.familyId && !this.matchFamilyId(entity, filter.familyId)) {
-          return false;
-        }
-        if (!!filter.target && !this.matchTarget(entity, filter.target, correlationId)) {
-          return false;
-        }
-        if (entity.credentialType === CredentialType.ACCESS_TOKEN_WITH_AUTH_SCHEME) {
-          if (!!filter.tokenType && !this.matchTokenType(entity, filter.tokenType)) {
-            return false;
-          }
-          if (filter.tokenType === AuthenticationScheme.SSH) {
-            if (filter.keyId && !this.matchKeyId(entity, filter.keyId)) {
-              return false;
-            }
-          }
-        }
-        const entityComponents = entity.additionalCacheKeyComponents;
-        const filterComponents = filter.additionalCacheKeyComponents;
-        const entityHasComponents = !!entityComponents && Object.keys(entityComponents).length > 0;
-        const filterHasComponents = !!filterComponents && Object.keys(filterComponents).length > 0;
-        if (entityHasComponents !== filterHasComponents) {
-          return false;
-        }
-        if (entityHasComponents && filterHasComponents) {
-          const entityKeys = Object.keys(entityComponents).sort();
-          const filterKeys = Object.keys(filterComponents).sort();
-          if (entityKeys.length !== filterKeys.length) {
-            return false;
-          }
-          for (let i = 0; i < entityKeys.length; i++) {
-            if (entityKeys[i] !== filterKeys[i] || entityComponents[entityKeys[i]] !== filterComponents[filterKeys[i]]) {
-              return false;
-            }
-          }
-        }
-        return true;
-      }
-      /**
-       * retrieve appMetadata matching all provided filters; if no filter is set, get all appMetadata
-       * @param filter
-       * @param correlationId
-       */
-      getAppMetadataFilteredBy(filter, correlationId) {
-        const allCacheKeys = this.getKeys();
-        const matchingAppMetadata = {};
-        allCacheKeys.forEach((cacheKey) => {
-          if (!this.isAppMetadata(cacheKey)) {
-            return;
-          }
-          const entity = this.getAppMetadata(cacheKey, correlationId);
-          if (!entity) {
-            return;
-          }
-          if (!!filter.environment && !this.matchEnvironment(entity, filter.environment, correlationId)) {
-            return;
-          }
-          if (!!filter.clientId && !this.matchClientId(entity, filter.clientId)) {
-            return;
-          }
-          matchingAppMetadata[cacheKey] = entity;
-        });
-        return matchingAppMetadata;
-      }
-      /**
-       * retrieve authorityMetadata that contains a matching alias
-       * @param host
-       * @param correlationId
-       */
-      getAuthorityMetadataByAlias(host, correlationId) {
-        const allCacheKeys = this.getAuthorityMetadataKeys();
-        let matchedEntity = null;
-        allCacheKeys.forEach((cacheKey) => {
-          if (!this.isAuthorityMetadata(cacheKey) || cacheKey.indexOf(this.clientId) === -1) {
-            return;
-          }
-          const entity = this.getAuthorityMetadata(cacheKey, correlationId);
-          if (!entity) {
-            return;
-          }
-          if (entity.aliases.indexOf(host) === -1) {
-            return;
-          }
-          matchedEntity = entity;
-        });
-        return matchedEntity;
-      }
-      /**
-       * Removes all accounts and related tokens from cache.
-       */
-      removeAllAccounts(correlationId) {
-        const accounts = this.getAllAccounts({}, correlationId);
-        accounts.forEach((account) => {
-          this.removeAccount(account, correlationId);
-        });
-      }
-      /**
-       * Removes the account and related tokens for a given account key
-       * @param account
-       */
-      removeAccount(account, correlationId) {
-        this.removeAccountContext(account, correlationId);
-        const accountKeys = this.getAccountKeys();
-        const keyFilter = (key) => {
-          return key.includes(account.homeAccountId) && key.includes(account.environment);
-        };
-        accountKeys.filter(keyFilter).forEach((key) => {
-          this.removeItem(key, correlationId);
-          this.performanceClient.incrementFields({ accountsRemoved: 1 }, correlationId);
-        });
-      }
-      /**
-       * Removes credentials associated with the provided account
-       * @param account
-       */
-      removeAccountContext(account, correlationId) {
-        const allTokenKeys = this.getTokenKeys();
-        const keyFilter = (key) => {
-          return key.includes(account.homeAccountId) && key.includes(account.environment);
-        };
-        allTokenKeys.idToken.filter(keyFilter).forEach((key) => {
-          this.removeIdToken(key, correlationId);
-        });
-        allTokenKeys.accessToken.filter(keyFilter).forEach((key) => {
-          this.removeAccessToken(key, correlationId);
-        });
-        allTokenKeys.refreshToken.filter(keyFilter).forEach((key) => {
-          this.removeRefreshToken(key, correlationId);
-        });
-      }
-      /**
-       * returns a boolean if the given credential is removed
-       * @param key
-       * @param correlationId
-       */
-      removeAccessToken(key, correlationId) {
-        const credential = this.getAccessTokenCredential(key, correlationId);
-        if (!credential) {
-          return;
-        }
-        this.removeItem(key, correlationId);
-        this.performanceClient.incrementFields({ accessTokensRemoved: 1 }, correlationId);
-        if (credential.credentialType.toLowerCase() === CredentialType.ACCESS_TOKEN_WITH_AUTH_SCHEME.toLowerCase()) {
-          if (credential.tokenType === AuthenticationScheme.POP) {
-            const accessTokenWithAuthSchemeEntity = credential;
-            const kid = accessTokenWithAuthSchemeEntity.keyId;
-            if (kid) {
-              void this.cryptoImpl.removeTokenBindingKey(kid, correlationId).catch(() => {
-                this.commonLogger.error(`Failed to remove token binding key '${kid}'`, correlationId);
-                this.performanceClient?.incrementFields({ removeTokenBindingKeyFailure: 1 }, correlationId);
-              });
-            }
-          }
-        }
-      }
-      /**
-       * Removes all app metadata objects from cache.
-       */
-      removeAppMetadata(correlationId) {
-        const allCacheKeys = this.getKeys();
-        allCacheKeys.forEach((cacheKey) => {
-          if (this.isAppMetadata(cacheKey)) {
-            this.removeItem(cacheKey, correlationId);
-          }
-        });
-        return true;
-      }
-      /**
-       * Retrieve IdTokenEntity from cache
-       * @param account {AccountInfo}
-       * @param tokenKeys {?TokenKeys}
-       * @param targetRealm {?string}
-       * @param performanceClient {?IPerformanceClient}
-       * @param correlationId {?string}
-       */
-      getIdToken(account, correlationId, tokenKeys, targetRealm) {
-        this.commonLogger.trace("CacheManager - getIdToken called", correlationId);
-        const idTokenFilter = {
-          homeAccountId: account.homeAccountId,
-          environment: account.environment,
-          credentialType: CredentialType.ID_TOKEN,
-          clientId: this.clientId,
-          realm: targetRealm
-        };
-        const idTokenMap = this.getIdTokensByFilter(idTokenFilter, correlationId, tokenKeys);
-        const numIdTokens = idTokenMap.size;
-        if (numIdTokens < 1) {
-          this.commonLogger.info("CacheManager:getIdToken - No token found", correlationId);
-          return null;
-        } else if (numIdTokens > 1) {
-          let tokensToBeRemoved = idTokenMap;
-          if (!targetRealm) {
-            const homeIdTokenMap = /* @__PURE__ */ new Map();
-            idTokenMap.forEach((idToken, key) => {
-              if (idToken.realm === account.tenantId) {
-                homeIdTokenMap.set(key, idToken);
-              }
-            });
-            const numHomeIdTokens = homeIdTokenMap.size;
-            if (numHomeIdTokens < 1) {
-              this.commonLogger.info("CacheManager:getIdToken - Multiple ID tokens found for account but none match account entity tenant id, returning first result", correlationId);
-              return idTokenMap.values().next().value ?? null;
-            } else if (numHomeIdTokens === 1) {
-              this.commonLogger.info("CacheManager:getIdToken - Multiple ID tokens found for account, defaulting to home tenant profile", correlationId);
-              return homeIdTokenMap.values().next().value ?? null;
-            } else {
-              tokensToBeRemoved = homeIdTokenMap;
-            }
-          }
-          this.commonLogger.info("CacheManager:getIdToken - Multiple matching ID tokens found, clearing them", correlationId);
-          tokensToBeRemoved.forEach((idToken, key) => {
-            this.removeIdToken(key, correlationId);
-          });
-          this.performanceClient.addFields({ multiMatchedID: idTokenMap.size }, correlationId);
-          return null;
-        }
-        this.commonLogger.info("CacheManager:getIdToken - Returning ID token", correlationId);
-        return idTokenMap.values().next().value ?? null;
-      }
-      /**
-       * Gets all idTokens matching the given filter
-       * @param filter
-       * @returns
-       */
-      getIdTokensByFilter(filter, correlationId, tokenKeys) {
-        const idTokenKeys = tokenKeys && tokenKeys.idToken || this.getTokenKeys().idToken;
-        const idTokens = /* @__PURE__ */ new Map();
-        idTokenKeys.forEach((key) => {
-          if (!this.idTokenKeyMatchesFilter(key, {
-            clientId: this.clientId,
-            ...filter
-          })) {
-            return;
-          }
-          const idToken = this.getIdTokenCredential(key, correlationId);
-          if (idToken && this.credentialMatchesFilter(idToken, filter, correlationId)) {
-            idTokens.set(key, idToken);
-          }
-        });
-        return idTokens;
-      }
-      /**
-       * Validate the cache key against filter before retrieving and parsing cache value
-       * @param key
-       * @param filter
-       * @returns
-       */
-      idTokenKeyMatchesFilter(inputKey, filter) {
-        const key = inputKey.toLowerCase();
-        if (filter.clientId && key.indexOf(filter.clientId.toLowerCase()) === -1) {
-          return false;
-        }
-        if (filter.homeAccountId && key.indexOf(filter.homeAccountId.toLowerCase()) === -1) {
-          return false;
-        }
-        return true;
-      }
-      /**
-       * Removes idToken from the cache
-       * @param key
-       */
-      removeIdToken(key, correlationId) {
-        this.removeItem(key, correlationId);
-      }
-      /**
-       * Removes refresh token from the cache
-       * @param key
-       */
-      removeRefreshToken(key, correlationId) {
-        this.removeItem(key, correlationId);
-      }
-      /**
-       * Retrieve AccessTokenEntity from cache
-       * @param account {AccountInfo}
-       * @param request {BaseAuthRequest}
-       * @param tokenKeys {?TokenKeys}
-       * @param performanceClient {?IPerformanceClient}
-       */
-      getAccessToken(account, request, tokenKeys, targetRealm) {
-        const correlationId = request.correlationId;
-        this.commonLogger.trace("CacheManager - getAccessToken called", correlationId);
-        const scopes = ScopeSet.createSearchScopes(request.scopes, correlationId);
-        const authScheme = request.authenticationScheme || AuthenticationScheme.BEARER;
-        const credentialType = authScheme.toLowerCase() !== AuthenticationScheme.BEARER.toLowerCase() ? CredentialType.ACCESS_TOKEN_WITH_AUTH_SCHEME : CredentialType.ACCESS_TOKEN;
-        const attributeTokenPartition = serializeAttributeTokens(request.attributeTokens);
-        const additionalCacheKeyComponents = attributeTokenPartition ? {
-          attribute_tokens: attributeTokenPartition
-        } : void 0;
-        const accessTokenFilter = {
-          homeAccountId: account.homeAccountId,
-          environment: account.environment,
-          credentialType,
-          clientId: this.clientId,
-          realm: targetRealm || account.tenantId,
-          target: scopes,
-          tokenType: authScheme,
-          keyId: request.sshKid,
-          additionalCacheKeyComponents
-        };
-        const accessTokenKeys = tokenKeys && tokenKeys.accessToken || this.getTokenKeys().accessToken;
-        const accessTokens = [];
-        const matchedKeys = [];
-        accessTokenKeys.forEach((key) => {
-          if (this.accessTokenKeyMatchesFilter(key, accessTokenFilter, true)) {
-            const accessToken = this.getAccessTokenCredential(key, correlationId);
-            if (accessToken && this.credentialMatchesFilter(accessToken, accessTokenFilter, correlationId)) {
-              accessTokens.push(accessToken);
-              matchedKeys.push(key);
-            }
-          }
-        });
-        if (accessTokens.length < 1) {
-          this.commonLogger.info("CacheManager:getAccessToken - No token found", correlationId);
-          return null;
-        } else if (accessTokens.length > 1) {
-          this.commonLogger.info("CacheManager:getAccessToken - Multiple access tokens found, clearing them", correlationId);
-          matchedKeys.forEach((key) => {
-            this.removeAccessToken(key, correlationId);
-          });
-          this.performanceClient.addFields({ multiMatchedAT: accessTokens.length }, correlationId);
-          return null;
-        }
-        this.commonLogger.info("CacheManager:getAccessToken - Returning access token", correlationId);
-        return accessTokens[0];
-      }
-      /**
-       * Validate the cache key against filter before retrieving and parsing cache value
-       * @param key
-       * @param filter
-       * @param keyMustContainAllScopes
-       * @returns
-       */
-      accessTokenKeyMatchesFilter(inputKey, filter, keyMustContainAllScopes) {
-        const key = inputKey.toLowerCase();
-        if (filter.clientId && key.indexOf(filter.clientId.toLowerCase()) === -1) {
-          return false;
-        }
-        if (filter.homeAccountId && key.indexOf(filter.homeAccountId.toLowerCase()) === -1) {
-          return false;
-        }
-        if (filter.realm && key.indexOf(filter.realm.toLowerCase()) === -1) {
-          return false;
-        }
-        if (filter.target) {
-          const scopes = filter.target.asArray();
-          for (let i = 0; i < scopes.length; i++) {
-            if (keyMustContainAllScopes && !key.includes(scopes[i].toLowerCase())) {
-              return false;
-            } else if (!keyMustContainAllScopes && key.includes(scopes[i].toLowerCase())) {
-              return true;
-            }
-          }
-        }
-        return true;
-      }
-      /**
-       * Gets all access tokens matching the filter
-       * @param filter
-       * @returns
-       */
-      getAccessTokensByFilter(filter, correlationId) {
-        const tokenKeys = this.getTokenKeys();
-        const accessTokens = [];
-        tokenKeys.accessToken.forEach((key) => {
-          if (!this.accessTokenKeyMatchesFilter(key, filter, true)) {
-            return;
-          }
-          const accessToken = this.getAccessTokenCredential(key, correlationId);
-          if (accessToken && this.credentialMatchesFilter(accessToken, filter, correlationId)) {
-            accessTokens.push(accessToken);
-          }
-        });
-        return accessTokens;
-      }
-      /**
-       * Helper to retrieve the appropriate refresh token from cache
-       * @param account {AccountInfo}
-       * @param familyRT {boolean}
-       * @param tokenKeys {?TokenKeys}
-       * @param performanceClient {?IPerformanceClient}
-       * @param correlationId {?string}
-       */
-      getRefreshToken(account, familyRT, correlationId, tokenKeys) {
-        this.commonLogger.trace("CacheManager - getRefreshToken called", correlationId);
-        const id = familyRT ? THE_FAMILY_ID : void 0;
-        const refreshTokenFilter = {
-          homeAccountId: account.homeAccountId,
-          environment: account.environment,
-          credentialType: CredentialType.REFRESH_TOKEN,
-          clientId: this.clientId,
-          familyId: id
-        };
-        const refreshTokenKeys = tokenKeys && tokenKeys.refreshToken || this.getTokenKeys().refreshToken;
-        const refreshTokens = [];
-        refreshTokenKeys.forEach((key) => {
-          if (this.refreshTokenKeyMatchesFilter(key, refreshTokenFilter)) {
-            const refreshToken = this.getRefreshTokenCredential(key, correlationId);
-            if (refreshToken && this.credentialMatchesFilter(refreshToken, refreshTokenFilter, correlationId)) {
-              refreshTokens.push(refreshToken);
-            }
-          }
-        });
-        const numRefreshTokens = refreshTokens.length;
-        if (numRefreshTokens < 1) {
-          this.commonLogger.info("CacheManager:getRefreshToken - No refresh token found.", correlationId);
-          return null;
-        }
-        if (numRefreshTokens > 1) {
-          this.performanceClient.addFields({ multiMatchedRT: numRefreshTokens }, correlationId);
-        }
-        this.commonLogger.info("CacheManager:getRefreshToken - returning refresh token", correlationId);
-        return refreshTokens[0];
-      }
-      /**
-       * Validate the cache key against filter before retrieving and parsing cache value
-       * @param key
-       * @param filter
-       */
-      refreshTokenKeyMatchesFilter(inputKey, filter) {
-        const key = inputKey.toLowerCase();
-        if (filter.familyId && key.indexOf(filter.familyId.toLowerCase()) === -1) {
-          return false;
-        }
-        if (!filter.familyId && filter.clientId && key.indexOf(filter.clientId.toLowerCase()) === -1) {
-          return false;
-        }
-        if (filter.homeAccountId && key.indexOf(filter.homeAccountId.toLowerCase()) === -1) {
-          return false;
-        }
-        return true;
-      }
-      /**
-       * Retrieve AppMetadataEntity from cache
-       */
-      readAppMetadataFromCache(environment, correlationId) {
-        const appMetadataFilter = {
-          environment,
-          clientId: this.clientId
-        };
-        const appMetadata = this.getAppMetadataFilteredBy(appMetadataFilter, correlationId);
-        const appMetadataEntries = Object.keys(appMetadata).map((key) => appMetadata[key]);
-        const numAppMetadata = appMetadataEntries.length;
-        if (numAppMetadata < 1) {
-          return null;
-        } else if (numAppMetadata > 1) {
-          throw createClientAuthError(multipleMatchingAppMetadata, correlationId);
-        }
-        return appMetadataEntries[0];
-      }
-      /**
-       * Return the family_id value associated  with FOCI
-       * @param environment
-       * @param clientId
-       */
-      isAppMetadataFOCI(environment, correlationId) {
-        const appMetadata = this.readAppMetadataFromCache(environment, correlationId);
-        return !!(appMetadata && appMetadata.familyId === THE_FAMILY_ID);
-      }
-      /**
-       * helper to match account ids
-       * @param value
-       * @param homeAccountId
-       */
-      matchHomeAccountId(entity, homeAccountId) {
-        return !!(typeof entity.homeAccountId === "string" && homeAccountId === entity.homeAccountId);
-      }
-      /**
-       * helper to match account ids
-       * @param entity
-       * @param localAccountId
-       * @returns
-       */
-      matchLocalAccountIdFromTokenClaims(tokenClaims, localAccountId) {
-        const idTokenLocalAccountId = tokenClaims.oid || tokenClaims.sub;
-        return localAccountId === idTokenLocalAccountId;
-      }
-      matchLocalAccountIdFromTenantProfile(tenantProfile, localAccountId) {
-        return tenantProfile.localAccountId === localAccountId;
-      }
-      /**
-       * helper to match names
-       * @param entity
-       * @param name
-       * @returns true if the downcased name properties are present and match in the filter and the entity
-       */
-      matchName(claims, name2) {
-        return !!(name2.toLowerCase() === claims.name?.toLowerCase());
-      }
-      /**
-       * helper to match usernames
-       * @param entity
-       * @param username
-       * @returns
-       */
-      matchUsername(cachedUsername, filterUsername) {
-        return !!(cachedUsername && typeof cachedUsername === "string" && filterUsername?.toLowerCase() === cachedUsername.toLowerCase());
-      }
-      /**
-       * helper to match loginhints
-       * @param entity
-       * @param loginHint
-       * @returns
-       */
-      matchLoginHintWithTenantProfile(tenantProfile, loginHintFilter) {
-        return tenantProfile.loginHint === loginHintFilter || tenantProfile.username === loginHintFilter || tenantProfile.upn === loginHintFilter;
-      }
-      /**
-       * helper to match assertion
-       * @param value
-       * @param oboAssertion
-       */
-      matchUserAssertionHash(entity, userAssertionHash) {
-        return !!(entity.userAssertionHash && userAssertionHash === entity.userAssertionHash);
-      }
-      /**
-       * helper to match environment
-       * @param value
-       * @param environment
-       */
-      matchEnvironment(entity, environment, correlationId) {
-        if (this.staticAuthorityOptions) {
-          const staticAliases = getAliasesFromStaticSources(this.staticAuthorityOptions, this.commonLogger, correlationId);
-          if (staticAliases.includes(environment) && staticAliases.includes(entity.environment)) {
-            return true;
-          }
-        }
-        const cloudMetadata = this.getAuthorityMetadataByAlias(environment, correlationId);
-        if (cloudMetadata && cloudMetadata.aliases.indexOf(entity.environment) > -1) {
-          return true;
-        }
-        return false;
-      }
-      /**
-       * helper to match credential type
-       * @param entity
-       * @param credentialType
-       */
-      matchCredentialType(entity, credentialType) {
-        return entity.credentialType && credentialType.toLowerCase() === entity.credentialType.toLowerCase();
-      }
-      /**
-       * helper to match client ids
-       * @param entity
-       * @param clientId
-       */
-      matchClientId(entity, clientId) {
-        return !!(entity.clientId && clientId === entity.clientId);
-      }
-      /**
-       * helper to match family ids
-       * @param entity
-       * @param familyId
-       */
-      matchFamilyId(entity, familyId) {
-        return !!(entity.familyId && familyId === entity.familyId);
-      }
-      /**
-       * helper to match realm
-       * @param entity
-       * @param realm
-       */
-      matchRealm(entity, realm) {
-        return !!(entity.realm?.toLowerCase() === realm.toLowerCase());
-      }
-      /**
-       * helper to match loginHint which can be either:
-       * 1. login_hint ID token claim
-       * 2. username in cached account object
-       * 3. upn in ID token claims
-       * @param entity
-       * @param loginHint
-       * @returns
-       */
-      matchLoginHintFromTokenClaims(tokenClaims, loginHint) {
-        if (tokenClaims.login_hint === loginHint) {
-          return true;
-        }
-        if (tokenClaims.preferred_username === loginHint) {
-          return true;
-        }
-        if (tokenClaims.upn === loginHint) {
-          return true;
-        }
-        if (tokenClaims.emails && tokenClaims.emails.includes(loginHint)) {
-          return true;
-        }
-        return false;
-      }
-      /**
-       * Helper to match sid
-       * @param entity
-       * @param sid
-       * @returns true if the sid claim is present and matches the filter
-       */
-      matchSid(idTokenClaims, sid) {
-        return idTokenClaims.sid === sid;
-      }
-      matchAuthorityType(entity, authorityType) {
-        return !!(entity.authorityType && authorityType.toLowerCase() === entity.authorityType.toLowerCase());
-      }
-      /**
-       * Returns true if the target scopes are a subset of the current entity's scopes, false otherwise.
-       * @param entity
-       * @param target
-       */
-      matchTarget(entity, target, correlationId) {
-        const isNotAccessTokenCredential = entity.credentialType !== CredentialType.ACCESS_TOKEN && entity.credentialType !== CredentialType.ACCESS_TOKEN_WITH_AUTH_SCHEME;
-        if (isNotAccessTokenCredential || !entity.target) {
-          return false;
-        }
-        const entityScopeSet = ScopeSet.fromString(entity.target, correlationId);
-        return entityScopeSet.containsScopeSet(target);
-      }
-      /**
-       * Returns true if the credential's tokenType or Authentication Scheme matches the one in the request, false otherwise
-       * @param entity
-       * @param tokenType
-       */
-      matchTokenType(entity, tokenType) {
-        return !!(entity.tokenType && entity.tokenType === tokenType);
-      }
-      /**
-       * Returns true if the credential's keyId matches the one in the request, false otherwise
-       * @param entity
-       * @param keyId
-       */
-      matchKeyId(entity, keyId) {
-        return !!(entity.keyId && entity.keyId === keyId);
-      }
-      /**
-       * returns if a given cache entity is of the type appmetadata
-       * @param key
-       */
-      isAppMetadata(key) {
-        return key.indexOf(APP_METADATA) !== -1;
-      }
-      /**
-       * returns if a given cache entity is of the type authoritymetadata
-       * @param key
-       */
-      isAuthorityMetadata(key) {
-        return key.indexOf(AUTHORITY_METADATA_CACHE_KEY) !== -1;
-      }
-      /**
-       * returns cache key used for cloud instance metadata
-       */
-      generateAuthorityMetadataCacheKey(authority) {
-        return `${AUTHORITY_METADATA_CACHE_KEY}-${this.clientId}-${authority}`;
-      }
-      /**
-       * Helper to convert serialized data to object
-       * @param obj
-       * @param json
-       */
-      static toObject(obj, json) {
-        for (const propertyName in json) {
-          obj[propertyName] = json[propertyName];
-        }
-        return obj;
-      }
-    };
-    var DefaultStorageClass = class extends CacheManager {
-      async setAccount() {
-        throw createClientAuthError(methodNotImplemented, "");
-      }
-      getAccount() {
-        throw createClientAuthError(methodNotImplemented, "");
-      }
-      async setIdTokenCredential() {
-        throw createClientAuthError(methodNotImplemented, "");
-      }
-      getIdTokenCredential() {
-        throw createClientAuthError(methodNotImplemented, "");
-      }
-      async setAccessTokenCredential() {
-        throw createClientAuthError(methodNotImplemented, "");
-      }
-      getAccessTokenCredential() {
-        throw createClientAuthError(methodNotImplemented, "");
-      }
-      async setRefreshTokenCredential() {
-        throw createClientAuthError(methodNotImplemented, "");
-      }
-      getRefreshTokenCredential() {
-        throw createClientAuthError(methodNotImplemented, "");
-      }
-      setAppMetadata() {
-        throw createClientAuthError(methodNotImplemented, "");
-      }
-      getAppMetadata() {
-        throw createClientAuthError(methodNotImplemented, "");
-      }
-      setServerTelemetry() {
-        throw createClientAuthError(methodNotImplemented, "");
-      }
-      getServerTelemetry() {
-        throw createClientAuthError(methodNotImplemented, "");
-      }
-      setAuthorityMetadata() {
-        throw createClientAuthError(methodNotImplemented, "");
-      }
-      getAuthorityMetadata() {
-        throw createClientAuthError(methodNotImplemented, "");
-      }
-      getAuthorityMetadataKeys() {
-        throw createClientAuthError(methodNotImplemented, "");
-      }
-      setThrottlingCache() {
-        throw createClientAuthError(methodNotImplemented, "");
-      }
-      getThrottlingCache() {
-        throw createClientAuthError(methodNotImplemented, "");
-      }
-      removeItem() {
-        throw createClientAuthError(methodNotImplemented, "");
-      }
-      getKeys() {
-        throw createClientAuthError(methodNotImplemented, "");
-      }
-      getAccountKeys() {
-        throw createClientAuthError(methodNotImplemented, "");
-      }
-      getTokenKeys() {
-        throw createClientAuthError(methodNotImplemented, "");
-      }
-      /* eslint-disable @typescript-eslint/no-unused-vars */
-      generateCredentialKey(_credential, _hash) {
-        throw createClientAuthError(methodNotImplemented, "");
-      }
-      generateAccountKey() {
-        throw createClientAuthError(methodNotImplemented, "");
-      }
-    };
-    var PerformanceEventStatus = {
-      InProgress: 1
-    };
-    var StubPerformanceClient = class {
-      generateId() {
-        return "callback-id";
-      }
-      startMeasurement(measureName, correlationId) {
-        return {
-          end: () => null,
-          discard: () => {
-          },
-          add: () => {
-          },
-          increment: () => {
-          },
-          event: {
-            eventId: this.generateId(),
-            status: PerformanceEventStatus.InProgress,
-            authority: "",
-            libraryName: "",
-            libraryVersion: "",
-            clientId: "",
-            name: measureName,
-            startTimeMs: Date.now(),
-            correlationId: correlationId || ""
-          }
-        };
-      }
-      endMeasurement() {
-        return null;
-      }
-      discardMeasurements() {
-        return;
-      }
-      removePerformanceCallback() {
-        return true;
-      }
-      addPerformanceCallback() {
-        return "";
-      }
-      emitEvents() {
-        return;
-      }
-      addFields() {
-        return;
-      }
-      addGlobalFields() {
-        return;
-      }
-      incrementFields() {
-        return;
-      }
-      cacheEventByCorrelationId() {
-        return;
-      }
-    };
-    var DEFAULT_SYSTEM_OPTIONS$1 = {
-      tokenRenewalOffsetSeconds: DEFAULT_TOKEN_RENEWAL_OFFSET_SEC,
-      preventCorsPreflight: false
-    };
-    var DEFAULT_LOGGER_IMPLEMENTATION = {
-      loggerCallback: () => {
-      },
-      piiLoggingEnabled: false,
-      logLevel: exports2.LogLevel.Info,
-      correlationId: ""
-    };
-    var DEFAULT_NETWORK_IMPLEMENTATION = {
-      async sendGetRequestAsync() {
-        throw createClientAuthError(methodNotImplemented, "");
-      },
-      async sendPostRequestAsync() {
-        throw createClientAuthError(methodNotImplemented, "");
-      }
-    };
-    var DEFAULT_LIBRARY_INFO = {
-      sku: SKU,
-      version: version$1,
-      cpu: "",
-      os: ""
-    };
-    var DEFAULT_CLIENT_CREDENTIALS = {
-      clientSecret: "",
-      clientAssertion: void 0
-    };
-    var DEFAULT_AZURE_CLOUD_OPTIONS = {
-      azureCloudInstance: AzureCloudInstance.None,
-      tenant: `${DEFAULT_COMMON_TENANT}`
-    };
-    var DEFAULT_TELEMETRY_OPTIONS$1 = {
-      application: {
-        appName: "",
-        appVersion: ""
-      }
-    };
-    function buildClientConfiguration({ authOptions: userAuthOptions, systemOptions: userSystemOptions, loggerOptions: userLoggerOption, storageInterface: storageImplementation, networkInterface: networkImplementation, cryptoInterface: cryptoImplementation, clientCredentials, libraryInfo, telemetry, serverTelemetryManager, persistencePlugin, serializableCache }) {
-      const loggerOptions = {
-        ...DEFAULT_LOGGER_IMPLEMENTATION,
-        ...userLoggerOption
-      };
-      return {
-        authOptions: buildAuthOptions(userAuthOptions),
-        systemOptions: { ...DEFAULT_SYSTEM_OPTIONS$1, ...userSystemOptions },
-        loggerOptions,
-        storageInterface: storageImplementation || new DefaultStorageClass(userAuthOptions.clientId, DEFAULT_CRYPTO_IMPLEMENTATION, new Logger(loggerOptions, name$1, version$1), new StubPerformanceClient()),
-        networkInterface: networkImplementation || DEFAULT_NETWORK_IMPLEMENTATION,
-        cryptoInterface: cryptoImplementation || DEFAULT_CRYPTO_IMPLEMENTATION,
-        clientCredentials: clientCredentials || DEFAULT_CLIENT_CREDENTIALS,
-        libraryInfo: { ...DEFAULT_LIBRARY_INFO, ...libraryInfo },
-        telemetry: { ...DEFAULT_TELEMETRY_OPTIONS$1, ...telemetry },
-        serverTelemetryManager: serverTelemetryManager || null,
-        persistencePlugin: persistencePlugin || null,
-        serializableCache: serializableCache || null
-      };
-    }
-    function buildAuthOptions(authOptions) {
-      return {
-        clientCapabilities: [],
-        azureCloudOptions: DEFAULT_AZURE_CLOUD_OPTIONS,
-        instanceAware: false,
-        isMcp: false,
-        ...authOptions
-      };
-    }
-    function isOidcProtocolMode(config) {
-      return config.authOptions.authority.options.protocolMode === ProtocolMode.OIDC;
-    }
-    var TokenCacheContext = class {
-      constructor(tokenCache, hasChanged) {
-        this.cache = tokenCache;
-        this.hasChanged = hasChanged;
-      }
-      /**
-       * boolean which indicates the changes in cache
-       */
-      get cacheHasChanged() {
-        return this.hasChanged;
-      }
-      /**
-       * function to retrieve the token cache
-       */
-      get tokenCache() {
-        return this.cache;
-      }
-    };
-    var KeyLocation = {
-      SW: "sw"
-    };
-    var PopTokenGenerator = class {
-      constructor(cryptoUtils, performanceClient) {
-        this.cryptoUtils = cryptoUtils;
-        this.performanceClient = performanceClient;
-      }
-      /**
-       * Generates the req_cnf validated at the RP in the POP protocol for SHR parameters
-       * and returns an object containing the keyid, the full req_cnf string and the req_cnf string hash
-       * @param request
-       * @returns
-       */
-      async generateCnf(request, logger) {
-        const reqCnf = await invokeAsync(this.generateKid.bind(this), PopTokenGenerateCnf, logger, this.performanceClient, request.correlationId)(request);
-        const reqCnfString = this.cryptoUtils.base64UrlEncode(JSON.stringify(reqCnf));
-        return {
-          kid: reqCnf.kid,
-          reqCnfString
-        };
-      }
-      /**
-       * Generates key_id for a SHR token request
-       * @param request
-       * @returns
-       */
-      async generateKid(request) {
-        const kidThumbprint = await this.cryptoUtils.getPublicKeyThumbprint(request);
-        return {
-          kid: kidThumbprint,
-          xms_ksl: KeyLocation.SW
-        };
-      }
-      /**
-       * Signs the POP access_token with the local generated key-pair
-       * @param accessToken
-       * @param request
-       * @returns
-       */
-      async signPopToken(accessToken, keyId, request) {
-        return this.signPayload(accessToken, keyId, request);
-      }
-      /**
-       * Utility function to generate the signed JWT for an access_token
-       * @param payload
-       * @param kid
-       * @param request
-       * @param claims
-       * @returns
-       */
-      async signPayload(payload, keyId, request, claims) {
-        const { resourceRequestMethod, resourceRequestUri, shrClaims, shrNonce, shrOptions } = request;
-        const resourceUrlString = resourceRequestUri ? new UrlString(resourceRequestUri, request.correlationId) : void 0;
-        const resourceUrlComponents = resourceUrlString?.getUrlComponents();
-        return this.cryptoUtils.signJwt({
-          at: payload,
-          ts: nowSeconds(),
-          m: resourceRequestMethod?.toUpperCase(),
-          u: resourceUrlComponents?.HostNameAndPort,
-          nonce: shrNonce || this.cryptoUtils.createNewGuid(),
-          p: resourceUrlComponents?.AbsolutePath,
-          q: resourceUrlComponents?.QueryString ? [[], resourceUrlComponents.QueryString] : void 0,
-          client_claims: shrClaims || void 0,
-          ...claims
-        }, keyId, shrOptions, request.correlationId);
-      }
-    };
-    var noTokensFound = "no_tokens_found";
-    var nativeAccountUnavailable = "native_account_unavailable";
-    var refreshTokenExpired = "refresh_token_expired";
-    var uiNotAllowed = "ui_not_allowed";
-    var interactionRequired = "interaction_required";
-    var consentRequired = "consent_required";
-    var loginRequired = "login_required";
-    var badToken = "bad_token";
-    var interruptedUser = "interrupted_user";
-    var InteractionRequiredAuthErrorCodes = /* @__PURE__ */ Object.freeze({
-      __proto__: null,
-      badToken,
-      consentRequired,
-      interactionRequired,
-      interruptedUser,
-      loginRequired,
-      nativeAccountUnavailable,
-      noTokensFound,
-      refreshTokenExpired,
-      uiNotAllowed
-    });
-    var InteractionRequiredServerErrorMessage = [
-      interactionRequired,
-      consentRequired,
-      loginRequired,
-      badToken,
-      uiNotAllowed,
-      interruptedUser
-    ];
-    var InteractionRequiredAuthSubErrorMessage = [
-      "message_only",
-      "additional_action",
-      "basic_action",
-      "user_password_expired",
-      "consent_required",
-      "bad_token",
-      "ui_not_allowed",
-      "interrupted_user"
-    ];
-    var InteractionRequiredAuthError = class _InteractionRequiredAuthError extends AuthError {
-      constructor(errorCode, correlationId, errorMessage, subError, timestamp, traceId, claims, errorNo) {
-        super(errorCode, correlationId, errorMessage, subError);
-        Object.setPrototypeOf(this, _InteractionRequiredAuthError.prototype);
-        this.timestamp = timestamp || "";
-        this.traceId = traceId || "";
-        this.claims = claims || "";
-        this.name = "InteractionRequiredAuthError";
-        this.errorNo = errorNo;
-      }
-    };
-    function isInteractionRequiredError(errorCode, errorString, subError) {
-      const isInteractionRequiredErrorCode = !!errorCode && InteractionRequiredServerErrorMessage.indexOf(errorCode) > -1;
-      const isInteractionRequiredSubError = !!subError && InteractionRequiredAuthSubErrorMessage.indexOf(subError) > -1;
-      const isInteractionRequiredErrorDesc = !!errorString && InteractionRequiredServerErrorMessage.some((irErrorCode) => {
-        return errorString.indexOf(irErrorCode) > -1;
-      });
-      return isInteractionRequiredErrorCode || isInteractionRequiredErrorDesc || isInteractionRequiredSubError;
-    }
-    function createInteractionRequiredAuthError(errorCode, correlationId, errorMessage) {
-      return new InteractionRequiredAuthError(errorCode, correlationId, errorMessage);
-    }
-    var ServerError = class _ServerError extends AuthError {
-      constructor(errorCode, correlationId, errorMessage, subError, errorNo, status) {
-        super(errorCode, correlationId, errorMessage, subError);
-        this.name = "ServerError";
-        this.errorNo = errorNo;
-        this.status = status;
-        Object.setPrototypeOf(this, _ServerError.prototype);
-      }
-    };
-    function parseRequestState(base64Decode, state, correlationId) {
-      if (!base64Decode) {
-        throw createClientAuthError(noCryptoObject, correlationId);
-      }
-      if (!state) {
-        throw createClientAuthError(invalidState, correlationId);
-      }
-      try {
-        const splitState = state.split(RESOURCE_DELIM);
-        const libraryState = splitState[0];
-        const userState = splitState.length > 1 ? splitState.slice(1).join(RESOURCE_DELIM) : "";
-        const libraryStateString = base64Decode(libraryState);
-        const libraryStateObj = JSON.parse(libraryStateString);
-        return {
-          userRequestState: userState || "",
-          libraryState: libraryStateObj
-        };
-      } catch (e) {
-        throw createClientAuthError(invalidState, correlationId);
-      }
-    }
-    var ResponseHandler = class _ResponseHandler {
-      constructor(clientId, cacheStorage, cryptoObj, logger, performanceClient, serializableCache, persistencePlugin) {
-        this.clientId = clientId;
-        this.cacheStorage = cacheStorage;
-        this.cryptoObj = cryptoObj;
-        this.logger = logger;
-        this.performanceClient = performanceClient;
-        this.serializableCache = serializableCache;
-        this.persistencePlugin = persistencePlugin;
-      }
-      /**
-       * Function which validates server authorization token response.
-       * @param serverResponse
-       * @param correlationId
-       * @param refreshAccessToken
-       */
-      validateTokenResponse(serverResponse, correlationId, refreshAccessToken) {
-        if (serverResponse.error || serverResponse.error_description || serverResponse.suberror) {
-          const errString = `Error(s): ${serverResponse.error_codes || NOT_AVAILABLE} - Timestamp: ${serverResponse.timestamp || NOT_AVAILABLE} - Description: ${serverResponse.error_description || NOT_AVAILABLE} - Correlation ID: ${serverResponse.correlation_id || NOT_AVAILABLE} - Trace ID: ${serverResponse.trace_id || NOT_AVAILABLE}`;
-          const serverErrorNo = serverResponse.error_codes?.length ? serverResponse.error_codes[0] : void 0;
-          const serverError = new ServerError(serverResponse.error || "", serverResponse.correlation_id || "", errString, serverResponse.suberror, serverErrorNo, serverResponse.status);
-          if (refreshAccessToken && serverResponse.status && serverResponse.status >= HTTP_SERVER_ERROR_RANGE_START && serverResponse.status <= HTTP_SERVER_ERROR_RANGE_END) {
-            this.logger.warning(`executeTokenRequest:validateTokenResponse - AAD is currently unavailable and the access token is unable to be refreshed.
-${serverError}`, correlationId);
-            return;
-          } else if (refreshAccessToken && serverResponse.status && serverResponse.status >= HTTP_CLIENT_ERROR_RANGE_START && serverResponse.status <= HTTP_CLIENT_ERROR_RANGE_END) {
-            this.logger.warning(`executeTokenRequest:validateTokenResponse - AAD is currently available but is unable to refresh the access token.
-${serverError}`, correlationId);
-            return;
-          }
-          if (isInteractionRequiredError(serverResponse.error, serverResponse.error_description, serverResponse.suberror)) {
-            throw new InteractionRequiredAuthError(serverResponse.error || "", serverResponse.correlation_id || "", serverResponse.error_description, serverResponse.suberror, serverResponse.timestamp || "", serverResponse.trace_id || "", serverResponse.claims || "", serverErrorNo);
-          }
-          throw serverError;
-        }
-      }
-      /**
-       * Returns a constructed token response based on given string. Also manages the cache updates and cleanups.
-       * @param serverTokenResponse
-       * @param authority
-       */
-      async handleServerTokenResponse(serverTokenResponse, authority, reqTimestamp, request, apiId, authCodePayload, userAssertionHash, handlingRefreshTokenResponse, forceCacheRefreshTokenResponse, serverRequestId, additionalCacheKeyComponents) {
-        let idTokenClaims;
-        if (serverTokenResponse.id_token) {
-          idTokenClaims = extractTokenClaims(serverTokenResponse.id_token || "", this.cryptoObj.base64Decode, request.correlationId);
-          if (authCodePayload && authCodePayload.nonce) {
-            if (idTokenClaims.nonce !== authCodePayload.nonce) {
-              throw createClientAuthError(nonceMismatch, request.correlationId);
-            }
-          }
-        }
-        this.homeAccountIdentifier = generateHomeAccountId(serverTokenResponse.client_info || "", authority.authorityType, this.logger, this.cryptoObj, request.correlationId, idTokenClaims);
-        let requestStateObj;
-        if (!!authCodePayload && !!authCodePayload.state) {
-          requestStateObj = parseRequestState(this.cryptoObj.base64Decode, authCodePayload.state, request.correlationId);
-        }
-        serverTokenResponse.key_id = serverTokenResponse.key_id || request.sshKid || void 0;
-        const attributeTokenPartition = serializeAttributeTokens(request.attributeTokens);
-        const cacheKeyComponents = additionalCacheKeyComponents ?? (attributeTokenPartition ? {
-          attribute_tokens: attributeTokenPartition
-        } : void 0);
-        const cacheRecord = this.generateCacheRecord(serverTokenResponse, authority, reqTimestamp, request, idTokenClaims, userAssertionHash, authCodePayload, cacheKeyComponents);
-        let cacheContext;
-        try {
-          if (this.persistencePlugin && this.serializableCache) {
-            this.logger.verbose("Persistence enabled, calling beforeCacheAccess", request.correlationId);
-            cacheContext = new TokenCacheContext(this.serializableCache, true);
-            await this.persistencePlugin.beforeCacheAccess(cacheContext);
-          }
-          if (handlingRefreshTokenResponse && !forceCacheRefreshTokenResponse && cacheRecord.account) {
-            const cachedAccounts = this.cacheStorage.getAllAccounts({
-              homeAccountId: cacheRecord.account.homeAccountId,
-              environment: cacheRecord.account.environment
-            }, request.correlationId);
-            if (cachedAccounts.length < 1) {
-              this.logger.warning("Account used to refresh tokens not in persistence, refreshed tokens will not be stored in the cache", request.correlationId);
-              this.performanceClient?.addFields({
-                acntLoggedOut: true
-              }, request.correlationId);
-              return await _ResponseHandler.generateAuthenticationResult(this.cryptoObj, authority, cacheRecord, false, request, this.performanceClient, idTokenClaims, requestStateObj, void 0, serverRequestId);
-            }
-          }
-          await this.cacheStorage.saveCacheRecord(cacheRecord, request.correlationId, isKmsi(idTokenClaims || {}), apiId, request.storeInCache);
-        } finally {
-          if (this.persistencePlugin && this.serializableCache && cacheContext) {
-            this.logger.verbose("Persistence enabled, calling afterCacheAccess", request.correlationId);
-            await this.persistencePlugin.afterCacheAccess(cacheContext);
-          }
-        }
-        return _ResponseHandler.generateAuthenticationResult(this.cryptoObj, authority, cacheRecord, false, request, this.performanceClient, idTokenClaims, requestStateObj, serverTokenResponse, serverRequestId);
-      }
-      /**
-       * Generates CacheRecord
-       * @param serverTokenResponse
-       * @param idTokenObj
-       * @param authority
-       */
-      generateCacheRecord(serverTokenResponse, authority, reqTimestamp, request, idTokenClaims, userAssertionHash, authCodePayload, additionalCacheKeyComponents) {
-        const env = authority.getPreferredCache();
-        if (!env) {
-          throw createClientAuthError(invalidCacheEnvironment, request.correlationId);
-        }
-        const claimsTenantId = getTenantIdFromIdTokenClaims(idTokenClaims);
-        let cachedIdToken;
-        let cachedAccount;
-        if (serverTokenResponse.id_token && !!idTokenClaims) {
-          cachedIdToken = createIdTokenEntity(this.homeAccountIdentifier, env, serverTokenResponse.id_token, this.clientId, claimsTenantId || "");
-          cachedAccount = buildAccountToCache(
-            this.cacheStorage,
-            authority,
-            this.homeAccountIdentifier,
-            this.cryptoObj.base64Decode,
-            request.correlationId,
-            idTokenClaims,
-            serverTokenResponse.client_info,
-            env,
-            claimsTenantId,
-            authCodePayload,
-            void 0,
-            // nativeAccountId
-            this.logger,
-            this.performanceClient
-          );
-        }
-        let cachedAccessToken = null;
-        if (serverTokenResponse.access_token) {
-          const responseScopes = serverTokenResponse.scope ? ScopeSet.fromString(serverTokenResponse.scope, request.correlationId) : new ScopeSet(request.scopes || [], request.correlationId);
-          const expiresIn = (typeof serverTokenResponse.expires_in === "string" ? parseInt(serverTokenResponse.expires_in, 10) : serverTokenResponse.expires_in) || 0;
-          const extExpiresIn = (typeof serverTokenResponse.ext_expires_in === "string" ? parseInt(serverTokenResponse.ext_expires_in, 10) : serverTokenResponse.ext_expires_in) || 0;
-          const refreshIn = (typeof serverTokenResponse.refresh_in === "string" ? parseInt(serverTokenResponse.refresh_in, 10) : serverTokenResponse.refresh_in) || void 0;
-          const tokenExpirationSeconds = reqTimestamp + expiresIn;
-          const extendedTokenExpirationSeconds = tokenExpirationSeconds + extExpiresIn;
-          const refreshOnSeconds = refreshIn && refreshIn > 0 ? reqTimestamp + refreshIn : void 0;
-          cachedAccessToken = createAccessTokenEntity(this.homeAccountIdentifier, env, serverTokenResponse.access_token, this.clientId, claimsTenantId || authority.tenant || "", responseScopes.printScopes(), tokenExpirationSeconds, extendedTokenExpirationSeconds, this.cryptoObj.base64Decode, request.correlationId, refreshOnSeconds, serverTokenResponse.token_type, userAssertionHash, serverTokenResponse.key_id, additionalCacheKeyComponents);
-          const resource = request.resource || null;
-          if (resource) {
-            cachedAccessToken.resource = resource;
-          }
-        }
-        let cachedRefreshToken = null;
-        if (serverTokenResponse.refresh_token) {
-          let rtExpiresOn;
-          if (serverTokenResponse.refresh_token_expires_in) {
-            const rtExpiresIn = typeof serverTokenResponse.refresh_token_expires_in === "string" ? parseInt(serverTokenResponse.refresh_token_expires_in, 10) : serverTokenResponse.refresh_token_expires_in;
-            rtExpiresOn = reqTimestamp + rtExpiresIn;
-            this.performanceClient?.addFields({ ntwkRtExpiresOnSeconds: rtExpiresOn }, request.correlationId);
-          }
-          cachedRefreshToken = createRefreshTokenEntity(this.homeAccountIdentifier, env, serverTokenResponse.refresh_token, this.clientId, serverTokenResponse.foci, userAssertionHash, rtExpiresOn);
-        }
-        let cachedAppMetadata = null;
-        if (serverTokenResponse.foci) {
-          cachedAppMetadata = {
-            clientId: this.clientId,
-            environment: env,
-            familyId: serverTokenResponse.foci
-          };
-        }
-        return {
-          account: cachedAccount,
-          idToken: cachedIdToken,
-          accessToken: cachedAccessToken,
-          refreshToken: cachedRefreshToken,
-          appMetadata: cachedAppMetadata
-        };
-      }
-      /**
-       * Creates an @AuthenticationResult from @CacheRecord , @IdToken , and a boolean that states whether or not the result is from cache.
-       *
-       * Optionally takes a state string that is set as-is in the response.
-       *
-       * @param cacheRecord
-       * @param idTokenObj
-       * @param fromTokenCache
-       * @param stateString
-       */
-      static async generateAuthenticationResult(cryptoObj, authority, cacheRecord, fromTokenCache, request, performanceClient, idTokenClaims, requestState, serverTokenResponse, requestId) {
-        let accessToken = "";
-        let responseScopes = [];
-        let expiresOn = null;
-        let extExpiresOn;
-        let refreshOn;
-        let familyId = "";
-        if (cacheRecord.accessToken) {
-          if (cacheRecord.accessToken.tokenType === AuthenticationScheme.POP && !request.popKid) {
-            const popTokenGenerator = new PopTokenGenerator(cryptoObj, performanceClient);
-            const { secret, keyId } = cacheRecord.accessToken;
-            if (!keyId) {
-              throw createClientAuthError(keyIdMissing, request.correlationId);
-            }
-            accessToken = await popTokenGenerator.signPopToken(secret, keyId, request);
-          } else {
-            accessToken = cacheRecord.accessToken.secret;
-          }
-          responseScopes = ScopeSet.fromString(cacheRecord.accessToken.target, request.correlationId).asArray();
-          expiresOn = toDateFromSeconds(cacheRecord.accessToken.expiresOn);
-          extExpiresOn = toDateFromSeconds(cacheRecord.accessToken.extendedExpiresOn);
-          if (cacheRecord.accessToken.refreshOn) {
-            refreshOn = toDateFromSeconds(cacheRecord.accessToken.refreshOn);
-          }
-        }
-        if (cacheRecord.appMetadata) {
-          familyId = cacheRecord.appMetadata.familyId === THE_FAMILY_ID ? THE_FAMILY_ID : "";
-        }
-        const uid = idTokenClaims?.oid || idTokenClaims?.sub || "";
-        const tid = idTokenClaims?.tid || "";
-        if (serverTokenResponse?.spa_accountid && !!cacheRecord.account) {
-          cacheRecord.account.nativeAccountId = serverTokenResponse?.spa_accountid;
-          const targetTenantId = tid || cacheRecord.account.realm;
-          if (cacheRecord.account.tenantProfiles) {
-            const matchingProfile = cacheRecord.account.tenantProfiles.find((tp) => tp.tenantId === targetTenantId);
-            if (matchingProfile) {
-              matchingProfile.nativeAccountId = serverTokenResponse.spa_accountid;
-            }
-          }
-        }
-        const accountInfo = cacheRecord.account ? updateAccountTenantProfileData(
-          getAccountInfo(cacheRecord.account),
-          void 0,
-          // tenantProfile optional
-          idTokenClaims,
-          cacheRecord.idToken?.secret
-        ) : null;
-        return {
-          authority: authority.canonicalAuthority,
-          uniqueId: uid,
-          tenantId: tid,
-          scopes: responseScopes,
-          account: accountInfo,
-          idToken: cacheRecord?.idToken?.secret || "",
-          idTokenClaims: idTokenClaims || {},
-          accessToken,
-          fromCache: fromTokenCache,
-          expiresOn,
-          extExpiresOn,
-          refreshOn,
-          correlationId: request.correlationId,
-          requestId: requestId || "",
-          familyId,
-          tokenType: cacheRecord.accessToken?.tokenType || "",
-          state: requestState ? requestState.userRequestState : "",
-          cloudGraphHostName: cacheRecord.account?.cloudGraphHostName || "",
-          msGraphHost: cacheRecord.account?.msGraphHost || "",
-          code: serverTokenResponse?.spa_code,
-          fromPlatformBroker: false
-        };
-      }
-    };
-    function buildAccountToCache(cacheStorage, authority, homeAccountId, base64Decode, correlationId, idTokenClaims, clientInfo, environment, claimsTenantId, authCodePayload, nativeAccountId, logger, performanceClient) {
-      logger?.verbose("setCachedAccount called", correlationId);
-      const accountEnvironment = environment || authority.getPreferredCache();
-      const matchedAccounts = cacheStorage.getAccountsFilteredBy({ homeAccountId, environment: accountEnvironment }, correlationId);
-      performanceClient?.addFields({ cacheMatchedAccounts: matchedAccounts.length }, correlationId);
-      if (matchedAccounts.length > 1) {
-        logger?.warning("Multiple base accounts matched homeAccountId. Ignoring cached account and creating a new base account.", correlationId);
-      }
-      const cachedAccount = matchedAccounts.length === 1 ? matchedAccounts[0] : null;
-      const baseAccount = cachedAccount || createAccountEntity({
-        homeAccountId,
-        idTokenClaims,
-        clientInfo,
-        environment,
-        cloudGraphHostName: authCodePayload?.cloud_graph_host_name,
-        msGraphHost: authCodePayload?.msgraph_host,
-        nativeAccountId
-      }, authority, correlationId, base64Decode);
-      const tenantProfiles = baseAccount.tenantProfiles || [];
-      const tenantId = claimsTenantId || baseAccount.realm;
-      if (tenantId && !tenantProfiles.find((tenantProfile) => {
-        return tenantProfile.tenantId === tenantId;
-      })) {
-        const newTenantProfile = buildTenantProfile(homeAccountId, baseAccount.localAccountId, tenantId, nativeAccountId, idTokenClaims);
-        tenantProfiles.push(newTenantProfile);
-      }
-      baseAccount.tenantProfiles = tenantProfiles;
-      return baseAccount;
-    }
-    var CcsCredentialType = {
-      HOME_ACCOUNT_ID: "home_account_id",
-      UPN: "UPN"
-    };
-    async function getClientAssertion(clientAssertion, clientId, tokenEndpoint, fmiPath) {
-      if (typeof clientAssertion === "string") {
-        return clientAssertion;
-      } else {
-        const config = {
-          clientId,
-          tokenEndpoint,
-          fmiPath
-        };
-        return clientAssertion(config);
-      }
-    }
-    function getRequestThumbprint(clientId, request, homeAccountId) {
-      return {
-        clientId,
-        authority: request.authority,
-        scopes: request.scopes,
-        homeAccountIdentifier: homeAccountId,
-        claims: request.claims,
-        authenticationScheme: request.authenticationScheme,
-        resourceRequestMethod: request.resourceRequestMethod,
-        resourceRequestUri: request.resourceRequestUri,
-        shrClaims: request.shrClaims,
-        sshKid: request.sshKid,
-        embeddedClientId: request.embeddedClientId || request.extraParameters?.clientId,
-        resource: request.resource,
-        attributeTokens: serializeAttributeTokens(request.attributeTokens)
-      };
-    }
-    var ThrottlingUtils = class _ThrottlingUtils {
-      /**
-       * Prepares a RequestThumbprint to be stored as a key.
-       * @param thumbprint
-       */
-      static generateThrottlingStorageKey(thumbprint) {
-        return `${THROTTLING_PREFIX}.${JSON.stringify(thumbprint)}`;
-      }
-      /**
-       * Performs necessary throttling checks before a network request.
-       * @param cacheManager
-       * @param thumbprint
-       */
-      static preProcess(cacheManager, thumbprint, correlationId) {
-        const key = _ThrottlingUtils.generateThrottlingStorageKey(thumbprint);
-        const value = cacheManager.getThrottlingCache(key, correlationId);
-        if (value) {
-          if (value.throttleTime < Date.now()) {
-            cacheManager.removeItem(key, correlationId);
-            return;
-          }
-          throw new ServerError(value.errorCodes?.join(" ") || "", correlationId, value.errorMessage, value.subError);
-        }
-      }
-      /**
-       * Performs necessary throttling checks after a network request.
-       * @param cacheManager
-       * @param thumbprint
-       * @param response
-       */
-      static postProcess(cacheManager, thumbprint, response, correlationId) {
-        if (_ThrottlingUtils.checkResponseStatus(response) || _ThrottlingUtils.checkResponseForRetryAfter(response)) {
-          const thumbprintValue = {
-            throttleTime: _ThrottlingUtils.calculateThrottleTime(parseInt(response.headers[HeaderNames.RETRY_AFTER])),
-            error: response.body.error,
-            errorCodes: response.body.error_codes,
-            errorMessage: response.body.error_description,
-            subError: response.body.suberror
-          };
-          cacheManager.setThrottlingCache(_ThrottlingUtils.generateThrottlingStorageKey(thumbprint), thumbprintValue, correlationId);
-        }
-      }
-      /**
-       * Checks a NetworkResponse object's status codes against 429 or 5xx
-       * @param response
-       */
-      static checkResponseStatus(response) {
-        return response.status === 429 || response.status >= 500 && response.status < 600;
-      }
-      /**
-       * Checks a NetworkResponse object's RetryAfter header
-       * @param response
-       */
-      static checkResponseForRetryAfter(response) {
-        if (response.headers) {
-          return response.headers.hasOwnProperty(HeaderNames.RETRY_AFTER) && (response.status < 200 || response.status >= 300);
-        }
-        return false;
-      }
-      /**
-       * Calculates the Unix-time value for a throttle to expire given throttleTime in seconds.
-       * @param throttleTime
-       */
-      static calculateThrottleTime(throttleTime) {
-        const time = throttleTime <= 0 ? 0 : throttleTime;
-        const currentSeconds = Date.now() / 1e3;
-        return Math.floor(Math.min(currentSeconds + (time || DEFAULT_THROTTLE_TIME_SECONDS), currentSeconds + DEFAULT_MAX_THROTTLE_TIME_SECONDS) * 1e3);
-      }
-      static removeThrottle(cacheManager, clientId, request, homeAccountIdentifier) {
-        const thumbprint = getRequestThumbprint(clientId, request, homeAccountIdentifier);
-        const key = this.generateThrottlingStorageKey(thumbprint);
-        cacheManager.removeItem(key, request.correlationId);
-      }
-    };
-    var NetworkError = class _NetworkError extends AuthError {
-      constructor(error, httpStatus, responseHeaders) {
-        super(error.errorCode, error.correlationId, error.errorMessage, error.subError);
-        Object.setPrototypeOf(this, _NetworkError.prototype);
-        this.name = "NetworkError";
-        this.error = error;
-        this.httpStatus = httpStatus;
-        this.responseHeaders = responseHeaders;
-      }
-    };
-    function createNetworkError(error, httpStatus, responseHeaders, additionalError) {
-      error.errorMessage = `${error.errorMessage}, additionalErrorInfo: error.name:${additionalError?.name}, error.message:${additionalError?.message}`;
-      return new NetworkError(error, httpStatus, responseHeaders);
-    }
-    function createTokenRequestHeaders(logger, preventCorsPreflight, ccsCred) {
-      const headers = {};
-      headers[HeaderNames.CONTENT_TYPE] = URL_FORM_CONTENT_TYPE;
-      if (!preventCorsPreflight && ccsCred) {
-        switch (ccsCred.type) {
-          case CcsCredentialType.HOME_ACCOUNT_ID:
-            try {
-              const clientInfo = buildClientInfoFromHomeAccountId(ccsCred.credential);
-              headers[HeaderNames.CCS_HEADER] = `Oid:${clientInfo.uid}@${clientInfo.utid}`;
-            } catch (e) {
-              logger.verbose(`Could not parse home account ID for CCS Header: '${e}'`, "");
-            }
-            break;
-          case CcsCredentialType.UPN:
-            headers[HeaderNames.CCS_HEADER] = `UPN: ${ccsCred.credential}`;
-            break;
-        }
-      }
-      return headers;
-    }
-    function createTokenQueryParameters(request, clientId, redirectUri, performanceClient) {
-      const parameters = /* @__PURE__ */ new Map();
-      if (request.embeddedClientId) {
-        addBrokerParameters(parameters, clientId, redirectUri);
-      }
-      if (request.extraQueryParameters) {
-        addExtraParameters(parameters, request.extraQueryParameters);
-      }
-      addCorrelationId(parameters, request.correlationId);
-      instrumentBrokerParams(parameters, request.correlationId, performanceClient);
-      return mapToQueryString(parameters);
-    }
-    async function executePostToTokenEndpoint(tokenEndpoint, queryString, headers, thumbprint, correlationId, cacheManager, networkClient, logger, performanceClient, serverTelemetryManager) {
-      const response = await sendPostRequest(thumbprint, tokenEndpoint, { body: queryString, headers }, correlationId, cacheManager, networkClient, logger, performanceClient);
-      if (serverTelemetryManager && response.status < 500 && response.status !== 429) {
-        serverTelemetryManager.clearTelemetryCache();
-      }
-      return response;
-    }
-    async function sendPostRequest(thumbprint, tokenEndpoint, options, correlationId, cacheManager, networkClient, logger, performanceClient) {
-      ThrottlingUtils.preProcess(cacheManager, thumbprint, correlationId);
-      let response;
-      try {
-        response = await invokeAsync(networkClient.sendPostRequestAsync.bind(networkClient), NetworkClientSendPostRequestAsync, logger, performanceClient, correlationId)(tokenEndpoint, { ...options, correlationId, performanceClient });
-        const responseHeaders = response.headers || {};
-        performanceClient?.addFields({
-          refreshTokenSize: response.body.refresh_token?.length || 0,
-          httpVerToken: responseHeaders[HeaderNames.X_MS_HTTP_VERSION] || "",
-          requestId: responseHeaders[HeaderNames.X_MS_REQUEST_ID] || ""
-        }, correlationId);
-      } catch (e) {
-        if (e instanceof NetworkError) {
-          const responseHeaders = e.responseHeaders;
-          if (responseHeaders) {
-            performanceClient?.addFields({
-              httpVerToken: responseHeaders[HeaderNames.X_MS_HTTP_VERSION] || "",
-              requestId: responseHeaders[HeaderNames.X_MS_REQUEST_ID] || "",
-              contentTypeHeader: responseHeaders[HeaderNames.CONTENT_TYPE] || void 0,
-              contentLengthHeader: responseHeaders[HeaderNames.CONTENT_LENGTH] || void 0,
-              httpStatus: e.httpStatus
-            }, correlationId);
-          }
-          throw e.error;
-        }
-        if (e instanceof AuthError) {
-          throw e;
-        } else {
-          throw createClientAuthError(networkError, correlationId);
-        }
-      }
-      ThrottlingUtils.postProcess(cacheManager, thumbprint, response, correlationId);
-      return response;
-    }
     var AuthorizationCodeClient = class {
       constructor(configuration, performanceClient) {
         this.includeRedirectUri = true;
@@ -45913,12 +45804,6 @@ ${serverError}`, correlationId);
         }
         addScopes(parameters, request.scopes, request.correlationId, true, this.oidcDefaultScopes);
         addResource(parameters, request.resource);
-        if (request.attributeTokens) {
-          addAttributeTokens(parameters, request.attributeTokens);
-        }
-        this.performanceClient?.addFields({
-          hasAttributeTokens: !!request.attributeTokens?.length
-        }, request.correlationId);
         addAuthorizationCode(parameters, request.code);
         addLibraryInfo(parameters, this.config.libraryInfo);
         addApplicationTelemetry(parameters, this.config.telemetry.application);
@@ -46040,103 +45925,6 @@ ${serverError}`, correlationId);
         this.authority = cloudInstanceAuthority;
       }
     };
-    function getStandardAuthorizeRequestParameters(authOptions, request, logger, performanceClient) {
-      const correlationId = request.correlationId;
-      const parameters = /* @__PURE__ */ new Map();
-      addClientId(parameters, request.embeddedClientId || request.extraQueryParameters?.[CLIENT_ID] || authOptions.clientId);
-      const requestScopes = [
-        ...request.scopes || [],
-        ...request.extraScopesToConsent || []
-      ];
-      addScopes(parameters, requestScopes, request.correlationId, true, authOptions.authority.options.OIDCOptions?.defaultScopes);
-      addResource(parameters, request.resource);
-      addRedirectUri(parameters, request.redirectUri);
-      addCorrelationId(parameters, correlationId);
-      addResponseMode(parameters, request.responseMode);
-      addClientInfo(parameters);
-      addCliData(parameters);
-      if (request.prompt) {
-        addPrompt(parameters, request.prompt);
-      }
-      if (request.domainHint) {
-        addDomainHint(parameters, request.domainHint);
-      }
-      if (request.prompt !== PromptValue$1.SELECT_ACCOUNT) {
-        if (request.sid && request.prompt === PromptValue$1.NONE) {
-          logger.verbose("createAuthCodeUrlQueryString: Prompt is none, adding sid from request", request.correlationId);
-          addSid(parameters, request.sid);
-        } else if (request.account) {
-          const accountSid = extractAccountSid(request.account);
-          let accountLoginHintClaim = extractLoginHint(request.account);
-          if (accountLoginHintClaim && request.domainHint) {
-            logger.warning(`AuthorizationCodeClient.createAuthCodeUrlQueryString: "domainHint" param is set, skipping opaque "login_hint" claim. Please consider not passing domainHint`, request.correlationId);
-            accountLoginHintClaim = null;
-          }
-          if (accountLoginHintClaim) {
-            logger.verbose("createAuthCodeUrlQueryString: login_hint claim present on account", request.correlationId);
-            addLoginHint(parameters, accountLoginHintClaim);
-            try {
-              const clientInfo = buildClientInfoFromHomeAccountId(request.account.homeAccountId);
-              addCcsOid(parameters, clientInfo);
-            } catch (e) {
-              logger.verbose("createAuthCodeUrlQueryString: Could not parse home account ID for CCS Header", request.correlationId);
-            }
-          } else if (accountSid && request.prompt === PromptValue$1.NONE) {
-            logger.verbose("createAuthCodeUrlQueryString: Prompt is none, adding sid from account", request.correlationId);
-            addSid(parameters, accountSid);
-            try {
-              const clientInfo = buildClientInfoFromHomeAccountId(request.account.homeAccountId);
-              addCcsOid(parameters, clientInfo);
-            } catch (e) {
-              logger.verbose("createAuthCodeUrlQueryString: Could not parse home account ID for CCS Header", request.correlationId);
-            }
-          } else if (request.loginHint) {
-            logger.verbose("createAuthCodeUrlQueryString: Adding login_hint from request", request.correlationId);
-            addLoginHint(parameters, request.loginHint);
-            addCcsUpn(parameters, request.loginHint);
-          } else if (request.account.username) {
-            logger.verbose("createAuthCodeUrlQueryString: Adding login_hint from account", request.correlationId);
-            addLoginHint(parameters, request.account.username);
-            try {
-              const clientInfo = buildClientInfoFromHomeAccountId(request.account.homeAccountId);
-              addCcsOid(parameters, clientInfo);
-            } catch (e) {
-              logger.verbose("createAuthCodeUrlQueryString: Could not parse home account ID for CCS Header", request.correlationId);
-            }
-          }
-        } else if (request.loginHint) {
-          logger.verbose("createAuthCodeUrlQueryString: No account, adding login_hint from request", request.correlationId);
-          addLoginHint(parameters, request.loginHint);
-          addCcsUpn(parameters, request.loginHint);
-        }
-      } else {
-        logger.verbose("createAuthCodeUrlQueryString: Prompt is select_account, ignoring account hints", request.correlationId);
-      }
-      if (request.nonce) {
-        addNonce(parameters, request.nonce);
-      }
-      if (request.state) {
-        addState(parameters, request.state);
-      }
-      if (request.embeddedClientId) {
-        addBrokerParameters(parameters, authOptions.clientId, authOptions.redirectUri);
-      }
-      addClaims(parameters, request.correlationId, request.claims, authOptions.clientCapabilities, request.skipBrokerClaims);
-      if (authOptions.instanceAware && (!request.extraQueryParameters || !Object.keys(request.extraQueryParameters).includes(INSTANCE_AWARE))) {
-        addInstanceAware(parameters);
-      }
-      return parameters;
-    }
-    function getAuthorizeUrl(authority, requestParameters) {
-      const queryString = mapToQueryString(requestParameters);
-      return UrlString.appendQueryString(authority.authorizationEndpoint, queryString);
-    }
-    function extractAccountSid(account) {
-      return account.idTokenClaims?.sid || null;
-    }
-    function extractLoginHint(account) {
-      return account.loginHint || account.idTokenClaims?.login_hint || null;
-    }
     var DEFAULT_REFRESH_TOKEN_EXPIRATION_OFFSET_SECONDS = 300;
     var RefreshTokenClient = class {
       constructor(configuration, performanceClient) {
@@ -46258,12 +46046,6 @@ ${serverError}`, correlationId);
           addServerTelemetry(parameters, this.serverTelemetryManager);
         }
         addRefreshToken(parameters, request.refreshToken);
-        if (request.attributeTokens) {
-          addAttributeTokens(parameters, request.attributeTokens);
-        }
-        this.performanceClient?.addFields({
-          hasAttributeTokens: !!request.attributeTokens?.length
-        }, request.correlationId);
         if (this.config.clientCredentials.clientSecret) {
           addClientSecret(parameters, this.config.clientCredentials.clientSecret);
         }
@@ -46317,6 +46099,206 @@ ${serverError}`, correlationId);
         return mapToQueryString(parameters);
       }
     };
+    var SilentFlowClient = class {
+      constructor(configuration, performanceClient) {
+        this.config = buildClientConfiguration(configuration);
+        this.logger = new Logger(this.config.loggerOptions, name$1, version$1);
+        this.cryptoUtils = this.config.cryptoInterface;
+        this.cacheManager = this.config.storageInterface;
+        this.networkClient = this.config.networkInterface;
+        this.serverTelemetryManager = this.config.serverTelemetryManager;
+        this.authority = this.config.authOptions.authority;
+        this.performanceClient = performanceClient;
+      }
+      /**
+       * Retrieves token from cache or throws an error if it must be refreshed.
+       * @param request
+       */
+      async acquireCachedToken(request) {
+        let lastCacheOutcome = CacheOutcome.NOT_APPLICABLE;
+        if (request.forceRefresh || !StringUtils.isEmptyObj(request.claims)) {
+          this.setCacheOutcome(CacheOutcome.FORCE_REFRESH_OR_CLAIMS, request.correlationId);
+          throw createClientAuthError(tokenRefreshRequired, request.correlationId);
+        }
+        if (!request.account) {
+          throw createClientAuthError(noAccountInSilentRequest, request.correlationId);
+        }
+        const requestTenantId = request.account.tenantId || getTenantFromAuthorityString(request.authority, request.correlationId);
+        const tokenKeys = this.cacheManager.getTokenKeys();
+        const cachedAccessToken = this.cacheManager.getAccessToken(request.account, request, tokenKeys, requestTenantId);
+        if (!cachedAccessToken) {
+          this.setCacheOutcome(CacheOutcome.NO_CACHED_ACCESS_TOKEN, request.correlationId);
+          throw createClientAuthError(tokenRefreshRequired, request.correlationId);
+        } else if (wasClockTurnedBack(cachedAccessToken.cachedAt) || isTokenExpired(cachedAccessToken.expiresOn, this.config.systemOptions.tokenRenewalOffsetSeconds)) {
+          this.setCacheOutcome(CacheOutcome.CACHED_ACCESS_TOKEN_EXPIRED, request.correlationId);
+          throw createClientAuthError(tokenRefreshRequired, request.correlationId);
+        } else if (request.resource) {
+          if (cachedAccessToken.resource !== request.resource) {
+            this.setCacheOutcome(CacheOutcome.NO_CACHED_ACCESS_TOKEN, request.correlationId);
+            throw createClientAuthError(tokenRefreshRequired, request.correlationId);
+          }
+        } else if (cachedAccessToken.refreshOn && isTokenExpired(cachedAccessToken.refreshOn, 0)) {
+          lastCacheOutcome = CacheOutcome.PROACTIVELY_REFRESHED;
+        }
+        const environment = request.authority || this.authority.getPreferredCache();
+        const cacheRecord = {
+          account: this.cacheManager.getAccount(this.cacheManager.generateAccountKey(request.account), request.correlationId),
+          accessToken: cachedAccessToken,
+          idToken: this.cacheManager.getIdToken(request.account, request.correlationId, tokenKeys, requestTenantId),
+          refreshToken: null,
+          appMetadata: this.cacheManager.readAppMetadataFromCache(environment, request.correlationId)
+        };
+        this.setCacheOutcome(lastCacheOutcome, request.correlationId);
+        if (this.config.serverTelemetryManager) {
+          this.config.serverTelemetryManager.incrementCacheHits();
+        }
+        return [
+          await invokeAsync(this.generateResultFromCacheRecord.bind(this), SilentFlowClientGenerateResultFromCacheRecord, this.logger, this.performanceClient, request.correlationId)(cacheRecord, request),
+          lastCacheOutcome
+        ];
+      }
+      setCacheOutcome(cacheOutcome, correlationId) {
+        this.serverTelemetryManager?.setCacheOutcome(cacheOutcome);
+        this.performanceClient?.addFields({
+          cacheOutcome
+        }, correlationId);
+        if (cacheOutcome !== CacheOutcome.NOT_APPLICABLE) {
+          this.logger.info(`Token refresh is required due to cache outcome: '${cacheOutcome}'`, correlationId);
+        }
+      }
+      /**
+       * Helper function to build response object from the CacheRecord
+       * @param cacheRecord
+       */
+      async generateResultFromCacheRecord(cacheRecord, request) {
+        let idTokenClaims;
+        if (cacheRecord.idToken) {
+          idTokenClaims = extractTokenClaims(cacheRecord.idToken.secret, this.config.cryptoInterface.base64Decode, request.correlationId);
+        }
+        return ResponseHandler.generateAuthenticationResult(this.cryptoUtils, this.authority, cacheRecord, true, request, this.performanceClient, idTokenClaims);
+      }
+    };
+    function getStandardAuthorizeRequestParameters(authOptions, request, logger, performanceClient) {
+      const correlationId = request.correlationId;
+      const parameters = /* @__PURE__ */ new Map();
+      addClientId(parameters, request.embeddedClientId || request.extraQueryParameters?.[CLIENT_ID] || authOptions.clientId);
+      const requestScopes = [
+        ...request.scopes || [],
+        ...request.extraScopesToConsent || []
+      ];
+      addScopes(parameters, requestScopes, request.correlationId, true, authOptions.authority.options.OIDCOptions?.defaultScopes);
+      addResource(parameters, request.resource);
+      addRedirectUri(parameters, request.redirectUri);
+      addCorrelationId(parameters, correlationId);
+      addResponseMode(parameters, request.responseMode);
+      addClientInfo(parameters);
+      addCliData(parameters);
+      if (request.prompt) {
+        addPrompt(parameters, request.prompt);
+      }
+      if (request.domainHint) {
+        addDomainHint(parameters, request.domainHint);
+      }
+      if (request.prompt !== PromptValue$1.SELECT_ACCOUNT) {
+        if (request.sid && request.prompt === PromptValue$1.NONE) {
+          logger.verbose("createAuthCodeUrlQueryString: Prompt is none, adding sid from request", request.correlationId);
+          addSid(parameters, request.sid);
+        } else if (request.account) {
+          const accountSid = extractAccountSid(request.account);
+          let accountLoginHintClaim = extractLoginHint(request.account);
+          if (accountLoginHintClaim && request.domainHint) {
+            logger.warning(`AuthorizationCodeClient.createAuthCodeUrlQueryString: "domainHint" param is set, skipping opaque "login_hint" claim. Please consider not passing domainHint`, request.correlationId);
+            accountLoginHintClaim = null;
+          }
+          if (accountLoginHintClaim) {
+            logger.verbose("createAuthCodeUrlQueryString: login_hint claim present on account", request.correlationId);
+            addLoginHint(parameters, accountLoginHintClaim);
+            try {
+              const clientInfo = buildClientInfoFromHomeAccountId(request.account.homeAccountId);
+              addCcsOid(parameters, clientInfo);
+            } catch (e) {
+              logger.verbose("createAuthCodeUrlQueryString: Could not parse home account ID for CCS Header", request.correlationId);
+            }
+          } else if (accountSid && request.prompt === PromptValue$1.NONE) {
+            logger.verbose("createAuthCodeUrlQueryString: Prompt is none, adding sid from account", request.correlationId);
+            addSid(parameters, accountSid);
+            try {
+              const clientInfo = buildClientInfoFromHomeAccountId(request.account.homeAccountId);
+              addCcsOid(parameters, clientInfo);
+            } catch (e) {
+              logger.verbose("createAuthCodeUrlQueryString: Could not parse home account ID for CCS Header", request.correlationId);
+            }
+          } else if (request.loginHint) {
+            logger.verbose("createAuthCodeUrlQueryString: Adding login_hint from request", request.correlationId);
+            addLoginHint(parameters, request.loginHint);
+            addCcsUpn(parameters, request.loginHint);
+          } else if (request.account.username) {
+            logger.verbose("createAuthCodeUrlQueryString: Adding login_hint from account", request.correlationId);
+            addLoginHint(parameters, request.account.username);
+            try {
+              const clientInfo = buildClientInfoFromHomeAccountId(request.account.homeAccountId);
+              addCcsOid(parameters, clientInfo);
+            } catch (e) {
+              logger.verbose("createAuthCodeUrlQueryString: Could not parse home account ID for CCS Header", request.correlationId);
+            }
+          }
+        } else if (request.loginHint) {
+          logger.verbose("createAuthCodeUrlQueryString: No account, adding login_hint from request", request.correlationId);
+          addLoginHint(parameters, request.loginHint);
+          addCcsUpn(parameters, request.loginHint);
+        }
+      } else {
+        logger.verbose("createAuthCodeUrlQueryString: Prompt is select_account, ignoring account hints", request.correlationId);
+      }
+      if (request.nonce) {
+        addNonce(parameters, request.nonce);
+      }
+      if (request.state) {
+        addState(parameters, request.state);
+      }
+      if (request.embeddedClientId) {
+        addBrokerParameters(parameters, authOptions.clientId, authOptions.redirectUri);
+      }
+      addClaims(parameters, request.correlationId, request.claims, authOptions.clientCapabilities, request.skipBrokerClaims);
+      if (authOptions.instanceAware && (!request.extraQueryParameters || !Object.keys(request.extraQueryParameters).includes(INSTANCE_AWARE))) {
+        addInstanceAware(parameters);
+      }
+      return parameters;
+    }
+    function getAuthorizeUrl(authority, requestParameters) {
+      const queryString = mapToQueryString(requestParameters);
+      return UrlString.appendQueryString(authority.authorizationEndpoint, queryString);
+    }
+    function extractAccountSid(account) {
+      return account.idTokenClaims?.sid || null;
+    }
+    function extractLoginHint(account) {
+      return account.loginHint || account.idTokenClaims?.login_hint || null;
+    }
+    function enforceResourceParameter(isMcp, request) {
+      if (!isMcp) {
+        return;
+      }
+      if (request.resource && (containsResourceParam(request.extraParameters) || containsResourceParam(request.extraQueryParameters))) {
+        throw createClientAuthError(misplacedResourceParam, request.correlationId || "");
+      }
+      if (!request.resource) {
+        throw createClientAuthError(resourceParameterRequired, request.correlationId || "");
+      }
+    }
+    function containsResourceParam(params) {
+      if (!params) {
+        return false;
+      }
+      return Object.prototype.hasOwnProperty.call(params, "resource");
+    }
+    var unexpectedError = "unexpected_error";
+    var postRequestFailed = "post_request_failed";
+    var AuthErrorCodes = /* @__PURE__ */ Object.freeze({
+      __proto__: null,
+      postRequestFailed,
+      unexpectedError
+    });
     var skuGroupSeparator = ",";
     var skuValueSeparator = "|";
     function makeExtraSkuString(params) {
@@ -46544,102 +46526,6 @@ ${serverError}`, correlationId);
         return makeExtraSkuString(params);
       }
     };
-    var SilentFlowClient = class {
-      constructor(configuration, performanceClient) {
-        this.config = buildClientConfiguration(configuration);
-        this.logger = new Logger(this.config.loggerOptions, name$1, version$1);
-        this.cryptoUtils = this.config.cryptoInterface;
-        this.cacheManager = this.config.storageInterface;
-        this.networkClient = this.config.networkInterface;
-        this.serverTelemetryManager = this.config.serverTelemetryManager;
-        this.authority = this.config.authOptions.authority;
-        this.performanceClient = performanceClient;
-      }
-      /**
-       * Retrieves token from cache or throws an error if it must be refreshed.
-       * @param request
-       */
-      async acquireCachedToken(request) {
-        let lastCacheOutcome = CacheOutcome.NOT_APPLICABLE;
-        if (request.forceRefresh || !StringUtils.isEmptyObj(request.claims)) {
-          this.setCacheOutcome(CacheOutcome.FORCE_REFRESH_OR_CLAIMS, request.correlationId);
-          throw createClientAuthError(tokenRefreshRequired, request.correlationId);
-        }
-        if (!request.account) {
-          throw createClientAuthError(noAccountInSilentRequest, request.correlationId);
-        }
-        const requestTenantId = request.account.tenantId || getTenantFromAuthorityString(request.authority, request.correlationId);
-        const tokenKeys = this.cacheManager.getTokenKeys();
-        const cachedAccessToken = this.cacheManager.getAccessToken(request.account, request, tokenKeys, requestTenantId);
-        if (!cachedAccessToken) {
-          this.setCacheOutcome(CacheOutcome.NO_CACHED_ACCESS_TOKEN, request.correlationId);
-          throw createClientAuthError(tokenRefreshRequired, request.correlationId);
-        } else if (wasClockTurnedBack(cachedAccessToken.cachedAt) || isTokenExpired(cachedAccessToken.expiresOn, this.config.systemOptions.tokenRenewalOffsetSeconds)) {
-          this.setCacheOutcome(CacheOutcome.CACHED_ACCESS_TOKEN_EXPIRED, request.correlationId);
-          throw createClientAuthError(tokenRefreshRequired, request.correlationId);
-        } else if (request.resource) {
-          if (cachedAccessToken.resource !== request.resource) {
-            this.setCacheOutcome(CacheOutcome.NO_CACHED_ACCESS_TOKEN, request.correlationId);
-            throw createClientAuthError(tokenRefreshRequired, request.correlationId);
-          }
-        } else if (cachedAccessToken.refreshOn && isTokenExpired(cachedAccessToken.refreshOn, 0)) {
-          lastCacheOutcome = CacheOutcome.PROACTIVELY_REFRESHED;
-        }
-        const environment = request.authority || this.authority.getPreferredCache();
-        const cacheRecord = {
-          account: this.cacheManager.getAccount(this.cacheManager.generateAccountKey(request.account), request.correlationId),
-          accessToken: cachedAccessToken,
-          idToken: this.cacheManager.getIdToken(request.account, request.correlationId, tokenKeys, requestTenantId),
-          refreshToken: null,
-          appMetadata: this.cacheManager.readAppMetadataFromCache(environment, request.correlationId)
-        };
-        this.setCacheOutcome(lastCacheOutcome, request.correlationId);
-        if (this.config.serverTelemetryManager) {
-          this.config.serverTelemetryManager.incrementCacheHits();
-        }
-        return [
-          await invokeAsync(this.generateResultFromCacheRecord.bind(this), SilentFlowClientGenerateResultFromCacheRecord, this.logger, this.performanceClient, request.correlationId)(cacheRecord, request),
-          lastCacheOutcome
-        ];
-      }
-      setCacheOutcome(cacheOutcome, correlationId) {
-        this.serverTelemetryManager?.setCacheOutcome(cacheOutcome);
-        this.performanceClient?.addFields({
-          cacheOutcome
-        }, correlationId);
-        if (cacheOutcome !== CacheOutcome.NOT_APPLICABLE) {
-          this.logger.info(`Token refresh is required due to cache outcome: '${cacheOutcome}'`, correlationId);
-        }
-      }
-      /**
-       * Helper function to build response object from the CacheRecord
-       * @param cacheRecord
-       */
-      async generateResultFromCacheRecord(cacheRecord, request) {
-        let idTokenClaims;
-        if (cacheRecord.idToken) {
-          idTokenClaims = extractTokenClaims(cacheRecord.idToken.secret, this.config.cryptoInterface.base64Decode, request.correlationId);
-        }
-        return ResponseHandler.generateAuthenticationResult(this.cryptoUtils, this.authority, cacheRecord, true, request, this.performanceClient, idTokenClaims);
-      }
-    };
-    function enforceResourceParameter(isMcp, request) {
-      if (!isMcp) {
-        return;
-      }
-      if (request.resource && (containsResourceParam(request.extraParameters) || containsResourceParam(request.extraQueryParameters))) {
-        throw createClientAuthError(misplacedResourceParam, request.correlationId || "");
-      }
-      if (!request.resource) {
-        throw createClientAuthError(resourceParameterRequired, request.correlationId || "");
-      }
-    }
-    function containsResourceParam(params) {
-      if (!params) {
-        return false;
-      }
-      return Object.prototype.hasOwnProperty.call(params, "resource");
-    }
     var Deserializer = class {
       /**
        * Parse the JSON blob in memory and deserialize the content
@@ -47338,7 +47224,7 @@ ${serverError}`, correlationId);
        * @param buffer
        */
       sha256(buffer) {
-        return crypto.createHash(Hash.SHA256).update(buffer).digest();
+        return crypto2.createHash(Hash.SHA256).update(buffer).digest();
       }
     };
     var PkceGenerator = class {
@@ -47361,7 +47247,7 @@ ${serverError}`, correlationId);
         const charArr = [];
         const maxNumber = 256 - 256 % CharSet.CV_CHARSET.length;
         while (charArr.length <= RANDOM_OCTET_SIZE) {
-          const byte = crypto.randomBytes(1)[0];
+          const byte = crypto2.randomBytes(1)[0];
           if (byte >= maxNumber) {
             continue;
           }
@@ -47460,14 +47346,10 @@ ${serverError}`, correlationId);
     };
     function computeAdditionalCacheKeyHash(components) {
       const sortedKeys = Object.keys(components).sort();
-      let input = "";
-      for (const key of sortedKeys) {
-        const value = components[key];
-        input += `${Buffer.byteLength(key, "utf8")}:${key}${Buffer.byteLength(value, "utf8")}:${value}`;
-      }
-      return crypto.createHash("sha256").update(input, "utf8").digest("base64url");
+      const input = sortedKeys.map((k) => k + components[k]).join("");
+      return crypto2.createHash("sha256").update(input, "utf8").digest("base64url");
     }
-    function generateCredentialKey(credential, hash) {
+    function generateCredentialKey(credential) {
       const familyId = credential.credentialType === CredentialType.REFRESH_TOKEN && credential.familyId || credential.clientId;
       const scheme = credential.tokenType && credential.tokenType.toLowerCase() !== AuthenticationScheme.BEARER.toLowerCase() ? credential.tokenType.toLowerCase() : "";
       const credentialKey = [
@@ -47480,7 +47362,7 @@ ${serverError}`, correlationId);
         scheme
       ];
       if (credential.additionalCacheKeyComponents && Object.keys(credential.additionalCacheKeyComponents).length > 0) {
-        credentialKey.push(hash ?? computeAdditionalCacheKeyHash(credential.additionalCacheKeyComponents));
+        credentialKey.push(computeAdditionalCacheKeyHash(credential.additionalCacheKeyComponents));
       }
       return credentialKey.join(CACHE.KEY_SEPARATOR).toLowerCase();
     }
@@ -47616,8 +47498,8 @@ ${serverError}`, correlationId);
         cache[key] = value;
         this.setCache(cache);
       }
-      generateCredentialKey(credential, additionalCacheKeyHash) {
-        return generateCredentialKey(credential, additionalCacheKeyHash);
+      generateCredentialKey(credential) {
+        return generateCredentialKey(credential);
       }
       generateAccountKey(account) {
         return generateAccountKey(account);
@@ -47684,14 +47566,11 @@ ${serverError}`, correlationId);
         return null;
       }
       /**
-       * Set accessToken credential to the cache
-       * @param accessToken - the access token entity to cache
-       * @param _correlationId - unique identifier for the request
-       * @param _kmsi - keep me signed in flag
-       * @param additionalCacheKeyHash - optional precomputed hash of additionalCacheKeyComponents used in key generation
+       * set accessToken credential
+       * @param accessToken -  cache value to be set of type AccessTokenEntity
        */
-      async setAccessTokenCredential(accessToken, _correlationId, _kmsi, additionalCacheKeyHash) {
-        const accessTokenKey = this.generateCredentialKey(accessToken, additionalCacheKeyHash);
+      async setAccessTokenCredential(accessToken) {
+        const accessTokenKey = this.generateCredentialKey(accessToken);
         this.setItem(accessTokenKey, accessToken);
       }
       /**
@@ -48264,7 +48143,7 @@ ${serverError}`, correlationId);
       }
     };
     var name = "@azure/msal-node";
-    var version = "5.5.0";
+    var version = "5.3.1";
     var BaseClient = class {
       constructor(configuration) {
         this.config = buildClientConfiguration(configuration);
@@ -48746,9 +48625,6 @@ ${serverError}`, correlationId);
       }
     };
     var LoopbackClient = class {
-      constructor(preferredPort) {
-        this.preferredPort = preferredPort;
-      }
       /**
        * Spins up a loopback server which returns the server response when the localhost redirectUri is hit
        * @param successTemplate
@@ -48761,97 +48637,30 @@ ${serverError}`, correlationId);
         }
         return new Promise((resolve, reject) => {
           this.server = http.createServer((req, res) => {
-            const method = req.method?.toUpperCase();
-            if (method !== "GET" && method !== "POST") {
-              res.writeHead(405, {
-                Allow: "GET, POST"
-              });
-              res.end("Method Not Allowed");
-              return;
-            }
             const url = req.url;
             if (!url) {
               res.end(errorTemplate || "Error occurred loading redirectUrl");
               reject(NodeAuthError.createUnableToLoadRedirectUrlError());
               return;
             } else if (url === FORWARD_SLASH) {
-              if (method === "POST") {
-                this.handlePostRequest(req, res, resolve, successTemplate, errorTemplate);
-                return;
-              }
               res.end(successTemplate || "Auth code was successfully acquired. You can close this window now.");
               return;
             }
-            if (method === "GET") {
-              const redirectUri = this.getRedirectUri();
-              const parsedUrl = new URL(url, redirectUri);
-              const authCodeResponse = getDeserializedResponse(parsedUrl.search) || {};
-              if (!authCodeResponse.code && !authCodeResponse.error) {
-                res.writeHead(200);
-                res.end();
-                return;
-              }
-              if (authCodeResponse.code) {
-                res.writeHead(HTTP_REDIRECT, {
-                  location: redirectUri
-                });
-                res.end();
-              }
-              if (authCodeResponse.error) {
-                res.end(errorTemplate || `Error occurred: ${authCodeResponse.error}`);
-              }
-              resolve(authCodeResponse);
-            } else {
-              res.writeHead(200);
+            const redirectUri = this.getRedirectUri();
+            const parsedUrl = new URL(url, redirectUri);
+            const authCodeResponse = getDeserializedResponse(parsedUrl.search) || {};
+            if (authCodeResponse.code) {
+              res.writeHead(HTTP_REDIRECT, {
+                location: redirectUri
+              });
               res.end();
             }
-          });
-          const port = this.preferredPort || 0;
-          this.server.on("error", (err) => {
-            if (err.code === "EADDRINUSE" && this.preferredPort && port !== 0) {
-              this.server?.listen(0, "127.0.0.1");
-            } else {
-              reject(err);
+            if (authCodeResponse.error) {
+              res.end(errorTemplate || `Error occurred: ${authCodeResponse.error}`);
             }
+            resolve(authCodeResponse);
           });
-          this.server.listen(port, "127.0.0.1");
-        });
-      }
-      /**
-       * Handles POST requests for form_post response mode
-       */
-      handlePostRequest(req, res, resolve, successTemplate, errorTemplate) {
-        const contentType = req.headers["content-type"]?.split(";")[0]?.trim();
-        if (contentType !== "application/x-www-form-urlencoded") {
-          res.writeHead(415);
-          res.end("Unsupported Media Type");
-          return;
-        }
-        let body = "";
-        req.on("error", () => {
-          if (!res.headersSent) {
-            res.writeHead(400);
-          }
-          res.end();
-        });
-        req.on("data", (chunk) => {
-          body += chunk.toString();
-        });
-        req.on("end", () => {
-          const authCodeResponse = getDeserializedResponse(`?${body}`) || {};
-          if (!authCodeResponse.code && !authCodeResponse.error) {
-            res.writeHead(200);
-            res.end();
-            return;
-          }
-          if (authCodeResponse.error) {
-            res.writeHead(200);
-            res.end(errorTemplate || `Error occurred: ${authCodeResponse.error}`);
-          } else {
-            res.writeHead(200);
-            res.end(successTemplate || "Auth code was successfully acquired. You can close this window now.");
-          }
-          resolve(authCodeResponse);
+          this.server.listen(0, "127.0.0.1");
         });
       }
       /**
@@ -49025,7 +48834,7 @@ ${serverError}`, correlationId);
           if (response.body && response.body.error) {
             if (response.body.error === AUTHORIZATION_PENDING) {
               this.logger.info("Authorization pending. Continue polling.", request.correlationId);
-              await delay2(pollingIntervalMilli);
+              await delay(pollingIntervalMilli);
             } else {
               this.logger.info("Unexpected error in polling from the server", request.correlationId);
               throw createAuthError(postRequestFailed, request.correlationId, response.body.error);
@@ -49132,10 +48941,7 @@ ${serverError}`, correlationId);
         const correlationId = request.correlationId || this.cryptoProvider.createNewGuid();
         this.logger.trace("acquireTokenInteractive called", correlationId);
         enforceResourceParameter(this.config.auth.isMcp, request);
-        const { openBrowser, successTemplate, errorTemplate, windowHandle, loopbackClient: customLoopbackClient, preferredPort, ...remainingProperties } = request;
-        if (customLoopbackClient) {
-          this.logger.warning("The loopbackClient option is deprecated and will be removed in a future major version. Omit it to use the built-in loopback server, and set preferredPort when a fixed port is required.", correlationId);
-        }
+        const { openBrowser, successTemplate, errorTemplate, windowHandle, loopbackClient: customLoopbackClient, ...remainingProperties } = request;
         if (this.nativeBrokerPlugin) {
           const brokerRequest = {
             ...remainingProperties,
@@ -49160,11 +48966,7 @@ ${serverError}`, correlationId);
           request.redirectUri = "";
         }
         const { verifier, challenge } = await this.cryptoProvider.generatePkceCodes();
-        const loopbackClient = customLoopbackClient || new LoopbackClient(preferredPort);
-        const responseMode = remainingProperties.responseMode ?? ResponseMode$1.QUERY;
-        if (responseMode !== ResponseMode$1.QUERY && responseMode !== ResponseMode$1.FORM_POST) {
-          throw createClientConfigurationError(invalidResponseMode, correlationId);
-        }
+        const loopbackClient = customLoopbackClient || new LoopbackClient();
         let authCodeResponse = {};
         let authCodeListenerError = null;
         try {
@@ -49179,7 +48981,7 @@ ${serverError}`, correlationId);
             correlationId,
             scopes: request.scopes || OIDC_DEFAULT_SCOPES,
             redirectUri,
-            responseMode,
+            responseMode: ResponseMode$1.QUERY,
             codeChallenge: challenge,
             codeChallengeMethod: CodeChallengeMethodValues.S256
           };
@@ -49330,17 +49132,10 @@ ${serverError}`, correlationId);
         let additionalCacheKeyComponents;
         if (request.fmiPath) {
           additionalCacheKeyComponents = {
-            ...additionalCacheKeyComponents,
             fmi_path: request.fmiPath
           };
         }
-        if (request.claimsFromClient && !StringUtils.isEmptyObj(request.claimsFromClient)) {
-          additionalCacheKeyComponents = {
-            ...additionalCacheKeyComponents,
-            client_claims: request.claimsFromClient
-          };
-        }
-        if (request.skipCache || !StringUtils.isEmptyObj(request.claims)) {
+        if (request.skipCache || request.claims) {
           return this.executeTokenRequest(
             request,
             this.authority,
@@ -49523,8 +49318,8 @@ ${serverError}`, correlationId);
         if (request.fmiPath) {
           parameters.set(FMI_PATH, request.fmiPath);
         }
-        if (!StringUtils.isEmptyObj(request.claims) || !StringUtils.isEmptyObj(request.claimsFromClient) || this.config.authOptions.clientCapabilities && this.config.authOptions.clientCapabilities.length > 0) {
-          addClaims(parameters, request.correlationId, request.claims, this.config.authOptions.clientCapabilities, void 0, request.claimsFromClient);
+        if (!StringUtils.isEmptyObj(request.claims) || this.config.authOptions.clientCapabilities && this.config.authOptions.clientCapabilities.length > 0) {
+          addClaims(parameters, request.correlationId, request.claims, this.config.authOptions.clientCapabilities);
         }
         return mapToQueryString(parameters);
       }
@@ -49540,19 +49335,13 @@ ${serverError}`, correlationId);
       async acquireToken(request) {
         this.scopeSet = new ScopeSet(request.scopes || [], request.correlationId);
         this.userAssertionHash = await this.cryptoUtils.hashString(request.oboAssertion);
-        let additionalCacheKeyComponents;
-        if (request.claimsFromClient && !StringUtils.isEmptyObj(request.claimsFromClient)) {
-          additionalCacheKeyComponents = {
-            client_claims: request.claimsFromClient
-          };
-        }
-        if (request.skipCache || !StringUtils.isEmptyObj(request.claims)) {
-          return this.executeTokenRequest(request, this.authority, this.userAssertionHash, additionalCacheKeyComponents);
+        if (request.skipCache || request.claims) {
+          return this.executeTokenRequest(request, this.authority, this.userAssertionHash);
         }
         try {
-          return await this.getCachedAuthenticationResult(request, additionalCacheKeyComponents);
+          return await this.getCachedAuthenticationResult(request);
         } catch (e) {
-          return await this.executeTokenRequest(request, this.authority, this.userAssertionHash, additionalCacheKeyComponents);
+          return await this.executeTokenRequest(request, this.authority, this.userAssertionHash);
         }
       }
       /**
@@ -49563,8 +49352,8 @@ ${serverError}`, correlationId);
        * This is to prevent security issues when the assertion changes over time, however, longlived RT helps retaining the session
        * @param request - developer provided CommonOnBehalfOfRequest
        */
-      async getCachedAuthenticationResult(request, additionalCacheKeyComponents) {
-        const cachedAccessToken = this.readAccessTokenFromCacheForOBO(this.config.authOptions.clientId, request, additionalCacheKeyComponents);
+      async getCachedAuthenticationResult(request) {
+        const cachedAccessToken = this.readAccessTokenFromCacheForOBO(this.config.authOptions.clientId, request);
         if (!cachedAccessToken) {
           this.serverTelemetryManager?.setCacheOutcome(CacheOutcome.NO_CACHED_ACCESS_TOKEN);
           this.logger.info("SilentFlowClient:acquireCachedToken - No access token found in cache for the given properties.", request.correlationId);
@@ -49624,7 +49413,7 @@ ${serverError}`, correlationId);
        * @param clientId - client id
        * @param request - developer provided CommonOnBehalfOfRequest
        */
-      readAccessTokenFromCacheForOBO(clientId, request, additionalCacheKeyComponents) {
+      readAccessTokenFromCacheForOBO(clientId, request) {
         const authScheme = request.authenticationScheme || AuthenticationScheme.BEARER;
         const credentialType = authScheme.toLowerCase() !== AuthenticationScheme.BEARER.toLowerCase() ? CredentialType.ACCESS_TOKEN_WITH_AUTH_SCHEME : CredentialType.ACCESS_TOKEN;
         const accessTokenFilter = {
@@ -49633,8 +49422,7 @@ ${serverError}`, correlationId);
           target: ScopeSet.createSearchScopes(this.scopeSet.asArray(), request.correlationId),
           tokenType: authScheme,
           keyId: request.sshKid,
-          userAssertionHash: this.userAssertionHash,
-          additionalCacheKeyComponents
+          userAssertionHash: this.userAssertionHash
         };
         const accessTokens = this.cacheManager.getAccessTokensByFilter(accessTokenFilter, request.correlationId);
         const numAccessTokens = accessTokens.length;
@@ -49650,7 +49438,7 @@ ${serverError}`, correlationId);
        * @param request - developer provided CommonOnBehalfOfRequest
        * @param authority - authority object
        */
-      async executeTokenRequest(request, authority, userAssertionHash, additionalCacheKeyComponents) {
+      async executeTokenRequest(request, authority, userAssertionHash) {
         const queryParametersString = this.createTokenQueryParameters(request);
         const endpoint = UrlString.appendQueryString(authority.tokenEndpoint, queryParametersString);
         const requestBody = await this.createTokenRequestBody(request);
@@ -49670,24 +49458,7 @@ ${serverError}`, correlationId);
         const response = await this.executePostToTokenEndpoint(endpoint, requestBody, headers, thumbprint, request.correlationId);
         const responseHandler = new ResponseHandler(this.config.authOptions.clientId, this.cacheManager, this.cryptoUtils, this.logger, this.performanceClient, this.config.serializableCache, this.config.persistencePlugin);
         responseHandler.validateTokenResponse(response.body, request.correlationId);
-        const tokenResponse = await responseHandler.handleServerTokenResponse(
-          response.body,
-          this.authority,
-          reqTimestamp,
-          request,
-          ApiId.acquireTokenByOBO,
-          void 0,
-          // authCodePayload
-          userAssertionHash,
-          // userAssertionHash
-          void 0,
-          // handlingRefreshTokenResponse
-          void 0,
-          // forceCacheRefreshTokenResponse
-          void 0,
-          // serverRequestId
-          additionalCacheKeyComponents
-        );
+        const tokenResponse = await responseHandler.handleServerTokenResponse(response.body, this.authority, reqTimestamp, request, ApiId.acquireTokenByOBO, void 0, userAssertionHash);
         return tokenResponse;
       }
       /**
@@ -49718,8 +49489,8 @@ ${serverError}`, correlationId);
           addClientAssertion(parameters, await getClientAssertion(clientAssertion.assertion, this.config.authOptions.clientId, request.resourceRequestUri));
           addClientAssertionType(parameters, clientAssertion.assertionType);
         }
-        if (!StringUtils.isEmptyObj(request.claims) || !StringUtils.isEmptyObj(request.claimsFromClient) || this.config.authOptions.clientCapabilities && this.config.authOptions.clientCapabilities.length > 0) {
-          addClaims(parameters, request.correlationId, request.claims, this.config.authOptions.clientCapabilities, void 0, request.claimsFromClient);
+        if (request.claims || this.config.authOptions.clientCapabilities && this.config.authOptions.clientCapabilities.length > 0) {
+          addClaims(parameters, request.correlationId, request.claims, this.config.authOptions.clientCapabilities);
         }
         return mapToQueryString(parameters);
       }
@@ -49796,8 +49567,8 @@ ${serverError}`, correlationId);
           addClientAssertion(parameters, await getClientAssertion(clientAssertion.assertion, this.config.authOptions.clientId, this.authority.tokenEndpoint));
           addClientAssertionType(parameters, clientAssertion.assertionType);
         }
-        if (!StringUtils.isEmptyObj(request.claims) || !StringUtils.isEmptyObj(request.claimsFromClient) || this.config.authOptions.clientCapabilities && this.config.authOptions.clientCapabilities.length > 0) {
-          addClaims(parameters, request.correlationId, request.claims, this.config.authOptions.clientCapabilities, void 0, request.claimsFromClient);
+        if (request.claims || this.config.authOptions.clientCapabilities && this.config.authOptions.clientCapabilities.length > 0) {
+          addClaims(parameters, request.correlationId, request.claims, this.config.authOptions.clientCapabilities);
         }
         return mapToQueryString(parameters);
       }
@@ -50373,7 +50144,7 @@ ${serverError}`, correlationId);
         return request;
       }
     };
-    var ARC_API_VERSION = "2020-06-01";
+    var ARC_API_VERSION = "2019-11-01";
     var DEFAULT_AZURE_ARC_IDENTITY_ENDPOINT = "http://127.0.0.1:40342/metadata/identity/oauth2/token";
     var HIMDS_EXECUTABLE_HELPER_STRING = "N/A: himds executable exists";
     var SUPPORTED_AZURE_ARC_PLATFORMS = {
@@ -51413,7 +51184,7 @@ var require_uuidUtils = __commonJS({
     });
     module2.exports = __toCommonJS2(uuidUtils_exports);
     function randomUUID2() {
-      return globalThis.crypto.randomUUID();
+      return crypto.randomUUID();
     }
   }
 });
@@ -51678,39 +51449,18 @@ var require_internal2 = __commonJS({
 
 // ../../node_modules/@azure/core-util/dist/commonjs/aborterUtils.js
 var require_aborterUtils = __commonJS({
-  "../../node_modules/@azure/core-util/dist/commonjs/aborterUtils.js"(exports2, module2) {
-    var __defProp2 = Object.defineProperty;
-    var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
-    var __getOwnPropNames2 = Object.getOwnPropertyNames;
-    var __hasOwnProp2 = Object.prototype.hasOwnProperty;
-    var __export2 = (target, all) => {
-      for (var name in all)
-        __defProp2(target, name, { get: all[name], enumerable: true });
-    };
-    var __copyProps2 = (to, from, except, desc) => {
-      if (from && typeof from === "object" || typeof from === "function") {
-        for (let key of __getOwnPropNames2(from))
-          if (!__hasOwnProp2.call(to, key) && key !== except)
-            __defProp2(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc2(from, key)) || desc.enumerable });
-      }
-      return to;
-    };
-    var __toCommonJS2 = (mod) => __copyProps2(__defProp2({}, "__esModule", { value: true }), mod);
-    var aborterUtils_exports = {};
-    __export2(aborterUtils_exports, {
-      cancelablePromiseRace: () => cancelablePromiseRace2
-    });
-    module2.exports = __toCommonJS2(aborterUtils_exports);
-    async function cancelablePromiseRace2(abortablePromiseBuilders, options) {
+  "../../node_modules/@azure/core-util/dist/commonjs/aborterUtils.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.cancelablePromiseRace = cancelablePromiseRace;
+    async function cancelablePromiseRace(abortablePromiseBuilders, options) {
       const aborter = new AbortController();
       function abortHandler() {
         aborter.abort();
       }
       options?.abortSignal?.addEventListener("abort", abortHandler);
       try {
-        return await Promise.race(
-          abortablePromiseBuilders.map((p) => p({ abortSignal: aborter.signal }))
-        );
+        return await Promise.race(abortablePromiseBuilders.map((p) => p({ abortSignal: aborter.signal })));
       } finally {
         aborter.abort();
         options?.abortSignal?.removeEventListener("abort", abortHandler);
@@ -51721,98 +51471,45 @@ var require_aborterUtils = __commonJS({
 
 // ../../node_modules/@azure/abort-controller/dist/commonjs/AbortError.js
 var require_AbortError = __commonJS({
-  "../../node_modules/@azure/abort-controller/dist/commonjs/AbortError.js"(exports2, module2) {
-    var __defProp2 = Object.defineProperty;
-    var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
-    var __getOwnPropNames2 = Object.getOwnPropertyNames;
-    var __hasOwnProp2 = Object.prototype.hasOwnProperty;
-    var __export2 = (target, all) => {
-      for (var name in all)
-        __defProp2(target, name, { get: all[name], enumerable: true });
-    };
-    var __copyProps2 = (to, from, except, desc) => {
-      if (from && typeof from === "object" || typeof from === "function") {
-        for (let key of __getOwnPropNames2(from))
-          if (!__hasOwnProp2.call(to, key) && key !== except)
-            __defProp2(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc2(from, key)) || desc.enumerable });
-      }
-      return to;
-    };
-    var __toCommonJS2 = (mod) => __copyProps2(__defProp2({}, "__esModule", { value: true }), mod);
-    var AbortError_exports = {};
-    __export2(AbortError_exports, {
-      AbortError: () => AbortError2
-    });
-    module2.exports = __toCommonJS2(AbortError_exports);
+  "../../node_modules/@azure/abort-controller/dist/commonjs/AbortError.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.AbortError = void 0;
     var AbortError2 = class extends Error {
       constructor(message) {
         super(message);
         this.name = "AbortError";
       }
     };
+    exports2.AbortError = AbortError2;
   }
 });
 
 // ../../node_modules/@azure/abort-controller/dist/commonjs/index.js
 var require_commonjs3 = __commonJS({
-  "../../node_modules/@azure/abort-controller/dist/commonjs/index.js"(exports2, module2) {
-    var __defProp2 = Object.defineProperty;
-    var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
-    var __getOwnPropNames2 = Object.getOwnPropertyNames;
-    var __hasOwnProp2 = Object.prototype.hasOwnProperty;
-    var __export2 = (target, all) => {
-      for (var name in all)
-        __defProp2(target, name, { get: all[name], enumerable: true });
-    };
-    var __copyProps2 = (to, from, except, desc) => {
-      if (from && typeof from === "object" || typeof from === "function") {
-        for (let key of __getOwnPropNames2(from))
-          if (!__hasOwnProp2.call(to, key) && key !== except)
-            __defProp2(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc2(from, key)) || desc.enumerable });
-      }
-      return to;
-    };
-    var __toCommonJS2 = (mod) => __copyProps2(__defProp2({}, "__esModule", { value: true }), mod);
-    var src_exports = {};
-    __export2(src_exports, {
-      AbortError: () => import_AbortError.AbortError
-    });
-    module2.exports = __toCommonJS2(src_exports);
-    var import_AbortError = require_AbortError();
+  "../../node_modules/@azure/abort-controller/dist/commonjs/index.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.AbortError = void 0;
+    var AbortError_js_1 = require_AbortError();
+    Object.defineProperty(exports2, "AbortError", { enumerable: true, get: function() {
+      return AbortError_js_1.AbortError;
+    } });
   }
 });
 
 // ../../node_modules/@azure/core-util/dist/commonjs/createAbortablePromise.js
 var require_createAbortablePromise = __commonJS({
-  "../../node_modules/@azure/core-util/dist/commonjs/createAbortablePromise.js"(exports2, module2) {
-    var __defProp2 = Object.defineProperty;
-    var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
-    var __getOwnPropNames2 = Object.getOwnPropertyNames;
-    var __hasOwnProp2 = Object.prototype.hasOwnProperty;
-    var __export2 = (target, all) => {
-      for (var name in all)
-        __defProp2(target, name, { get: all[name], enumerable: true });
-    };
-    var __copyProps2 = (to, from, except, desc) => {
-      if (from && typeof from === "object" || typeof from === "function") {
-        for (let key of __getOwnPropNames2(from))
-          if (!__hasOwnProp2.call(to, key) && key !== except)
-            __defProp2(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc2(from, key)) || desc.enumerable });
-      }
-      return to;
-    };
-    var __toCommonJS2 = (mod) => __copyProps2(__defProp2({}, "__esModule", { value: true }), mod);
-    var createAbortablePromise_exports = {};
-    __export2(createAbortablePromise_exports, {
-      createAbortablePromise: () => createAbortablePromise2
-    });
-    module2.exports = __toCommonJS2(createAbortablePromise_exports);
-    var import_abort_controller = require_commonjs3();
-    function createAbortablePromise2(buildPromise, options) {
+  "../../node_modules/@azure/core-util/dist/commonjs/createAbortablePromise.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.createAbortablePromise = createAbortablePromise;
+    var abort_controller_1 = require_commonjs3();
+    function createAbortablePromise(buildPromise, options) {
       const { cleanupBeforeAbort, abortSignal, abortErrorMsg } = options ?? {};
       return new Promise((resolve, reject) => {
         function rejectOnAbort() {
-          reject(new import_abort_controller.AbortError(abortErrorMsg ?? "The operation was aborted."));
+          reject(new abort_controller_1.AbortError(abortErrorMsg ?? "The operation was aborted."));
         }
         function removeListeners() {
           abortSignal?.removeEventListener("abort", onAbort);
@@ -51826,16 +51523,13 @@ var require_createAbortablePromise = __commonJS({
           return rejectOnAbort();
         }
         try {
-          buildPromise(
-            (x) => {
-              removeListeners();
-              resolve(x);
-            },
-            (x) => {
-              removeListeners();
-              reject(x);
-            }
-          );
+          buildPromise((x) => {
+            removeListeners();
+            resolve(x);
+          }, (x) => {
+            removeListeners();
+            reject(x);
+          });
         } catch (err) {
           reject(err);
         }
@@ -51847,76 +51541,43 @@ var require_createAbortablePromise = __commonJS({
 
 // ../../node_modules/@azure/core-util/dist/commonjs/delay.js
 var require_delay2 = __commonJS({
-  "../../node_modules/@azure/core-util/dist/commonjs/delay.js"(exports2, module2) {
-    var __defProp2 = Object.defineProperty;
-    var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
-    var __getOwnPropNames2 = Object.getOwnPropertyNames;
-    var __hasOwnProp2 = Object.prototype.hasOwnProperty;
-    var __export2 = (target, all) => {
-      for (var name in all)
-        __defProp2(target, name, { get: all[name], enumerable: true });
-    };
-    var __copyProps2 = (to, from, except, desc) => {
-      if (from && typeof from === "object" || typeof from === "function") {
-        for (let key of __getOwnPropNames2(from))
-          if (!__hasOwnProp2.call(to, key) && key !== except)
-            __defProp2(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc2(from, key)) || desc.enumerable });
-      }
-      return to;
-    };
-    var __toCommonJS2 = (mod) => __copyProps2(__defProp2({}, "__esModule", { value: true }), mod);
-    var delay_exports = {};
-    __export2(delay_exports, {
-      delay: () => delay2
-    });
-    module2.exports = __toCommonJS2(delay_exports);
-    var import_createAbortablePromise = require_createAbortablePromise();
+  "../../node_modules/@azure/core-util/dist/commonjs/delay.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.delay = delay;
+    exports2.calculateRetryDelay = calculateRetryDelay2;
+    var createAbortablePromise_js_1 = require_createAbortablePromise();
+    var util_1 = require_internal2();
     var StandardAbortMessage = "The delay was aborted.";
-    function delay2(timeInMs, options) {
+    function delay(timeInMs, options) {
       let token;
       const { abortSignal, abortErrorMsg } = options ?? {};
-      return (0, import_createAbortablePromise.createAbortablePromise)(
-        (resolve) => {
-          token = setTimeout(resolve, timeInMs);
-        },
-        {
-          cleanupBeforeAbort: () => clearTimeout(token),
-          abortSignal,
-          abortErrorMsg: abortErrorMsg ?? StandardAbortMessage
-        }
-      );
+      return (0, createAbortablePromise_js_1.createAbortablePromise)((resolve) => {
+        token = setTimeout(resolve, timeInMs);
+      }, {
+        cleanupBeforeAbort: () => clearTimeout(token),
+        abortSignal,
+        abortErrorMsg: abortErrorMsg ?? StandardAbortMessage
+      });
+    }
+    function calculateRetryDelay2(retryAttempt, config) {
+      const exponentialDelay = config.retryDelayInMs * Math.pow(2, retryAttempt);
+      const clampedDelay = Math.min(config.maxRetryDelayInMs, exponentialDelay);
+      const retryAfterInMs = clampedDelay / 2 + (0, util_1.getRandomIntegerInclusive)(0, clampedDelay / 2);
+      return { retryAfterInMs };
     }
   }
 });
 
 // ../../node_modules/@azure/core-util/dist/commonjs/error.js
 var require_error2 = __commonJS({
-  "../../node_modules/@azure/core-util/dist/commonjs/error.js"(exports2, module2) {
-    var __defProp2 = Object.defineProperty;
-    var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
-    var __getOwnPropNames2 = Object.getOwnPropertyNames;
-    var __hasOwnProp2 = Object.prototype.hasOwnProperty;
-    var __export2 = (target, all) => {
-      for (var name in all)
-        __defProp2(target, name, { get: all[name], enumerable: true });
-    };
-    var __copyProps2 = (to, from, except, desc) => {
-      if (from && typeof from === "object" || typeof from === "function") {
-        for (let key of __getOwnPropNames2(from))
-          if (!__hasOwnProp2.call(to, key) && key !== except)
-            __defProp2(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc2(from, key)) || desc.enumerable });
-      }
-      return to;
-    };
-    var __toCommonJS2 = (mod) => __copyProps2(__defProp2({}, "__esModule", { value: true }), mod);
-    var error_exports = {};
-    __export2(error_exports, {
-      getErrorMessage: () => getErrorMessage2
-    });
-    module2.exports = __toCommonJS2(error_exports);
-    var import_util = require_internal2();
-    function getErrorMessage2(e) {
-      if ((0, import_util.isError)(e)) {
+  "../../node_modules/@azure/core-util/dist/commonjs/error.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.getErrorMessage = getErrorMessage;
+    var util_1 = require_internal2();
+    function getErrorMessage(e) {
+      if ((0, util_1.isError)(e)) {
         return e.message;
       } else {
         let stringified;
@@ -51937,115 +51598,75 @@ var require_error2 = __commonJS({
 
 // ../../node_modules/@azure/core-util/dist/commonjs/typeGuards.js
 var require_typeGuards = __commonJS({
-  "../../node_modules/@azure/core-util/dist/commonjs/typeGuards.js"(exports2, module2) {
-    var __defProp2 = Object.defineProperty;
-    var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
-    var __getOwnPropNames2 = Object.getOwnPropertyNames;
-    var __hasOwnProp2 = Object.prototype.hasOwnProperty;
-    var __export2 = (target, all) => {
-      for (var name in all)
-        __defProp2(target, name, { get: all[name], enumerable: true });
-    };
-    var __copyProps2 = (to, from, except, desc) => {
-      if (from && typeof from === "object" || typeof from === "function") {
-        for (let key of __getOwnPropNames2(from))
-          if (!__hasOwnProp2.call(to, key) && key !== except)
-            __defProp2(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc2(from, key)) || desc.enumerable });
-      }
-      return to;
-    };
-    var __toCommonJS2 = (mod) => __copyProps2(__defProp2({}, "__esModule", { value: true }), mod);
-    var typeGuards_exports = {};
-    __export2(typeGuards_exports, {
-      isDefined: () => isDefined2,
-      isObjectWithProperties: () => isObjectWithProperties2,
-      objectHasProperty: () => objectHasProperty2
-    });
-    module2.exports = __toCommonJS2(typeGuards_exports);
-    function isDefined2(thing) {
+  "../../node_modules/@azure/core-util/dist/commonjs/typeGuards.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.isDefined = isDefined;
+    exports2.isObjectWithProperties = isObjectWithProperties;
+    exports2.objectHasProperty = objectHasProperty;
+    function isDefined(thing) {
       return typeof thing !== "undefined" && thing !== null;
     }
-    function isObjectWithProperties2(thing, properties) {
-      if (!isDefined2(thing) || typeof thing !== "object") {
+    function isObjectWithProperties(thing, properties) {
+      if (!isDefined(thing) || typeof thing !== "object") {
         return false;
       }
       for (const property of properties) {
-        if (!objectHasProperty2(thing, property)) {
+        if (!objectHasProperty(thing, property)) {
           return false;
         }
       }
       return true;
     }
-    function objectHasProperty2(thing, property) {
-      return isDefined2(thing) && typeof thing === "object" && property in thing;
+    function objectHasProperty(thing, property) {
+      return isDefined(thing) && typeof thing === "object" && property in thing;
     }
   }
 });
 
 // ../../node_modules/@azure/core-util/dist/commonjs/index.js
 var require_commonjs4 = __commonJS({
-  "../../node_modules/@azure/core-util/dist/commonjs/index.js"(exports2, module2) {
-    var __create2 = Object.create;
-    var __defProp2 = Object.defineProperty;
-    var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
-    var __getOwnPropNames2 = Object.getOwnPropertyNames;
-    var __getProtoOf2 = Object.getPrototypeOf;
-    var __hasOwnProp2 = Object.prototype.hasOwnProperty;
-    var __export2 = (target, all) => {
-      for (var name in all)
-        __defProp2(target, name, { get: all[name], enumerable: true });
-    };
-    var __copyProps2 = (to, from, except, desc) => {
-      if (from && typeof from === "object" || typeof from === "function") {
-        for (let key of __getOwnPropNames2(from))
-          if (!__hasOwnProp2.call(to, key) && key !== except)
-            __defProp2(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc2(from, key)) || desc.enumerable });
-      }
-      return to;
-    };
-    var __toESM2 = (mod, isNodeMode, target) => (target = mod != null ? __create2(__getProtoOf2(mod)) : {}, __copyProps2(
-      // If the importer is in node compatibility mode or this is not an ESM
-      // file that has been converted to a CommonJS file using a Babel-
-      // compatible transform (i.e. "__esModule" has not been set), then set
-      // "default" to the CommonJS "module.exports" for node compatibility.
-      isNodeMode || !mod || !mod.__esModule ? __defProp2(target, "default", { value: mod, enumerable: true }) : target,
-      mod
-    ));
-    var __toCommonJS2 = (mod) => __copyProps2(__defProp2({}, "__esModule", { value: true }), mod);
-    var src_exports = {};
-    __export2(src_exports, {
-      calculateRetryDelay: () => calculateRetryDelay2,
-      cancelablePromiseRace: () => import_aborterUtils.cancelablePromiseRace,
-      computeSha256Hash: () => computeSha256Hash2,
-      computeSha256Hmac: () => computeSha256Hmac2,
-      createAbortablePromise: () => import_createAbortablePromise.createAbortablePromise,
-      delay: () => import_delay.delay,
-      getErrorMessage: () => import_error.getErrorMessage,
-      getRandomIntegerInclusive: () => getRandomIntegerInclusive2,
-      isBrowser: () => isBrowser2,
-      isBun: () => isBun2,
-      isDefined: () => import_typeGuards.isDefined,
-      isDeno: () => isDeno2,
-      isError: () => isError2,
-      isNode: () => isNode,
-      isNodeLike: () => isNodeLike2,
-      isNodeRuntime: () => isNodeRuntime2,
-      isObject: () => isObject2,
-      isObjectWithProperties: () => import_typeGuards.isObjectWithProperties,
-      isReactNative: () => isReactNative2,
-      isWebWorker: () => isWebWorker2,
-      objectHasProperty: () => import_typeGuards.objectHasProperty,
-      randomUUID: () => randomUUID2,
-      stringToUint8Array: () => stringToUint8Array2,
-      uint8ArrayToString: () => uint8ArrayToString2
-    });
-    module2.exports = __toCommonJS2(src_exports);
-    var tspRuntime = __toESM2(require_internal2());
-    var import_aborterUtils = require_aborterUtils();
-    var import_createAbortablePromise = require_createAbortablePromise();
-    var import_delay = require_delay2();
-    var import_error = require_error2();
-    var import_typeGuards = require_typeGuards();
+  "../../node_modules/@azure/core-util/dist/commonjs/index.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.isWebWorker = exports2.isReactNative = exports2.isNodeRuntime = exports2.isNodeLike = exports2.isNode = exports2.isDeno = exports2.isBun = exports2.isBrowser = exports2.objectHasProperty = exports2.isObjectWithProperties = exports2.isDefined = exports2.getErrorMessage = exports2.delay = exports2.createAbortablePromise = exports2.cancelablePromiseRace = void 0;
+    exports2.calculateRetryDelay = calculateRetryDelay2;
+    exports2.computeSha256Hash = computeSha256Hash2;
+    exports2.computeSha256Hmac = computeSha256Hmac2;
+    exports2.getRandomIntegerInclusive = getRandomIntegerInclusive2;
+    exports2.isError = isError2;
+    exports2.isObject = isObject2;
+    exports2.randomUUID = randomUUID2;
+    exports2.uint8ArrayToString = uint8ArrayToString2;
+    exports2.stringToUint8Array = stringToUint8Array2;
+    var tslib_1 = (init_tslib_es6(), __toCommonJS(tslib_es6_exports));
+    var tspRuntime = tslib_1.__importStar(require_internal2());
+    var aborterUtils_js_1 = require_aborterUtils();
+    Object.defineProperty(exports2, "cancelablePromiseRace", { enumerable: true, get: function() {
+      return aborterUtils_js_1.cancelablePromiseRace;
+    } });
+    var createAbortablePromise_js_1 = require_createAbortablePromise();
+    Object.defineProperty(exports2, "createAbortablePromise", { enumerable: true, get: function() {
+      return createAbortablePromise_js_1.createAbortablePromise;
+    } });
+    var delay_js_1 = require_delay2();
+    Object.defineProperty(exports2, "delay", { enumerable: true, get: function() {
+      return delay_js_1.delay;
+    } });
+    var error_js_1 = require_error2();
+    Object.defineProperty(exports2, "getErrorMessage", { enumerable: true, get: function() {
+      return error_js_1.getErrorMessage;
+    } });
+    var typeGuards_js_1 = require_typeGuards();
+    Object.defineProperty(exports2, "isDefined", { enumerable: true, get: function() {
+      return typeGuards_js_1.isDefined;
+    } });
+    Object.defineProperty(exports2, "isObjectWithProperties", { enumerable: true, get: function() {
+      return typeGuards_js_1.isObjectWithProperties;
+    } });
+    Object.defineProperty(exports2, "objectHasProperty", { enumerable: true, get: function() {
+      return typeGuards_js_1.objectHasProperty;
+    } });
     function calculateRetryDelay2(retryAttempt, config) {
       return tspRuntime.calculateRetryDelay(retryAttempt, config);
     }
@@ -52067,14 +51688,14 @@ var require_commonjs4 = __commonJS({
     function randomUUID2() {
       return tspRuntime.randomUUID();
     }
-    var isBrowser2 = tspRuntime.isBrowser;
-    var isBun2 = tspRuntime.isBun;
-    var isDeno2 = tspRuntime.isDeno;
-    var isNode = tspRuntime.isNodeLike;
-    var isNodeLike2 = tspRuntime.isNodeLike;
-    var isNodeRuntime2 = tspRuntime.isNodeRuntime;
-    var isReactNative2 = tspRuntime.isReactNative;
-    var isWebWorker2 = tspRuntime.isWebWorker;
+    exports2.isBrowser = tspRuntime.isBrowser;
+    exports2.isBun = tspRuntime.isBun;
+    exports2.isDeno = tspRuntime.isDeno;
+    exports2.isNode = tspRuntime.isNodeLike;
+    exports2.isNodeLike = tspRuntime.isNodeLike;
+    exports2.isNodeRuntime = tspRuntime.isNodeRuntime;
+    exports2.isReactNative = tspRuntime.isReactNative;
+    exports2.isWebWorker = tspRuntime.isWebWorker;
     function uint8ArrayToString2(bytes, format) {
       return tspRuntime.uint8ArrayToString(bytes, format);
     }
@@ -54161,7 +53782,7 @@ var require_logPolicy = __commonJS({
           logger(`Request: ${sanitizer.sanitize(request)}`);
           const response = await next(request);
           logger(`Response status code: ${response.status}`);
-          logger(`Headers: ${sanitizer.sanitize({ headers: response.headers })}`);
+          logger(`Headers: ${sanitizer.sanitize(response.headers)}`);
           return response;
         }
       };
@@ -54251,7 +53872,7 @@ var require_constants3 = __commonJS({
       SDK_VERSION: () => SDK_VERSION
     });
     module2.exports = __toCommonJS2(constants_exports);
-    var SDK_VERSION = "0.3.8";
+    var SDK_VERSION = "0.3.6";
     var DEFAULT_RETRY_POLICY_COUNT = 3;
   }
 });
@@ -54373,13 +53994,13 @@ var require_helpers = __commonJS({
     var __toCommonJS2 = (mod) => __copyProps2(__defProp2({}, "__esModule", { value: true }), mod);
     var helpers_exports = {};
     __export2(helpers_exports, {
-      delay: () => delay2,
+      delay: () => delay,
       parseHeaderValueAsNumber: () => parseHeaderValueAsNumber
     });
     module2.exports = __toCommonJS2(helpers_exports);
     var import_AbortError = require_AbortError2();
     var StandardAbortMessage = "The operation was aborted.";
-    function delay2(delayInMs, value, options) {
+    function delay(delayInMs, value, options) {
       return new Promise((resolve, reject) => {
         let timer = void 0;
         let onAborted = void 0;
@@ -57521,10 +57142,9 @@ var require_sendRequest = __commonJS({
     function buildPipelineRequest(method, url, options = {}) {
       const requestContentType = getRequestContentType(options);
       const { body, multipartBody } = getRequestBody(options.body, requestContentType);
-      const accept = options.accept ?? options.headers?.accept ?? (options.noDefaultAcceptHeader ? void 0 : "application/json");
       const headers = (0, import_httpHeaders.createHttpHeaders)({
         ...options.headers ? options.headers : {},
-        ...accept !== void 0 && { accept },
+        accept: options.accept ?? options.headers?.accept ?? "application/json",
         ...requestContentType && {
           "content-type": requestContentType
         }
@@ -57536,7 +57156,6 @@ var require_sendRequest = __commonJS({
         onDownloadProgress,
         timeout,
         responseAsStream,
-        noDefaultAcceptHeader: _noDefaultAcceptHeader,
         url: _url,
         method: _method,
         body: _body,
@@ -57893,7 +57512,6 @@ var require_getClient = __commonJS({
           });
         }
       }
-      const noDefaultAcceptHeader = clientOptions.internal?.noDefaultAcceptHeader ?? false;
       const { allowInsecureConnection, httpClient } = clientOptions;
       const endpointUrl = clientOptions.endpoint ?? endpoint;
       const client = (path2, ...args) => {
@@ -57906,8 +57524,7 @@ var require_getClient = __commonJS({
               pipeline,
               requestOptions,
               allowInsecureConnection,
-              httpClient,
-              noDefaultAcceptHeader
+              httpClient
             );
           },
           post: (requestOptions = {}) => {
@@ -57917,8 +57534,7 @@ var require_getClient = __commonJS({
               pipeline,
               requestOptions,
               allowInsecureConnection,
-              httpClient,
-              noDefaultAcceptHeader
+              httpClient
             );
           },
           put: (requestOptions = {}) => {
@@ -57928,8 +57544,7 @@ var require_getClient = __commonJS({
               pipeline,
               requestOptions,
               allowInsecureConnection,
-              httpClient,
-              noDefaultAcceptHeader
+              httpClient
             );
           },
           patch: (requestOptions = {}) => {
@@ -57939,8 +57554,7 @@ var require_getClient = __commonJS({
               pipeline,
               requestOptions,
               allowInsecureConnection,
-              httpClient,
-              noDefaultAcceptHeader
+              httpClient
             );
           },
           delete: (requestOptions = {}) => {
@@ -57950,8 +57564,7 @@ var require_getClient = __commonJS({
               pipeline,
               requestOptions,
               allowInsecureConnection,
-              httpClient,
-              noDefaultAcceptHeader
+              httpClient
             );
           },
           head: (requestOptions = {}) => {
@@ -57961,8 +57574,7 @@ var require_getClient = __commonJS({
               pipeline,
               requestOptions,
               allowInsecureConnection,
-              httpClient,
-              noDefaultAcceptHeader
+              httpClient
             );
           },
           options: (requestOptions = {}) => {
@@ -57972,8 +57584,7 @@ var require_getClient = __commonJS({
               pipeline,
               requestOptions,
               allowInsecureConnection,
-              httpClient,
-              noDefaultAcceptHeader
+              httpClient
             );
           },
           trace: (requestOptions = {}) => {
@@ -57983,8 +57594,7 @@ var require_getClient = __commonJS({
               pipeline,
               requestOptions,
               allowInsecureConnection,
-              httpClient,
-              noDefaultAcceptHeader
+              httpClient
             );
           }
         };
@@ -57995,7 +57605,7 @@ var require_getClient = __commonJS({
         pipeline
       };
     }
-    function buildOperation(method, url, pipeline, options, allowInsecureConnection, httpClient, noDefaultAcceptHeader = false) {
+    function buildOperation(method, url, pipeline, options, allowInsecureConnection, httpClient) {
       allowInsecureConnection = options.allowInsecureConnection ?? allowInsecureConnection;
       return {
         then: function(onFulfilled, onrejected) {
@@ -58003,7 +57613,7 @@ var require_getClient = __commonJS({
             method,
             url,
             pipeline,
-            { ...options, allowInsecureConnection, noDefaultAcceptHeader },
+            { ...options, allowInsecureConnection },
             httpClient
           ).then(onFulfilled, onrejected);
         },
@@ -58017,7 +57627,7 @@ var require_getClient = __commonJS({
               method,
               url,
               pipeline,
-              { ...options, allowInsecureConnection, noDefaultAcceptHeader, responseAsStream: true },
+              { ...options, allowInsecureConnection, responseAsStream: true },
               httpClient
             );
           }
@@ -58028,7 +57638,7 @@ var require_getClient = __commonJS({
               method,
               url,
               pipeline,
-              { ...options, allowInsecureConnection, noDefaultAcceptHeader, responseAsStream: true },
+              { ...options, allowInsecureConnection, responseAsStream: true },
               httpClient
             );
           } else {
@@ -58610,7 +58220,7 @@ var require_constants4 = __commonJS({
       SDK_VERSION: () => SDK_VERSION
     });
     module2.exports = __toCommonJS2(constants_exports);
-    var SDK_VERSION = "1.25.0";
+    var SDK_VERSION = "1.24.0";
     var DEFAULT_RETRY_POLICY_COUNT = 3;
   }
 });
@@ -60327,7 +59937,7 @@ var require_commonjs6 = __commonJS({
 });
 
 // ../../node_modules/@azure/core-client/dist/commonjs/state-cjs.js
-var require_state_cjs2 = __commonJS({
+var require_state_cjs = __commonJS({
   "../../node_modules/@azure/core-client/dist/commonjs/state-cjs.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
@@ -60345,7 +59955,7 @@ var require_operationHelpers = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.getOperationArgumentValueFromParameter = getOperationArgumentValueFromParameter;
     exports2.getOperationRequestInfo = getOperationRequestInfo;
-    var state_1 = require_state_cjs2();
+    var state_1 = require_state_cjs();
     function getOperationArgumentValueFromParameter(operationArguments, parameter, fallbackObject) {
       let parameterPath = parameter.parameterPath;
       const parameterMapper = parameter.mapper;
@@ -74232,7 +73842,7 @@ var require_dist_node2 = __commonJS({
         return value;
       }
     }
-    function isDefined2(value) {
+    function isDefined(value) {
       return value !== void 0 && value !== null;
     }
     function isKeyOperator(operator) {
@@ -74240,7 +73850,7 @@ var require_dist_node2 = __commonJS({
     }
     function getValues(context, operator, key, modifier) {
       var value = context[key], result = [];
-      if (isDefined2(value) && value !== "") {
+      if (isDefined(value) && value !== "") {
         if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
           value = value.toString();
           if (modifier && modifier !== "*") {
@@ -74252,14 +73862,14 @@ var require_dist_node2 = __commonJS({
         } else {
           if (modifier === "*") {
             if (Array.isArray(value)) {
-              value.filter(isDefined2).forEach(function(value2) {
+              value.filter(isDefined).forEach(function(value2) {
                 result.push(
                   encodeValue(operator, value2, isKeyOperator(operator) ? key : "")
                 );
               });
             } else {
               Object.keys(value).forEach(function(k) {
-                if (isDefined2(value[k])) {
+                if (isDefined(value[k])) {
                   result.push(encodeValue(operator, value[k], k));
                 }
               });
@@ -74267,12 +73877,12 @@ var require_dist_node2 = __commonJS({
           } else {
             const tmp = [];
             if (Array.isArray(value)) {
-              value.filter(isDefined2).forEach(function(value2) {
+              value.filter(isDefined).forEach(function(value2) {
                 tmp.push(encodeValue(operator, value2));
               });
             } else {
               Object.keys(value).forEach(function(k) {
-                if (isDefined2(value[k])) {
+                if (isDefined(value[k])) {
                   tmp.push(encodeUnreserved(k));
                   tmp.push(encodeValue(operator, value[k].toString()));
                 }
@@ -74287,7 +73897,7 @@ var require_dist_node2 = __commonJS({
         }
       } else {
         if (operator === ";") {
-          if (isDefined2(value)) {
+          if (isDefined(value)) {
             result.push(encodeUnreserved(key));
           }
         } else if (value === "" && (operator === "&" || operator === "?")) {
@@ -81036,13 +80646,13 @@ var require_GitLabIntegration_cjs = __commonJS({
             if (attempt++ >= maxRetries) {
               return response;
             }
-            const delay2 = parseRetryAfterMs(
+            const delay = parseRetryAfterMs(
               response.headers.get("Retry-After"),
               backoffDelay(attempt)
             );
             await response.body?.cancel().catch(() => {
             });
-            await sleep(delay2, abortSignal);
+            await sleep(delay, abortSignal);
             if (abortSignal?.aborted) return response;
           }
         };
@@ -82435,8 +82045,8 @@ safe-buffer/index.js:
   (*! safe-buffer. MIT License. Feross Aboukhadijeh <https://feross.org/opensource> *)
 
 @azure/msal-node/lib/msal-node.cjs:
-  (*! @azure/msal-node v5.5.0 2026-08-04 *)
-  (*! @azure/msal-common v16.12.0 2026-08-04 *)
+  (*! @azure/msal-node v5.3.1 2026-06-30 *)
+  (*! @azure/msal-common v16.11.0 2026-06-30 *)
 
 is-plain-object/dist/is-plain-object.js:
   (*!

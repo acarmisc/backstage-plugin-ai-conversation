@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useApi } from '@backstage/core-plugin-api';
 import { liteLlmChatApiRef, LiteLlmChatApi } from '../api';
+import { computeRegenerateTarget, computeEditTarget } from './chatTruncation';
 import type {
   Thread,
   ChatMessage,
@@ -453,33 +454,16 @@ export function useChat(opts: UseChatOptions): UseChatResult {
   const regenerateFrom = useCallback(
     (messageId: string) => {
       if (!activeThread) return;
-      const messages = activeThread.messages;
-      const idx = messages.findIndex(m => m.id === messageId);
-      if (idx === -1) return;
-      const target = messages[idx];
+      const target = computeRegenerateTarget(activeThread.messages, messageId);
+      if (!target) return;
       const compareModels = activeThread.compareModels;
-      const isCompare = activeThread.mode === 'compare' && !!compareModels?.length;
+      const isCompare =
+        activeThread.mode === 'compare' && !!compareModels?.length && target.isCompareEligible;
 
-      if (target.role === 'user') {
-        if (isCompare) runCompareSend(target.content, messages.slice(0, idx), compareModels!);
-        else runSend(target.content, messages.slice(0, idx));
-        return;
-      }
-
-      const turnId = target.turnId;
-      let userIdx = idx - 1;
-      while (
-        userIdx >= 0 &&
-        !(messages[userIdx].role === 'user' && (!turnId || messages[userIdx].turnId === turnId))
-      ) {
-        userIdx -= 1;
-      }
-      if (userIdx < 0) return;
-
-      if (isCompare && target.compareModel) {
-        runCompareSend(messages[userIdx].content, messages.slice(0, userIdx), compareModels!);
+      if (isCompare) {
+        runCompareSend(target.text, target.baseMessages, compareModels!);
       } else {
-        runSend(messages[userIdx].content, messages.slice(0, userIdx));
+        runSend(target.text, target.baseMessages);
       }
     },
     [activeThread, runSend, runCompareSend],
@@ -492,13 +476,12 @@ export function useChat(opts: UseChatOptions): UseChatResult {
   const editAndResend = useCallback(
     (messageId: string, newContent: string) => {
       if (!activeThread) return;
-      const messages = activeThread.messages;
-      const idx = messages.findIndex(m => m.id === messageId);
-      if (idx === -1 || messages[idx].role !== 'user') return;
+      const target = computeEditTarget(activeThread.messages, messageId);
+      if (!target) return;
       if (activeThread.mode === 'compare' && activeThread.compareModels?.length) {
-        runCompareSend(newContent, messages.slice(0, idx), activeThread.compareModels);
+        runCompareSend(newContent, target.baseMessages, activeThread.compareModels);
       } else {
-        runSend(newContent, messages.slice(0, idx));
+        runSend(newContent, target.baseMessages);
       }
     },
     [activeThread, runSend, runCompareSend],

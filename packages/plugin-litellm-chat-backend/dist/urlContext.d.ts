@@ -3,6 +3,11 @@ export interface FetchedUrlContext {
     title: string;
     text: string;
 }
+export declare function isBlockedAddress(ip: string): boolean;
+export declare function stripHtml(html: string): {
+    title: string;
+    text: string;
+};
 /** Fetches `rawUrl` with SSRF guards and returns extracted title + text,
  * capped at `maxChars`. Each redirect hop (up to MAX_REDIRECTS) is
  * independently re-validated — https-only, public-address-only — before
