@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "description": "LiteLLM RAG Chat plugin packages for Backstage. Designed for use within Backstage monorepo.",
+  "packageManager": "yarn@4.5.1",
   "workspaces": [
     "packages/*"
   ],
