@@ -4,6 +4,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import CheckIcon from '@mui/icons-material/Check';
 import EditIcon from '@mui/icons-material/Edit';
 import LinkIcon from '@mui/icons-material/Link';
+import { safeHref } from '../safeUrl';
 import type { ChatMessage } from '../types';
 
 export interface UserMessageProps {
@@ -72,16 +73,22 @@ export const UserMessage: React.FC<UserMessageProps> = ({ message, onEditAndRese
       {message.attachedUrl && (
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 0.5 }}>
           <Tooltip title={message.attachedUrl.url}>
+            {/* An imported thread can carry any string here, so only link out
+                when it is a real http(s) URL — otherwise show a plain chip. */}
             <Chip
               size="small"
               icon={<LinkIcon fontSize="small" />}
               label={message.attachedUrl.title}
               variant="outlined"
-              component="a"
-              href={message.attachedUrl.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              clickable
+              {...(safeHref(message.attachedUrl.url)
+                ? {
+                    component: 'a' as const,
+                    href: safeHref(message.attachedUrl.url),
+                    target: '_blank',
+                    rel: 'noopener noreferrer',
+                    clickable: true,
+                  }
+                : {})}
             />
           </Tooltip>
         </Box>

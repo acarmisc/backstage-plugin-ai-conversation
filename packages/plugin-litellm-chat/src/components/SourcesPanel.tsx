@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Chip, Typography } from '@mui/material';
+import { safeHref } from '../safeUrl';
 import type { Citation } from '../types';
 
 export interface SourcesPanelProps {
@@ -21,8 +22,8 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({ citations }) => {
           <Box key={i} sx={{ mt: 1.5 }}>
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
               <Typography variant="body2" fontWeight={500}>
-                {c.url ? (
-                  <a href={c.url} target="_blank" rel="noopener noreferrer">
+                {safeHref(c.url) ? (
+                  <a href={safeHref(c.url)} target="_blank" rel="noopener noreferrer">
                     {c.filename}
                   </a>
                 ) : (

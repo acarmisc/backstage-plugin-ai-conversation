@@ -1376,6 +1376,22 @@ var init_AssistantMessage = __esm({
   }
 });
 
+// src/safeUrl.ts
+function safeHref(url) {
+  if (!url) return void 0;
+  try {
+    const parsed = new URL(url, window.location.origin);
+    return parsed.protocol === "https:" || parsed.protocol === "http:" ? url : void 0;
+  } catch {
+    return void 0;
+  }
+}
+var init_safeUrl = __esm({
+  "src/safeUrl.ts"() {
+    "use strict";
+  }
+});
+
 // src/components/UserMessage.tsx
 import React10, { useState as useState8 } from "react";
 import { Box as Box8, Button as Button2, Chip as Chip4, IconButton as IconButton4, TextField as TextField3, Tooltip as Tooltip4 } from "@mui/material";
@@ -1387,6 +1403,7 @@ var UserMessage;
 var init_UserMessage = __esm({
   "src/components/UserMessage.tsx"() {
     "use strict";
+    init_safeUrl();
     UserMessage = ({ message, onEditAndResend }) => {
       const [editing, setEditing] = useState8(false);
       const [draft, setDraft] = useState8(message.content);
@@ -1439,11 +1456,13 @@ var init_UserMessage = __esm({
             icon: /* @__PURE__ */ React10.createElement(LinkIcon, { fontSize: "small" }),
             label: message.attachedUrl.title,
             variant: "outlined",
-            component: "a",
-            href: message.attachedUrl.url,
-            target: "_blank",
-            rel: "noopener noreferrer",
-            clickable: true
+            ...safeHref(message.attachedUrl.url) ? {
+              component: "a",
+              href: safeHref(message.attachedUrl.url),
+              target: "_blank",
+              rel: "noopener noreferrer",
+              clickable: true
+            } : {}
           }
         ))),
         /* @__PURE__ */ React10.createElement(
@@ -1569,8 +1588,9 @@ var SourcesPanel;
 var init_SourcesPanel = __esm({
   "src/components/SourcesPanel.tsx"() {
     "use strict";
+    init_safeUrl();
     SourcesPanel = ({ citations }) => {
-      return /* @__PURE__ */ React13.createElement(Box10, { sx: { p: 1.5 } }, /* @__PURE__ */ React13.createElement(Typography8, { variant: "overline", color: "text.secondary" }, "Sources"), citations.length === 0 ? /* @__PURE__ */ React13.createElement(Typography8, { variant: "body2", color: "text.secondary", sx: { mt: 0.5 } }, "No sources for the latest reply yet.") : citations.map((c, i) => /* @__PURE__ */ React13.createElement(Box10, { key: i, sx: { mt: 1.5 } }, /* @__PURE__ */ React13.createElement(Box10, { sx: { display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" } }, /* @__PURE__ */ React13.createElement(Typography8, { variant: "body2", fontWeight: 500 }, c.url ? /* @__PURE__ */ React13.createElement("a", { href: c.url, target: "_blank", rel: "noopener noreferrer" }, c.filename) : c.filename), c.source && /* @__PURE__ */ React13.createElement(
+      return /* @__PURE__ */ React13.createElement(Box10, { sx: { p: 1.5 } }, /* @__PURE__ */ React13.createElement(Typography8, { variant: "overline", color: "text.secondary" }, "Sources"), citations.length === 0 ? /* @__PURE__ */ React13.createElement(Typography8, { variant: "body2", color: "text.secondary", sx: { mt: 0.5 } }, "No sources for the latest reply yet.") : citations.map((c, i) => /* @__PURE__ */ React13.createElement(Box10, { key: i, sx: { mt: 1.5 } }, /* @__PURE__ */ React13.createElement(Box10, { sx: { display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" } }, /* @__PURE__ */ React13.createElement(Typography8, { variant: "body2", fontWeight: 500 }, safeHref(c.url) ? /* @__PURE__ */ React13.createElement("a", { href: safeHref(c.url), target: "_blank", rel: "noopener noreferrer" }, c.filename) : c.filename), c.source && /* @__PURE__ */ React13.createElement(
         Chip5,
         {
           size: "small",
