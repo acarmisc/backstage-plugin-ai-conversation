@@ -50,11 +50,12 @@ import { VectorStorePicker } from './VectorStorePicker';
 import { PersonaPicker } from './PersonaPicker';
 import { PersonaHomepage } from './PersonaHomepage';
 import { KeyPicker } from './KeyPicker';
+import { OptionPicker } from './OptionPicker';
 import { MessageList } from './MessageList';
 import { ErrorBanner } from './ErrorBanner';
 import { SourcesPanel } from './SourcesPanel';
 import { UsagePanel } from './UsagePanel';
-import type { ChatConfig, Persona, Thread, UrlContextPreview } from '../types';
+import type { ChatConfig, ChatTraits, Persona, ReasoningEffort, Thread, UrlContextPreview } from '../types';
 
 const SIDEBAR_WIDTH = 280;
 const SIDEBAR_RAIL_WIDTH = 48;
@@ -62,6 +63,15 @@ const RIGHT_RAIL_WIDTH = 300;
 const CHAT_MAX_WIDTH = 900;
 const URL_TOKEN_RE = /#(https:\/\/\S+)/;
 const URL_PREVIEW_DEBOUNCE_MS = 500;
+
+// Fixed, provider-agnostic enum — no prompt text attached (see
+// ReasoningEffort in types.ts), so unlike tone/focus/verbosity it doesn't
+// need a backend round-trip.
+const REASONING_EFFORT_OPTIONS: { id: ReasoningEffort; label: string }[] = [
+  { id: 'low', label: 'Low' },
+  { id: 'medium', label: 'Medium' },
+  { id: 'high', label: 'High' },
+];
 
 function threadMatchesQuery(thread: Thread, query: string): boolean {
   const q = query.trim().toLowerCase();
@@ -95,6 +105,10 @@ export const ChatPage: React.FC = () => {
   const [webSearch, setWebSearch] = useState(false);
   const [personaId, setPersonaId] = useState('');
   const [customSystemPrompt, setCustomSystemPrompt] = useState('');
+  const [toneId, setToneId] = useState('');
+  const [focusId, setFocusId] = useState('');
+  const [verbosityId, setVerbosityId] = useState('');
+  const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort | ''>('');
   const [keyVal, setKeyVal] = useState<{ alias: string; token: string }>({
     alias: '',
     token: '',
@@ -115,6 +129,8 @@ export const ChatPage: React.FC = () => {
   const [urlPreviewLoading, setUrlPreviewLoading] = useState(false);
   const [urlPreviewError, setUrlPreviewError] = useState<string | null>(null);
   const [dismissedUrl, setDismissedUrl] = useState<string | null>(null);
+  const [traits, setTraits] = useState<ChatTraits>({ tones: [], focuses: [], verbosities: [] });
+  const [traitsLoading, setTraitsLoading] = useState(true);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -131,6 +147,11 @@ export const ChatPage: React.FC = () => {
       .then(setPersonas)
       .catch(err => setPersonasError(err.message ?? 'Failed to load personas'))
       .finally(() => setPersonasLoading(false));
+    chatApi
+      .getChatTraits()
+      .then(setTraits)
+      .catch(() => {})
+      .finally(() => setTraitsLoading(false));
     identityApi
       .getCredentials()
       .then(c => setUserId(c.token ? 'oidc' : 'default'))
@@ -143,6 +164,10 @@ export const ChatPage: React.FC = () => {
     vectorStoreIds,
     personaId,
     customSystemPrompt,
+    toneId,
+    focusId,
+    verbosityId,
+    reasoningEffort,
     keyAlias: keyVal.alias,
     keyToken: keyVal.token,
     topK: 5,
@@ -160,6 +185,10 @@ export const ChatPage: React.FC = () => {
     setVectorStoreIds(chat.activeThread.vectorStoreIds);
     setPersonaId(chat.activeThread.personaId ?? '');
     setCustomSystemPrompt(chat.activeThread.customSystemPrompt ?? '');
+    setToneId(chat.activeThread.toneId ?? '');
+    setFocusId(chat.activeThread.focusId ?? '');
+    setVerbosityId(chat.activeThread.verbosityId ?? '');
+    setReasoningEffort(chat.activeThread.reasoningEffort ?? '');
     setKeyVal({ alias: chat.activeThread.keyAlias, token: chat.activeThread.keyToken });
     setCompareModeUi(chat.activeThread.mode === 'compare');
     setCompareModelsSel(chat.activeThread.compareModels ?? []);
@@ -376,6 +405,22 @@ export const ChatPage: React.FC = () => {
                     error={personasError}
                     onChange={handlePersonaChange}
                   />
+                  <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                    <OptionPicker
+                      label="Tone"
+                      value={toneId}
+                      options={traits.tones}
+                      onChange={setToneId}
+                      loading={traitsLoading}
+                    />
+                    <OptionPicker
+                      label="Focus"
+                      value={focusId}
+                      options={traits.focuses}
+                      onChange={setFocusId}
+                      loading={traitsLoading}
+                    />
+                  </Box>
                   <TextField
                     label="Custom system prompt"
                     placeholder={
@@ -434,6 +479,22 @@ export const ChatPage: React.FC = () => {
                         }
                         label={<Typography variant="body2">Include web search</Typography>}
                       />
+                      <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                        <OptionPicker
+                          label="Verbosity"
+                          value={verbosityId}
+                          options={traits.verbosities}
+                          onChange={setVerbosityId}
+                          loading={traitsLoading}
+                        />
+                        <OptionPicker
+                          label="Reasoning effort"
+                          value={reasoningEffort}
+                          options={REASONING_EFFORT_OPTIONS}
+                          onChange={id => setReasoningEffort(id as ReasoningEffort | '')}
+                          noneLabel="Model default"
+                        />
+                      </Box>
                       <KeyPicker
                         value={keyVal}
                         onChange={setKeyVal}

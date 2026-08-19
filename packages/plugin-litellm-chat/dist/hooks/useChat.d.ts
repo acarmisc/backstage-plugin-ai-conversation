@@ -1,10 +1,14 @@
-import type { Thread, Citation, KeySpend } from '../types';
+import type { Thread, Citation, KeySpend, ReasoningEffort } from '../types';
 export interface UseChatOptions {
     userId: string;
     model: string;
     vectorStoreIds: string[];
     personaId: string;
     customSystemPrompt: string;
+    toneId: string;
+    focusId: string;
+    verbosityId: string;
+    reasoningEffort: ReasoningEffort | '';
     keyAlias: string;
     keyToken: string;
     topK?: number;

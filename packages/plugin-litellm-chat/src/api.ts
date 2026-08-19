@@ -8,6 +8,7 @@ import type {
   SearchResult,
   ChatResult,
   ChatConfig,
+  ChatTraits,
   KeySpend,
   UrlContextPreview,
   FeedbackSummary,
@@ -18,6 +19,7 @@ export interface LiteLlmChatApiInterface {
   listVectorStores(): Promise<VectorStore[]>;
   listPersonas(): Promise<Persona[]>;
   getChatConfig(): Promise<ChatConfig>;
+  getChatTraits(): Promise<ChatTraits>;
   fetchUrlContext(url: string): Promise<UrlContextPreview>;
   getFeedbackSummary(filters?: { personaId?: string; model?: string }): Promise<FeedbackSummary>;
   getUsageSummary(groupBy: 'persona' | 'model', range?: string): Promise<UsageSummaryRow[]>;
@@ -107,6 +109,12 @@ export class LiteLlmChatApi implements LiteLlmChatApiInterface {
     if (!res.ok) {
       return { defaultModel: null, defaultVectorStoreIds: null, maxRequestBudget: null };
     }
+    return res.json();
+  }
+
+  async getChatTraits(): Promise<ChatTraits> {
+    const res = await this.fetchApi.fetch(`${BASE_PATH}/chat/traits`);
+    if (!res.ok) throw new Error(`chat/traits ${res.status}`);
     return res.json();
   }
 

@@ -43,7 +43,16 @@ export interface ChatFeedbackRequest {
   model: string;
   personaId?: string;
   vectorStoreIds?: string[];
+  toneId?: string;
+  focusId?: string;
+  verbosityId?: string;
 }
+
+/** Reasoning-effort levels forwarded as-is to LiteLLM's `reasoning_effort`
+ * param. Only models/providers that support it use it (LiteLLM maps it to
+ * the right native mechanism per provider, e.g. Anthropic extended
+ * thinking); others may ignore or reject it depending on `drop_params`. */
+export type ReasoningEffort = 'low' | 'medium' | 'high';
 
 export interface ChatStreamRequest {
   model: string;
@@ -69,6 +78,14 @@ export interface ChatStreamRequest {
    * LiteLLM deployment doesn't, this is a silent no-op upstream rather
    * than an error; verify against the live proxy before relying on it. */
   web_search?: boolean;
+  /** Ids into TONE_OPTIONS/FOCUS_OPTIONS/VERBOSITY_OPTIONS (see traits.ts).
+   * Resolved server-side into prompt fragments composed alongside the
+   * persona's system prompt — see composeSystemPrompt in router.ts. */
+  tone_id?: string;
+  focus_id?: string;
+  verbosity_id?: string;
+  /** Native passthrough — not composed into the system prompt. */
+  reasoning_effort?: ReasoningEffort;
 }
 
 export interface FetchContextRequest {

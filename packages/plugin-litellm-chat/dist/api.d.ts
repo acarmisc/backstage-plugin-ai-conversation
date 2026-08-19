@@ -1,9 +1,10 @@
 import { FetchApi } from '@backstage/core-plugin-api';
-import type { VectorStore, Persona, ChatRequest, ChatFeedbackRequest, ChatStreamChunk, ChatResult, ChatConfig, KeySpend, UrlContextPreview, FeedbackSummary, UsageSummaryRow } from './types';
+import type { VectorStore, Persona, ChatRequest, ChatFeedbackRequest, ChatStreamChunk, ChatResult, ChatConfig, ChatTraits, KeySpend, UrlContextPreview, FeedbackSummary, UsageSummaryRow } from './types';
 export interface LiteLlmChatApiInterface {
     listVectorStores(): Promise<VectorStore[]>;
     listPersonas(): Promise<Persona[]>;
     getChatConfig(): Promise<ChatConfig>;
+    getChatTraits(): Promise<ChatTraits>;
     fetchUrlContext(url: string): Promise<UrlContextPreview>;
     getFeedbackSummary(filters?: {
         personaId?: string;
@@ -37,6 +38,7 @@ export declare class LiteLlmChatApi implements LiteLlmChatApiInterface {
     listVectorStores(): Promise<VectorStore[]>;
     listPersonas(): Promise<Persona[]>;
     getChatConfig(): Promise<ChatConfig>;
+    getChatTraits(): Promise<ChatTraits>;
     fetchUrlContext(url: string): Promise<UrlContextPreview>;
     getFeedbackSummary(filters?: {
         personaId?: string;

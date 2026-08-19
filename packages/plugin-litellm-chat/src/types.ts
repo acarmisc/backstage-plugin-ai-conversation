@@ -56,7 +56,27 @@ export interface ChatFeedbackRequest {
   model: string;
   personaId?: string;
   vectorStoreIds?: string[];
+  toneId?: string;
+  focusId?: string;
+  verbosityId?: string;
 }
+
+/** id/label pair for a tone/focus/verbosity option — the prompt text stays
+ * server-side (see `/chat/traits` and traits.ts on the backend). */
+export interface TraitOption {
+  id: string;
+  label: string;
+}
+
+export interface ChatTraits {
+  tones: TraitOption[];
+  focuses: TraitOption[];
+  verbosities: TraitOption[];
+}
+
+/** Not fetched from the backend — a fixed, provider-agnostic enum with no
+ * prompt text attached, so there's nothing for the server to own here. */
+export type ReasoningEffort = 'low' | 'medium' | 'high';
 
 export interface ChatRequest {
   model: string;
@@ -79,6 +99,12 @@ export interface ChatRequest {
    * selected knowledge bases. Passed through as-is — see AGENTS.md for the
    * "verify LiteLLM has a native web_search tool first" caveat. */
   web_search?: boolean;
+  /** Ids into ChatTraits — resolved server-side into prompt fragments. */
+  tone_id?: string;
+  focus_id?: string;
+  verbosity_id?: string;
+  /** Native passthrough — not composed into the system prompt. */
+  reasoning_effort?: ReasoningEffort;
 }
 
 export interface SearchResult {
@@ -166,6 +192,10 @@ export interface Thread {
   mode?: 'single' | 'compare';
   compareModels?: string[];
   webSearch?: boolean;
+  toneId?: string;
+  focusId?: string;
+  verbosityId?: string;
+  reasoningEffort?: ReasoningEffort;
 }
 
 /** Portable export shape written by exportThread() / read by importThread().

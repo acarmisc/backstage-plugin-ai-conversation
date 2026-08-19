@@ -9,6 +9,7 @@ import type {
   Citation,
   KeySpend,
   ThreadExport,
+  ReasoningEffort,
 } from '../types';
 
 const THREAD_EXPORT_VERSION = 1 as const;
@@ -50,6 +51,10 @@ export interface UseChatOptions {
   vectorStoreIds: string[];
   personaId: string;
   customSystemPrompt: string;
+  toneId: string;
+  focusId: string;
+  verbosityId: string;
+  reasoningEffort: ReasoningEffort | '';
   keyAlias: string;
   keyToken: string;
   topK?: number;
@@ -85,7 +90,21 @@ export interface UseChatResult {
 }
 
 export function useChat(opts: UseChatOptions): UseChatResult {
-  const { userId, model, vectorStoreIds, personaId, customSystemPrompt, keyAlias, keyToken, topK, webSearch } = opts;
+  const {
+    userId,
+    model,
+    vectorStoreIds,
+    personaId,
+    customSystemPrompt,
+    toneId,
+    focusId,
+    verbosityId,
+    reasoningEffort,
+    keyAlias,
+    keyToken,
+    topK,
+    webSearch,
+  } = opts;
   const api = useApi(liteLlmChatApiRef) as InstanceType<typeof LiteLlmChatApi>;
 
   const [threads, setThreads] = useState<Thread[]>(() => loadThreads(userId));
@@ -238,6 +257,10 @@ export function useChat(opts: UseChatOptions): UseChatResult {
           vector_store_ids: vectorStoreIds.length ? vectorStoreIds : undefined,
           persona_id: personaId || undefined,
           custom_system_prompt: customSystemPrompt || undefined,
+          tone_id: toneId || undefined,
+          focus_id: focusId || undefined,
+          verbosity_id: verbosityId || undefined,
+          reasoning_effort: reasoningEffort || undefined,
           context_url: attachedUrl?.url,
           web_search: webSearch || undefined,
           top_k: topK,
@@ -308,7 +331,19 @@ export function useChat(opts: UseChatOptions): UseChatResult {
 
       abortMapRef.current.set(assistantMsgId, controller);
     },
-    [api, vectorStoreIds, personaId, customSystemPrompt, topK, keyToken, webSearch],
+    [
+      api,
+      vectorStoreIds,
+      personaId,
+      customSystemPrompt,
+      toneId,
+      focusId,
+      verbosityId,
+      reasoningEffort,
+      topK,
+      keyToken,
+      webSearch,
+    ],
   );
 
   // Shared core for sendMessage/regenerateFrom/editAndResend: appends a user
@@ -343,6 +378,10 @@ export function useChat(opts: UseChatOptions): UseChatResult {
                 vectorStoreIds,
                 personaId,
                 customSystemPrompt,
+                toneId,
+                focusId,
+                verbosityId,
+                reasoningEffort: reasoningEffort || undefined,
                 keyAlias,
                 keyToken,
                 webSearch,
@@ -360,7 +399,23 @@ export function useChat(opts: UseChatOptions): UseChatResult {
         }
       });
     },
-    [activeThread, api, keyToken, model, vectorStoreIds, personaId, customSystemPrompt, keyAlias, webSearch, startStream, stopGeneration],
+    [
+      activeThread,
+      api,
+      keyToken,
+      model,
+      vectorStoreIds,
+      personaId,
+      customSystemPrompt,
+      toneId,
+      focusId,
+      verbosityId,
+      reasoningEffort,
+      keyAlias,
+      webSearch,
+      startStream,
+      stopGeneration,
+    ],
   );
 
   // Compare mode: sends the same prompt to every model in `models` in
@@ -404,6 +459,10 @@ export function useChat(opts: UseChatOptions): UseChatResult {
                 vectorStoreIds,
                 personaId,
                 customSystemPrompt,
+                toneId,
+                focusId,
+                verbosityId,
+                reasoningEffort: reasoningEffort || undefined,
                 keyAlias,
                 keyToken,
                 webSearch,
@@ -423,7 +482,22 @@ export function useChat(opts: UseChatOptions): UseChatResult {
         });
       });
     },
-    [activeThread, api, keyToken, vectorStoreIds, personaId, customSystemPrompt, keyAlias, webSearch, startStream, stopGeneration],
+    [
+      activeThread,
+      api,
+      keyToken,
+      vectorStoreIds,
+      personaId,
+      customSystemPrompt,
+      toneId,
+      focusId,
+      verbosityId,
+      reasoningEffort,
+      keyAlias,
+      webSearch,
+      startStream,
+      stopGeneration,
+    ],
   );
 
   const sendMessage = useCallback(
@@ -601,6 +675,9 @@ export function useChat(opts: UseChatOptions): UseChatResult {
           model: activeThread.model,
           personaId: activeThread.personaId || undefined,
           vectorStoreIds: activeThread.vectorStoreIds,
+          toneId: activeThread.toneId || undefined,
+          focusId: activeThread.focusId || undefined,
+          verbosityId: activeThread.verbosityId || undefined,
         })
         .catch((err: Error) => setError(err.message));
     },

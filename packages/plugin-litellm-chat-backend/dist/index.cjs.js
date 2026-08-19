@@ -81541,6 +81541,87 @@ async function fetchUrlContext(rawUrl, maxChars = DEFAULT_MAX_CHARS) {
   throw Object.assign(new Error("too many redirects"), { status: 400 });
 }
 
+// src/traits.ts
+var TONE_OPTIONS = [
+  {
+    id: "friendly",
+    label: "Friendly",
+    prompt: "Tone: warm, encouraging, conversational."
+  },
+  {
+    id: "formal",
+    label: "Formal",
+    prompt: "Tone: precise, professional, formal register."
+  },
+  {
+    id: "direct",
+    label: "Direct",
+    prompt: "Tone: blunt and to the point \u2014 no hedging, no filler."
+  },
+  {
+    id: "socratic",
+    label: "Socratic",
+    prompt: "Tone: mentor-style \u2014 ask a clarifying or guiding question before giving the answer when the question is ambiguous or underspecified."
+  },
+  {
+    id: "playful",
+    label: "Playful",
+    prompt: "Tone: light, witty, occasional humor \u2014 stay accurate throughout."
+  }
+];
+var FOCUS_OPTIONS = [
+  {
+    id: "explain",
+    label: "Explain reasoning",
+    prompt: "Focus: prioritize explaining the reasoning and trade-offs behind the answer, not just the answer itself."
+  },
+  {
+    id: "actionable",
+    label: "Actionable",
+    prompt: "Focus: prioritize a concrete, actionable recommendation or next step over background."
+  },
+  {
+    id: "code",
+    label: "Code-first",
+    prompt: "Focus: prioritize code examples and concrete snippets over prose explanation."
+  },
+  {
+    id: "business",
+    label: "Business impact",
+    prompt: "Focus: frame the answer in terms of business impact, cost, and risk rather than technical detail."
+  },
+  {
+    id: "risk",
+    label: "Risk & edge cases",
+    prompt: "Focus: proactively call out edge cases, risks, and failure modes."
+  }
+];
+var VERBOSITY_OPTIONS = [
+  {
+    id: "concise",
+    label: "Concise",
+    prompt: "Length: be concise \u2014 short answers, no repetition, no unnecessary preamble."
+  },
+  {
+    id: "balanced",
+    label: "Balanced",
+    prompt: "Length: balance completeness and brevity."
+  },
+  {
+    id: "thorough",
+    label: "Thorough",
+    prompt: "Length: be thorough and comprehensive \u2014 include context, caveats, and examples."
+  }
+];
+function resolveTrait(options, id) {
+  if (!id) return void 0;
+  const found = options.find((o) => o.id === id);
+  if (!found) {
+    throw Object.assign(new Error(`invalid trait id: ${id}`), { status: 400 });
+  }
+  return found.prompt;
+}
+
 // src/router.ts
 var PERSONA_PROMPT_TTL_MS = 5 * 60 * 1e3;
 function readChatConfig(config) {
@@ -81599,10 +81680,13 @@ async function createRouter(options) {
     });
     return systemPrompt;
   }
-  async function applyPersona(personaId, customSystemPrompt, messages) {
+  async function composeSystemPrompt(personaId, toneId, focusId, verbosityId, customSystemPrompt, messages) {
     const personaPrompt = personaId ? await resolvePersonaPrompt(personaId) : void 0;
+    const tonePrompt = resolveTrait(TONE_OPTIONS, toneId);
+    const focusPrompt = resolveTrait(FOCUS_OPTIONS, focusId);
+    const verbosityPrompt = resolveTrait(VERBOSITY_OPTIONS, verbosityId);
     const trimmedCustom = customSystemPrompt?.trim() || void 0;
-    const systemPrompt = [personaPrompt, trimmedCustom].filter(Boolean).join("\n\n");
+    const systemPrompt = [personaPrompt, tonePrompt, focusPrompt, verbosityPrompt, trimmedCustom].filter(Boolean).join("\n\n");
     if (!systemPrompt) return messages;
     return [{ id: "persona-system", role: "system", content: systemPrompt }, ...messages];
   }
@@ -81715,6 +81799,14 @@ async function createRouter(options) {
       logger.error("Failed to list personas", err);
       res.status(502).json({ error: err.message });
     }
+  });
+  router.get("/chat/traits", (_req, res) => {
+    const strip = (opts) => opts.map(({ id, label }) => ({ id, label }));
+    res.json({
+      tones: strip(TONE_OPTIONS),
+      focuses: strip(FOCUS_OPTIONS),
+      verbosities: strip(VERBOSITY_OPTIONS)
+    });
   });
   router.get("/vector_stores", async (_req, res) => {
     try {
@@ -81846,7 +81938,10 @@ async function createRouter(options) {
         answer: body.answer ?? "",
         model: body.model ?? "",
         persona_id: body.personaId ?? null,
-        vector_store_ids: body.vectorStoreIds ? JSON.stringify(body.vectorStoreIds) : null
+        vector_store_ids: body.vectorStoreIds ? JSON.stringify(body.vectorStoreIds) : null,
+        tone_id: body.toneId ?? null,
+        focus_id: body.focusId ?? null,
+        verbosity_id: body.verbosityId ?? null
       }).onConflict(["thread_id", "message_id", "user_ref"]).merge({ vote: body.vote, comment: body.comment ?? null });
       res.json({ success: true });
     } catch (err) {
@@ -81925,8 +82020,11 @@ async function createRouter(options) {
         personaId: body.persona_id,
         grounded: !!body.vector_store_ids?.length
       });
-      let messages = await applyPersona(
+      let messages = await composeSystemPrompt(
         body.persona_id,
+        body.tone_id,
+        body.focus_id,
+        body.verbosity_id,
         body.custom_system_prompt,
         body.messages
       );
@@ -81942,6 +82040,9 @@ async function createRouter(options) {
       }
       if (body.web_search) {
         payload.web_search_options = {};
+      }
+      if (body.reasoning_effort) {
+        payload.reasoning_effort = body.reasoning_effort;
       }
       const upstream = await fetch(
         `${chatConfig.baseUrl}/v1/chat/completions`,
@@ -81987,8 +82088,11 @@ async function createRouter(options) {
         personaId: body.persona_id,
         grounded: !!body.vector_store_ids?.length
       });
-      let messages = await applyPersona(
+      let messages = await composeSystemPrompt(
         body.persona_id,
+        body.tone_id,
+        body.focus_id,
+        body.verbosity_id,
         body.custom_system_prompt,
         body.messages
       );
@@ -82005,6 +82109,9 @@ async function createRouter(options) {
       }
       if (body.web_search) {
         chatBody.web_search_options = {};
+      }
+      if (body.reasoning_effort) {
+        chatBody.reasoning_effort = body.reasoning_effort;
       }
       await proxySSE({
         upstreamUrl: `${base}/v1/chat/completions`,

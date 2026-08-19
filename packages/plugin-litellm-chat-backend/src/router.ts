@@ -17,6 +17,7 @@ import {
 import { proxySSE } from './stream';
 import { entityToPersonaSummary, resolveSystemPrompt } from './persona';
 import { fetchUrlContext, FetchedUrlContext } from './urlContext';
+import { TONE_OPTIONS, FOCUS_OPTIONS, VERBOSITY_OPTIONS, resolveTrait } from './traits';
 import type {
   VectorStore,
   ChatStreamRequest,
@@ -113,19 +114,28 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
     return systemPrompt;
   }
 
-  // Prepends a system message to `messages` combining the persona's system
-  // prompt (if `personaId` is set) with the user's free-text
-  // `customSystemPrompt` (if set) — persona first, then the custom prompt
-  // appended below it. If only one of the two is present, that one is used
-  // as-is; if neither is present, `messages` is returned unchanged.
-  async function applyPersona(
+  // Prepends a system message to `messages` layering, in order: the
+  // persona's system prompt, then tone/focus/verbosity trait fragments
+  // (each resolved server-side by id, see traits.ts), then the user's
+  // free-text `customSystemPrompt` last — so a power user's free text can
+  // override or emphasize anything above it. Any layer that's unset is
+  // skipped; if nothing resolves, `messages` is returned unchanged.
+  async function composeSystemPrompt(
     personaId: string | undefined,
+    toneId: string | undefined,
+    focusId: string | undefined,
+    verbosityId: string | undefined,
     customSystemPrompt: string | undefined,
     messages: ChatMessage[],
   ): Promise<ChatMessage[]> {
     const personaPrompt = personaId ? await resolvePersonaPrompt(personaId) : undefined;
+    const tonePrompt = resolveTrait(TONE_OPTIONS, toneId);
+    const focusPrompt = resolveTrait(FOCUS_OPTIONS, focusId);
+    const verbosityPrompt = resolveTrait(VERBOSITY_OPTIONS, verbosityId);
     const trimmedCustom = customSystemPrompt?.trim() || undefined;
-    const systemPrompt = [personaPrompt, trimmedCustom].filter(Boolean).join('\n\n');
+    const systemPrompt = [personaPrompt, tonePrompt, focusPrompt, verbosityPrompt, trimmedCustom]
+      .filter(Boolean)
+      .join('\n\n');
     if (!systemPrompt) return messages;
     return [{ id: 'persona-system', role: 'system', content: systemPrompt }, ...messages];
   }
@@ -289,6 +299,18 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
     }
   });
 
+  // Static tone/focus/verbosity option lists for the pickers — id/label
+  // only, never the prompt text (see traits.ts). Requested once at page
+  // load, same shape as /personas.
+  router.get('/chat/traits', (_req: Request, res: Response) => {
+    const strip = (opts: typeof TONE_OPTIONS) => opts.map(({ id, label }) => ({ id, label }));
+    res.json({
+      tones: strip(TONE_OPTIONS),
+      focuses: strip(FOCUS_OPTIONS),
+      verbosities: strip(VERBOSITY_OPTIONS),
+    });
+  });
+
   router.get('/vector_stores', async (_req: Request, res: Response) => {
     try {
       res.json(await fetchVectorStores());
@@ -450,6 +472,9 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
           vector_store_ids: body.vectorStoreIds
             ? JSON.stringify(body.vectorStoreIds)
             : null,
+          tone_id: body.toneId ?? null,
+          focus_id: body.focusId ?? null,
+          verbosity_id: body.verbosityId ?? null,
         })
         .onConflict(['thread_id', 'message_id', 'user_ref'])
         .merge({ vote: body.vote, comment: body.comment ?? null });
@@ -547,8 +572,11 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
         grounded: !!body.vector_store_ids?.length,
       });
 
-      let messages = await applyPersona(
+      let messages = await composeSystemPrompt(
         body.persona_id,
+        body.tone_id,
+        body.focus_id,
+        body.verbosity_id,
         body.custom_system_prompt,
         body.messages,
       );
@@ -565,6 +593,9 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       }
       if (body.web_search) {
         payload.web_search_options = {};
+      }
+      if (body.reasoning_effort) {
+        payload.reasoning_effort = body.reasoning_effort;
       }
 
       const upstream = await fetch(
@@ -614,8 +645,11 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
         grounded: !!body.vector_store_ids?.length,
       });
 
-      let messages = await applyPersona(
+      let messages = await composeSystemPrompt(
         body.persona_id,
+        body.tone_id,
+        body.focus_id,
+        body.verbosity_id,
         body.custom_system_prompt,
         body.messages,
       );
@@ -638,6 +672,9 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       }
       if (body.web_search) {
         chatBody.web_search_options = {};
+      }
+      if (body.reasoning_effort) {
+        chatBody.reasoning_effort = body.reasoning_effort;
       }
       await proxySSE({
         upstreamUrl: `${base}/v1/chat/completions`,
