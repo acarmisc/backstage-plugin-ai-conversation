@@ -31,6 +31,9 @@ litellm:
   masterKey: ${LITELLM_MASTER_KEY}
   chat:
     defaultModel: claude-3-5-sonnet
+    persistence:
+      enabled: false   # opt-in: persist chat threads server-side instead of browser-only
+      ttlDays: 30       # auto-delete threads after N days of inactivity; 0 = keep forever
 ```
 
 ## Features
@@ -41,7 +44,7 @@ litellm:
 - **Conversation customization**: Independent Tone, Focus, and Verbosity pickers layer short prompt fragments on top of the persona/custom prompt, plus a Reasoning effort picker (`low`/`medium`/`high`) forwarded natively to models that support it — mix and match without needing a dedicated persona per combination.
 - **Governance Integrated**: Inherits all user authentication, budget, and rate limiting from the existing LiteLLM Governance plugin.
 - **Per-user Keys**: Allow users to select their own LiteLLM keys for spend attribution.
-- **Threads**: Search, pin, export/import as portable JSON.
+- **Threads**: Search, pin, export/import as portable JSON. Client-side by default (localStorage); optionally persisted server-side via `litellm.chat.persistence.enabled`, with a configurable retention period (`ttlDays`, default 30, `0` = unlimited) enforced by a background cleanup job.
 - **Compare mode**: Send the same prompt to several models in parallel and compare replies side by side.
 - **LaTeX rendering** in assistant messages.
 - **Analytics**: A lightweight `/ai-chat/analytics` page for usage-by-persona/model and feedback totals.

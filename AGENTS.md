@@ -27,7 +27,7 @@ The chat plugin reuses all of this by **importing from the govai package**, not 
 | Decision | Choice | Rationale |
 |---|---|---|
 | Packaging | Separate plugin pair (`plugin-litellm-chat` + `plugin-litellm-chat-backend`) | Independently versionable; keeps governance and chat concerns decoupled; matches govai's monorepo pattern. |
-| Thread persistence | Client-side ephemeral (React state + localStorage) | LiteLLM is stateless — each turn resends full history anyway. No backend schema for threads themselves. Add DB persistence later if users ask. Exception: message feedback (thumbs up/down) is persisted server-side in a `chat_message_feedback` table (via `coreServices.database`), as a snapshotted event, not full thread history — see `plugin-litellm-chat-backend/migrations/`. |
+| Thread persistence | Client-side ephemeral by default (React state + localStorage); **opt-in server-side persistence** via `litellm.chat.persistence.enabled` (phase16) | LiteLLM is stateless — each turn resends full history anyway, so DB persistence was deferred until users actually asked for cross-device/durable history. Now available as an operator-controlled toggle: `chat_threads` table (`plugin-litellm-chat-backend/migrations/20260819130000_chat_threads.js`), `GET/PUT/DELETE /api/litellm-chat/threads[/:id]`, gated 404 when disabled. When enabled, the backend becomes authoritative — `useChat` loads the server's thread list on mount and syncs the active thread + create/delete/pin/import mutations back; localStorage is kept as a fast local cache/offline fallback either way. Auto-deletion after `ttlDays` (default 30, `0` = unlimited) runs via `coreServices.scheduler` (not a plain interval — DB-backed leader coordination matters here since the target deployment runs 2 Backstage replicas, see "Target environment" below). Message feedback (thumbs up/down) remains its own separate `chat_message_feedback` table/mechanism, a snapshotted event rather than full thread history. |
 | RAG endpoint | `/v1/rag/query` primary, `/v1/chat/completions` + `vector_store_ids` fallback | `/v1/rag/query` is model-agnostic (prepend-context, not provider-native tool). Fallback handles LiteLLM versions where `/rag/query` isn't mounted. |
 | Chat key strategy | User picks a key in the UI (dropdown from their existing keys) | Spend attribution to the user's chosen key; per-key budget/limits enforced natively by LiteLLM; no surprise auto-minted keys. |
 | UI surfaces | Full chat page at `/ai-chat` | v1 ships the page. Sidebar modal and home widget are future work. |
@@ -84,6 +84,9 @@ The chat plugin reuses all of this by **importing from the govai package**, not 
 | `/chat/traits` | GET | Static tone/focus/verbosity option lists for the pickers (id/label only — see `traits.ts`). |
 | `/chat/stream` | POST | Streaming chat proxy. The one new piece of engineering. Accepts optional `persona_id`, `tone_id`, `focus_id`, `verbosity_id` (composed server-side into one system message, in that order, persona first — see `composeSystemPrompt` in `router.ts`), and `reasoning_effort` (`low`\|`medium`\|`high`, forwarded to LiteLLM as-is, not composed into the prompt). |
 | `/chat/completions` | POST | Non-streaming chat variant. |
+| `/threads` | GET | (phase16) Lists the authenticated user's persisted threads. 404 when `litellm.chat.persistence.enabled` is false. |
+| `/threads/:id` | PUT | (phase16) Upserts a thread (title/pinned/data — `data` is opaque JSON, size-capped at 1MB). 404 when persistence is disabled. |
+| `/threads/:id` | DELETE | (phase16) Deletes one persisted thread, scoped to the authenticated user. 404 when persistence is disabled. |
 
 ### `/chat/stream` request body (from browser)
 
@@ -124,6 +127,9 @@ litellm:
     defaultModel: claude-3-5-sonnet        # optional, pre-selected in UI
     defaultVectorStoreIds: []               # optional, pre-selected in UI
     maxRequestBudget:                       # optional, USD guard (real enforcement is per-key in LiteLLM)
+    persistence:                            # optional (phase16), off by default
+      enabled: false                        # persist chat threads server-side instead of browser-only
+      ttlDays: 30                           # auto-delete threads after N days of inactivity; 0 = unlimited
 ```
 
 ### Plugin registration
@@ -237,7 +243,8 @@ backstage-plugin-litellm-rag-ai/
     │       ├── api.ts
     │       ├── types.ts
     │       ├── hooks/
-    │       │   └── useChat.ts
+    │       │   ├── useChat.ts
+    │       │   └── threadPersistence.ts
     │       └── components/
     │           ├── ChatPage.tsx
     │           ├── ChatComposer.tsx
@@ -257,6 +264,7 @@ backstage-plugin-litellm-rag-ai/
             ├── plugin.ts
             ├── router.ts
             ├── stream.ts                  # SSE proxy helper
+            ├── persistence.ts             # chat_threads CRUD + TTL purge (phase16)
             └── types.ts
 ```
 
@@ -277,10 +285,10 @@ backstage-plugin-litellm-rag-ai/
 13. **Multi-model compare** — per-thread `mode: 'single' | 'compare'`; compare mode streams the same prompt to several models in parallel (`runCompareSend`), each into its own message sharing a `turnId`, rendered as side-by-side columns. Required moving `useChat` off a single global `AbortController`/`isStreaming` flag onto a `Map<messageId, AbortController>` plus a `streamingMessageIds` set.
 14. **Web search toggle** — passes `web_search` through as LiteLLM's `web_search_options` alongside (not instead of) any selected knowledge bases; sources panel labels results Web vs Knowledge base by a `url`-field heuristic (LiteLLM doesn't tag result origin explicitly). Assumes the target LiteLLM deployment has a native web-search-capable model — **unverified against the live proxy**, see the "Known gaps" note below.
 15. **Analytics dashboard** — `chat_events` migration + best-effort per-turn logging (thread_id/user_ref/model/persona_id/grounded, not message content), `GET /feedback/summary` + `GET /usage/summary?groupBy=persona|model&range=`, `/ai-chat/analytics` page with hand-rolled bar charts (no new charting dependency). The summary endpoints return aggregate counts only, so they're reachable by any authenticated user — genuine admin-only *page* access requires a permission-policy in the target Backstage app, which this repo doesn't own (see "Known gaps").
+16. **Opt-in server-side thread persistence** — `chat_threads` migration (`id`+`user_ref` composite PK, opaque JSON `data` column) behind `litellm.chat.persistence.enabled` (default `false`). `GET/PUT/DELETE /api/litellm-chat/threads[/:id]`, each 404ing when persistence is off. `data` is never interpreted server-side — it's the frontend's `Thread` shape minus the live `keyToken`/`keyAlias` credential (same exclusion `exportThread()` already applied — see `hooks/threadPersistence.ts`'s `toSaveThreadBody`/`fromPersisted`), size-capped at 1MB per thread (`persistence.ts`). `useChat` treats the backend as authoritative once enabled: loads the server's list on mount (replacing whatever localStorage had), and syncs the active thread on the same 400ms debounce that already drives the localStorage write, plus immediate syncs on create/delete/pin/import — localStorage keeps writing regardless, as an offline cache/fallback. Auto-deletion after `ttlDays` (default 30, `0` = unlimited) runs via `coreServices.scheduler`, not a plain `setInterval` — the target deployment runs 2 Backstage replicas (see "Target environment"), and the scheduler service's DB-backed task locking is what keeps the sweep from running twice per tick.
 
 ## Things NOT in v1
 
-- **DB-backed threads** — client-side ephemeral only. Revisit if users ask. (Message feedback is the one exception — see the Thread persistence row above.)
 - **Bridge/CLI auth for chat** — chat is browser-only. The govai Keycloak bridge is for key minting by the Abby CLI.
 - **Custom chunking/reranker/hybrid search** — LiteLLM's `retrieval_config` gives `top_k` and optional rerank. If fine-grained retrieval control is needed later, build a dedicated retrieval service.
 - **File upload** — pgvector ingests files via its own admin API. Backstage chat is query-side only.
@@ -295,6 +303,7 @@ backstage-plugin-litellm-rag-ai/
 - **`#url` extraction (phase12) is regex-based HTML stripping**, not a DOM parser — deliberately avoids adding `jsdom`/`@mozilla/readability` as new dependencies. Good enough for typical article/doc pages; will do worse than a real reader-mode extractor on heavily scripted or non-semantic-HTML pages.
 - **Compare mode (phase13) shares one `citations`/`lastTurnUsage` slot across all columns** — whichever model's stream reports search results or usage last "wins" in the sources/usage panels. A real per-column breakdown would need those to become keyed by message id, deferred since it's cosmetic, not a correctness issue.
 - **Web vs Knowledge base citation labeling (phase14) is a heuristic** (`url` field present ⇒ web), not something LiteLLM tags explicitly — verify against real web-search response shapes before trusting the label in the UI.
+- **Persisted thread content (phase16) is plaintext at rest**, relying on Postgres-level protections (network policy, disk encryption if configured) rather than any application-level encryption — same trust boundary as `chat_message_feedback`/`chat_events`, but now covering full message content instead of aggregate/snapshot data. There's also no bulk "delete all my threads" endpoint yet (only per-thread `DELETE /threads/:id`); a full-account erasure request currently means either waiting out `ttlDays` or an operator running a manual `DELETE FROM chat_threads WHERE user_ref = ...`. Turning `persistence.enabled` on is a deliberate data-governance decision for the operator, not just a feature flag — see the plugin's chat-history-persistence design discussion for the full pros/cons.
 
 ## Build and test
 

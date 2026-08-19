@@ -81622,7 +81622,87 @@ function resolveTrait(options, id) {
   return found.prompt;
 }
 
+// src/persistence.ts
+var CHAT_THREADS_TABLE = "chat_threads";
+var MAX_THREAD_PAYLOAD_BYTES = 1e6;
+var MAX_THREAD_TITLE_LENGTH = 300;
+var ThreadValidationError = class extends Error {
+  constructor() {
+    super(...arguments);
+    this.status = 400;
+  }
+};
+var ThreadPayloadTooLargeError = class extends Error {
+  constructor() {
+    super(...arguments);
+    this.status = 413;
+  }
+};
+function serializeThreadPayload(body) {
+  if (!body || typeof body !== "object") {
+    throw new ThreadValidationError("thread body required");
+  }
+  if (typeof body.title !== "string" || !body.title.trim()) {
+    throw new ThreadValidationError("title required");
+  }
+  if (body.data === void 0) {
+    throw new ThreadValidationError("data required");
+  }
+  const title = body.title.slice(0, MAX_THREAD_TITLE_LENGTH);
+  const data = JSON.stringify(body.data);
+  if (Buffer.byteLength(data, "utf8") > MAX_THREAD_PAYLOAD_BYTES) {
+    throw new ThreadPayloadTooLargeError("thread payload too large");
+  }
+  return { title, pinned: !!body.pinned, data };
+}
+function mapThreadRow(row) {
+  let data = null;
+  try {
+    data = JSON.parse(row.data);
+  } catch {
+    data = null;
+  }
+  return {
+    id: row.id,
+    title: row.title,
+    pinned: !!row.pinned,
+    data,
+    createdAt: new Date(row.created_at).toISOString(),
+    updatedAt: new Date(row.updated_at).toISOString()
+  };
+}
+function computeExpiryCutoff(ttlDays, now = /* @__PURE__ */ new Date()) {
+  if (!ttlDays || ttlDays <= 0) return null;
+  return new Date(now.getTime() - ttlDays * 24 * 60 * 60 * 1e3);
+}
+async function listThreads(db, userRef) {
+  const rows = await db(CHAT_THREADS_TABLE).where("user_ref", userRef).orderBy("updated_at", "desc");
+  return rows.map(mapThreadRow);
+}
+async function saveThread(db, userRef, id, body) {
+  if (!id) throw new ThreadValidationError("thread id required");
+  const { title, pinned, data } = serializeThreadPayload(body);
+  await db(CHAT_THREADS_TABLE).insert({
+    id,
+    user_ref: userRef,
+    title,
+    pinned,
+    data,
+    updated_at: db.fn.now()
+  }).onConflict(["id", "user_ref"]).merge({ title, pinned, data, updated_at: db.fn.now() });
+}
+async function deleteThread(db, userRef, id) {
+  await db(CHAT_THREADS_TABLE).where({ id, user_ref: userRef }).del();
+}
+async function purgeExpiredThreads(db, ttlDays) {
+  const cutoff = computeExpiryCutoff(ttlDays);
+  if (!cutoff) return 0;
+  return db(CHAT_THREADS_TABLE).where("updated_at", "<", cutoff).del();
+}
+
 // src/router.ts
+var DEFAULT_PERSISTENCE_TTL_DAYS = 30;
+var THREAD_CLEANUP_TASK_ID = "litellm-chat:thread-cleanup";
 var PERSONA_PROMPT_TTL_MS = 5 * 60 * 1e3;
 function readChatConfig(config) {
   return {
@@ -81632,7 +81712,11 @@ function readChatConfig(config) {
       "litellm.chat.defaultVectorStoreIds"
     ),
     maxRequestBudget: config.getOptionalNumber("litellm.chat.maxRequestBudget"),
-    fetchContextMaxChars: config.getOptionalNumber("litellm.chat.fetchContext.maxChars")
+    fetchContextMaxChars: config.getOptionalNumber("litellm.chat.fetchContext.maxChars"),
+    persistence: {
+      enabled: config.getOptionalBoolean("litellm.chat.persistence.enabled") ?? false,
+      ttlDays: config.getOptionalNumber("litellm.chat.persistence.ttlDays") ?? DEFAULT_PERSISTENCE_TTL_DAYS
+    }
   };
 }
 function rangeToCutoff(range) {
@@ -81644,7 +81728,7 @@ function rangeToCutoff(range) {
   return new Date(Date.now() - ms);
 }
 async function createRouter(options) {
-  const { config, logger, auth, catalog, database, urlReader } = options;
+  const { config, logger, auth, catalog, database, urlReader, scheduler } = options;
   const chatConfig = readChatConfig(config);
   const scm = import_integration.ScmIntegrations.fromConfig(config);
   const promptDeps = { reader: urlReader, scm };
@@ -81658,6 +81742,20 @@ async function createRouter(options) {
         "@acarmisc/backstage-plugin-litellm-chat-backend",
         "migrations"
       )
+    });
+  }
+  if (chatConfig.persistence.enabled && chatConfig.persistence.ttlDays > 0) {
+    await scheduler.scheduleTask({
+      id: THREAD_CLEANUP_TASK_ID,
+      frequency: { hours: 24 },
+      timeout: { minutes: 5 },
+      initialDelay: { seconds: 30 },
+      fn: async () => {
+        const deleted = await purgeExpiredThreads(dbClient, chatConfig.persistence.ttlDays);
+        if (deleted > 0) {
+          logger.info(`Purged ${deleted} expired chat thread(s) (ttlDays=${chatConfig.persistence.ttlDays})`);
+        }
+      }
     });
   }
   async function resolvePersonaPrompt(personaId) {
@@ -81771,7 +81869,8 @@ async function createRouter(options) {
     res.json({
       defaultModel: chatConfig.defaultModel ?? null,
       defaultVectorStoreIds: chatConfig.defaultVectorStoreIds ?? null,
-      maxRequestBudget: chatConfig.maxRequestBudget ?? null
+      maxRequestBudget: chatConfig.maxRequestBudget ?? null,
+      persistence: chatConfig.persistence
     });
   });
   router.get("/personas", async (_req, res) => {
@@ -81998,6 +82097,65 @@ async function createRouter(options) {
       res.status(500).json({ error: err.message });
     }
   });
+  router.get("/threads", async (req, res) => {
+    if (!chatConfig.persistence.enabled) {
+      res.status(404).json({ error: "chat history persistence is disabled" });
+      return;
+    }
+    try {
+      const tokenEntityRef = await (0, import_backstage_plugin_litellm_backend.resolveUserId)(req, auth);
+      if (!tokenEntityRef) {
+        res.status(401).json({ error: "unauthenticated" });
+        return;
+      }
+      const threads = await listThreads(dbClient, tokenEntityRef);
+      res.json(threads);
+    } catch (err) {
+      logger.error("Failed to list persisted threads", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+  router.put("/threads/:id", async (req, res) => {
+    if (!chatConfig.persistence.enabled) {
+      res.status(404).json({ error: "chat history persistence is disabled" });
+      return;
+    }
+    try {
+      const tokenEntityRef = await (0, import_backstage_plugin_litellm_backend.resolveUserId)(req, auth);
+      if (!tokenEntityRef) {
+        res.status(401).json({ error: "unauthenticated" });
+        return;
+      }
+      await saveThread(
+        dbClient,
+        tokenEntityRef,
+        req.params.id,
+        req.body
+      );
+      res.json({ success: true });
+    } catch (err) {
+      logger.warn(`Failed to save thread ${req.params.id}: ${err.message}`);
+      res.status(err.status ?? 500).json({ error: err.message });
+    }
+  });
+  router.delete("/threads/:id", async (req, res) => {
+    if (!chatConfig.persistence.enabled) {
+      res.status(404).json({ error: "chat history persistence is disabled" });
+      return;
+    }
+    try {
+      const tokenEntityRef = await (0, import_backstage_plugin_litellm_backend.resolveUserId)(req, auth);
+      if (!tokenEntityRef) {
+        res.status(401).json({ error: "unauthenticated" });
+        return;
+      }
+      await deleteThread(dbClient, tokenEntityRef, req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      logger.error(`Failed to delete thread ${req.params.id}`, err);
+      res.status(500).json({ error: err.message });
+    }
+  });
   router.post("/chat/completions", async (req, res) => {
     try {
       const body = req.body;
@@ -82143,9 +82301,20 @@ var litellmChatPlugin = (0, import_backend_plugin_api2.createBackendPlugin)({
         discovery: import_backend_plugin_api2.coreServices.discovery,
         catalog: import_plugin_catalog_node.catalogServiceRef,
         database: import_backend_plugin_api2.coreServices.database,
-        urlReader: import_backend_plugin_api2.coreServices.urlReader
+        urlReader: import_backend_plugin_api2.coreServices.urlReader,
+        scheduler: import_backend_plugin_api2.coreServices.scheduler
       },
-      async init({ httpRouter, config, logger, auth, discovery, catalog, database, urlReader }) {
+      async init({
+        httpRouter,
+        config,
+        logger,
+        auth,
+        discovery,
+        catalog,
+        database,
+        urlReader,
+        scheduler
+      }) {
         const router = await createRouter({
           config,
           logger,
@@ -82153,7 +82322,8 @@ var litellmChatPlugin = (0, import_backend_plugin_api2.createBackendPlugin)({
           discovery,
           catalog,
           database,
-          urlReader
+          urlReader,
+          scheduler
         });
         httpRouter.use(router);
       }

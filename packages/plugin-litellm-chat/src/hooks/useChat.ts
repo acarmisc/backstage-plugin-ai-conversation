@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { useApi } from '@backstage/core-plugin-api';
 import { liteLlmChatApiRef, LiteLlmChatApi } from '../api';
 import { computeRegenerateTarget, computeEditTarget } from './chatTruncation';
+import { fromPersisted } from './threadPersistence';
 import type {
   Thread,
   ChatMessage,
@@ -59,6 +60,12 @@ export interface UseChatOptions {
   keyToken: string;
   topK?: number;
   webSearch?: boolean;
+  /** Mirrors `litellm.chat.persistence.enabled` (see config.d.ts). When
+   * true, threads are synced to the backend in addition to localStorage —
+   * on enable, the backend's thread list replaces local state (server is
+   * authoritative once persistence is on). When false (default), behavior
+   * is unchanged from client-side-only threads. */
+  persistenceEnabled?: boolean;
 }
 
 export interface UseChatResult {
@@ -104,6 +111,7 @@ export function useChat(opts: UseChatOptions): UseChatResult {
     keyToken,
     topK,
     webSearch,
+    persistenceEnabled,
   } = opts;
   const api = useApi(liteLlmChatApiRef) as InstanceType<typeof LiteLlmChatApi>;
 
@@ -127,15 +135,31 @@ export function useChat(opts: UseChatOptions): UseChatResult {
   // one is a synchronous, main-thread-blocking JSON.stringify per token.
   const threadsRef = useRef<Thread[]>(threads);
   threadsRef.current = threads;
+  const activeIdRef = useRef<string | null>(activeId);
+  activeIdRef.current = activeId;
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Syncs the active thread to the backend when persistence is enabled.
+  // Only the active thread, not the whole list — it's the one that changes
+  // on every streamed token, while other threads change only at specific
+  // mutation points (create/delete/pin/import), each of which syncs itself
+  // directly (see newThread/deleteThread/togglePin/importThread below).
+  // Best-effort: a sync failure degrades to localStorage-only for that
+  // thread rather than surfacing an error mid-stream.
+  const syncActiveThreadToBackend = useCallback(() => {
+    if (!persistenceEnabled) return;
+    const active = threadsRef.current.find(t => t.id === activeIdRef.current);
+    if (active) api.saveThread(active).catch(() => {});
+  }, [persistenceEnabled, api]);
 
   useEffect(() => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => {
       saveTimeoutRef.current = null;
       saveThreads(userId, threadsRef.current);
+      syncActiveThreadToBackend();
     }, SAVE_DEBOUNCE_MS);
-  }, [userId, threads]);
+  }, [userId, threads, syncActiveThreadToBackend]);
 
   // Flush any pending debounced write on unmount or tab close so a save
   // scheduled just before either doesn't get lost.
@@ -146,13 +170,37 @@ export function useChat(opts: UseChatOptions): UseChatResult {
         saveTimeoutRef.current = null;
       }
       saveThreads(userId, threadsRef.current);
+      syncActiveThreadToBackend();
     };
     window.addEventListener('beforeunload', flush);
     return () => {
       window.removeEventListener('beforeunload', flush);
       flush();
     };
-  }, [userId]);
+  }, [userId, syncActiveThreadToBackend]);
+
+  // When persistence is enabled, the backend's thread list is authoritative
+  // — load it once and replace whatever localStorage had (which may be
+  // stale or from before persistence was turned on). A fetch failure
+  // degrades to the localStorage-loaded threads already in state rather
+  // than clearing the sidebar.
+  useEffect(() => {
+    if (!persistenceEnabled) return;
+    let cancelled = false;
+    api
+      .listThreads()
+      .then(persisted => {
+        if (cancelled) return;
+        setThreads(persisted.map(fromPersisted));
+      })
+      .catch(err => {
+        if (!cancelled) setError(err.message);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [persistenceEnabled]);
 
   const activeThread = threads.find(t => t.id === activeId) ?? null;
 
@@ -179,6 +227,7 @@ export function useChat(opts: UseChatOptions): UseChatResult {
     };
     setThreads(prev => [thread, ...prev]);
     setActiveId(thread.id);
+    if (persistenceEnabled) api.saveThread(thread).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [keyToken, activeId]);
 
@@ -203,7 +252,17 @@ export function useChat(opts: UseChatOptions): UseChatResult {
     setError(null);
     setCitations([]);
     setKeySpend(null);
-  }, [model, vectorStoreIds, personaId, customSystemPrompt, keyAlias, keyToken]);
+    if (persistenceEnabled) api.saveThread(thread).catch(() => {});
+  }, [
+    model,
+    vectorStoreIds,
+    personaId,
+    customSystemPrompt,
+    keyAlias,
+    keyToken,
+    persistenceEnabled,
+    api,
+  ]);
 
   const selectThread = useCallback((id: string) => {
     setActiveId(id);
@@ -224,8 +283,9 @@ export function useChat(opts: UseChatOptions): UseChatResult {
       if (thread?.keyToken) {
         api.deleteChatKey(thread.keyToken).catch(() => {});
       }
+      if (persistenceEnabled) api.deleteThread(id).catch(() => {});
     },
-    [activeId, threads, api],
+    [activeId, threads, api, persistenceEnabled],
   );
 
   const stopGeneration = useCallback(() => {
@@ -580,11 +640,20 @@ export function useChat(opts: UseChatOptions): UseChatResult {
     [activeThread],
   );
 
-  const togglePin = useCallback((id: string) => {
-    setThreads(prev =>
-      prev.map(t => (t.id === id ? { ...t, pinned: !t.pinned } : t)),
-    );
-  }, []);
+  const togglePin = useCallback(
+    (id: string) => {
+      // Computed from the ref (not the `prev` inside setThreads' updater,
+      // which React may not invoke synchronously) so the value handed to
+      // saveThread below is available right after this call, not on some
+      // later render.
+      const current = threadsRef.current.find(t => t.id === id);
+      if (!current) return;
+      const toggled: Thread = { ...current, pinned: !current.pinned };
+      setThreads(prev => prev.map(t => (t.id === id ? toggled : t)));
+      if (persistenceEnabled) api.saveThread(toggled).catch(() => {});
+    },
+    [persistenceEnabled, api],
+  );
 
   const exportThread = useCallback(
     (id: string) => {
@@ -642,7 +711,8 @@ export function useChat(opts: UseChatOptions): UseChatResult {
     };
     setThreads(prev => [imported, ...prev]);
     setActiveId(imported.id);
-  }, []);
+    if (persistenceEnabled) api.saveThread(imported).catch(() => {});
+  }, [persistenceEnabled, api]);
 
   const submitFeedback = useCallback(
     (messageId: string, vote: 'up' | 'down') => {

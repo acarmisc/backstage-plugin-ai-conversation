@@ -13,6 +13,20 @@ var __export = (target, all) => {
     __defProp(target, name, { get: all[name], enumerable: true });
 };
 
+// src/hooks/threadPersistence.ts
+function toSaveThreadBody(thread) {
+  const { keyToken: _keyToken, keyAlias: _keyAlias, ...data } = thread;
+  return { title: thread.title, pinned: !!thread.pinned, data };
+}
+function fromPersisted(persisted) {
+  return { ...persisted.data, keyToken: "", keyAlias: "" };
+}
+var init_threadPersistence = __esm({
+  "src/hooks/threadPersistence.ts"() {
+    "use strict";
+  }
+});
+
 // src/api.ts
 import { createApiRef } from "@backstage/core-plugin-api";
 function normalizeChunk(raw) {
@@ -48,6 +62,7 @@ var liteLlmChatApiRef, BASE_PATH, LiteLlmChatApi;
 var init_api = __esm({
   "src/api.ts"() {
     "use strict";
+    init_threadPersistence();
     liteLlmChatApiRef = createApiRef({
       id: "plugin.litellm-chat.api"
     });
@@ -69,7 +84,12 @@ var init_api = __esm({
       async getChatConfig() {
         const res = await this.fetchApi.fetch(`${BASE_PATH}/config`);
         if (!res.ok) {
-          return { defaultModel: null, defaultVectorStoreIds: null, maxRequestBudget: null };
+          return {
+            defaultModel: null,
+            defaultVectorStoreIds: null,
+            maxRequestBudget: null,
+            persistence: { enabled: false, ttlDays: 30 }
+          };
         }
         return res.json();
       }
@@ -218,6 +238,31 @@ var init_api = __esm({
         }
         return res.json();
       }
+      async listThreads() {
+        const res = await this.fetchApi.fetch(`${BASE_PATH}/threads`);
+        if (!res.ok) throw new Error(`threads ${res.status}`);
+        return res.json();
+      }
+      async saveThread(thread) {
+        const res = await this.fetchApi.fetch(`${BASE_PATH}/threads/${encodeURIComponent(thread.id)}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(toSaveThreadBody(thread))
+        });
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          throw new Error(`save thread ${res.status}: ${text}`);
+        }
+      }
+      async deleteThread(id) {
+        const res = await this.fetchApi.fetch(`${BASE_PATH}/threads/${encodeURIComponent(id)}`, {
+          method: "DELETE"
+        });
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          throw new Error(`delete thread ${res.status}: ${text}`);
+        }
+      }
     };
   }
 });
@@ -292,7 +337,8 @@ function useChat(opts) {
     keyAlias,
     keyToken,
     topK,
-    webSearch
+    webSearch,
+    persistenceEnabled
   } = opts;
   const api = useApi(liteLlmChatApiRef);
   const [threads, setThreads] = useState(() => loadThreads(userId));
@@ -307,14 +353,23 @@ function useChat(opts) {
   const abortMapRef = useRef(/* @__PURE__ */ new Map());
   const threadsRef = useRef(threads);
   threadsRef.current = threads;
+  const activeIdRef = useRef(activeId);
+  activeIdRef.current = activeId;
   const saveTimeoutRef = useRef(null);
+  const syncActiveThreadToBackend = useCallback(() => {
+    if (!persistenceEnabled) return;
+    const active = threadsRef.current.find((t) => t.id === activeIdRef.current);
+    if (active) api.saveThread(active).catch(() => {
+    });
+  }, [persistenceEnabled, api]);
   useEffect(() => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => {
       saveTimeoutRef.current = null;
       saveThreads(userId, threadsRef.current);
+      syncActiveThreadToBackend();
     }, SAVE_DEBOUNCE_MS);
-  }, [userId, threads]);
+  }, [userId, threads, syncActiveThreadToBackend]);
   useEffect(() => {
     const flush = () => {
       if (saveTimeoutRef.current) {
@@ -322,13 +377,27 @@ function useChat(opts) {
         saveTimeoutRef.current = null;
       }
       saveThreads(userId, threadsRef.current);
+      syncActiveThreadToBackend();
     };
     window.addEventListener("beforeunload", flush);
     return () => {
       window.removeEventListener("beforeunload", flush);
       flush();
     };
-  }, [userId]);
+  }, [userId, syncActiveThreadToBackend]);
+  useEffect(() => {
+    if (!persistenceEnabled) return;
+    let cancelled = false;
+    api.listThreads().then((persisted) => {
+      if (cancelled) return;
+      setThreads(persisted.map(fromPersisted));
+    }).catch((err) => {
+      if (!cancelled) setError(err.message);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [persistenceEnabled]);
   const activeThread = threads.find((t) => t.id === activeId) ?? null;
   useEffect(() => {
     if (!keyToken || activeId) return;
@@ -349,6 +418,8 @@ function useChat(opts) {
     };
     setThreads((prev) => [thread, ...prev]);
     setActiveId(thread.id);
+    if (persistenceEnabled) api.saveThread(thread).catch(() => {
+    });
   }, [keyToken, activeId]);
   const newThread = useCallback(() => {
     const thread = {
@@ -371,7 +442,18 @@ function useChat(opts) {
     setError(null);
     setCitations([]);
     setKeySpend(null);
-  }, [model, vectorStoreIds, personaId, customSystemPrompt, keyAlias, keyToken]);
+    if (persistenceEnabled) api.saveThread(thread).catch(() => {
+    });
+  }, [
+    model,
+    vectorStoreIds,
+    personaId,
+    customSystemPrompt,
+    keyAlias,
+    keyToken,
+    persistenceEnabled,
+    api
+  ]);
   const selectThread = useCallback((id) => {
     setActiveId(id);
     setError(null);
@@ -390,8 +472,10 @@ function useChat(opts) {
         api.deleteChatKey(thread.keyToken).catch(() => {
         });
       }
+      if (persistenceEnabled) api.deleteThread(id).catch(() => {
+      });
     },
-    [activeId, threads, api]
+    [activeId, threads, api, persistenceEnabled]
   );
   const stopGeneration = useCallback(() => {
     abortMapRef.current.forEach((controller) => controller.abort());
@@ -677,11 +761,17 @@ function useChat(opts) {
     },
     [activeThread]
   );
-  const togglePin = useCallback((id) => {
-    setThreads(
-      (prev) => prev.map((t) => t.id === id ? { ...t, pinned: !t.pinned } : t)
-    );
-  }, []);
+  const togglePin = useCallback(
+    (id) => {
+      const current = threadsRef.current.find((t) => t.id === id);
+      if (!current) return;
+      const toggled = { ...current, pinned: !current.pinned };
+      setThreads((prev) => prev.map((t) => t.id === id ? toggled : t));
+      if (persistenceEnabled) api.saveThread(toggled).catch(() => {
+      });
+    },
+    [persistenceEnabled, api]
+  );
   const exportThread = useCallback(
     (id) => {
       const thread = threads.find((t) => t.id === id);
@@ -731,7 +821,9 @@ function useChat(opts) {
     };
     setThreads((prev) => [imported, ...prev]);
     setActiveId(imported.id);
-  }, []);
+    if (persistenceEnabled) api.saveThread(imported).catch(() => {
+    });
+  }, [persistenceEnabled, api]);
   const submitFeedback = useCallback(
     (messageId, vote) => {
       if (!activeThread) return;
@@ -793,6 +885,7 @@ var init_useChat = __esm({
     "use strict";
     init_api();
     init_chatTruncation();
+    init_threadPersistence();
     THREAD_EXPORT_VERSION = 1;
     STORAGE_PREFIX = "litellm-chat:threads";
     SAVE_DEBOUNCE_MS = 400;
@@ -1852,7 +1945,8 @@ var init_ChatPage = __esm({
       const [config, setConfig] = useState9({
         defaultModel: null,
         defaultVectorStoreIds: null,
-        maxRequestBudget: null
+        maxRequestBudget: null,
+        persistence: { enabled: false, ttlDays: 30 }
       });
       const [model, setModel] = useState9("");
       const [compareMode, setCompareModeUi] = useState9(false);
@@ -1912,7 +2006,8 @@ var init_ChatPage = __esm({
         keyAlias: keyVal.alias,
         keyToken: keyVal.token,
         topK: 5,
-        webSearch
+        webSearch,
+        persistenceEnabled: config.persistence.enabled
       });
       const activeThreadId = chat.activeThread?.id ?? null;
       useEffect5(() => {
@@ -2207,6 +2302,12 @@ var init_ChatPage = __esm({
             onChange: handleImportFile
           }
         )), importError && /* @__PURE__ */ React16.createElement(Box12, { sx: { px: 1.5, pb: 1 } }, /* @__PURE__ */ React16.createElement(Typography10, { variant: "caption", color: "error" }, importError)), /* @__PURE__ */ React16.createElement(Box12, { sx: { px: 1.5, pb: 1 } }, /* @__PURE__ */ React16.createElement(
+          Tooltip5,
+          {
+            title: config.persistence.enabled ? config.persistence.ttlDays > 0 ? `Threads are saved to your account and auto-deleted after ${config.persistence.ttlDays} days of inactivity.` : "Threads are saved to your account and kept indefinitely." : "Threads are stored only in this browser (localStorage) and are lost if browser data is cleared."
+          },
+          /* @__PURE__ */ React16.createElement(Typography10, { variant: "caption", color: "text.secondary" }, config.persistence.enabled ? `History saved to your account${config.persistence.ttlDays > 0 ? ` \xB7 ${config.persistence.ttlDays}d retention` : ""}` : "History stored only in this browser")
+        )), /* @__PURE__ */ React16.createElement(Box12, { sx: { px: 1.5, pb: 1 } }, /* @__PURE__ */ React16.createElement(
           InputBase,
           {
             fullWidth: true,

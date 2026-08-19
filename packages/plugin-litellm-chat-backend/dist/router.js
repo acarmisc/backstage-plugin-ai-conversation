@@ -42,7 +42,12 @@ const stream_1 = require("./stream");
 const persona_1 = require("./persona");
 const urlContext_1 = require("./urlContext");
 const traits_1 = require("./traits");
+const persistence_1 = require("./persistence");
 const types_1 = require("./types");
+const DEFAULT_PERSISTENCE_TTL_DAYS = 30;
+/** Task id for the periodic expired-thread cleanup — must be unique within
+ * the plugin's scheduler namespace. */
+const THREAD_CLEANUP_TASK_ID = 'litellm-chat:thread-cleanup';
 /** How long a composed persona prompt is cached before it's re-fetched and
  * re-expanded from source. Keeps message sends off the SCM hot path while
  * still picking up prompt edits within a few minutes. */
@@ -54,6 +59,11 @@ function readChatConfig(config) {
         defaultVectorStoreIds: config.getOptionalStringArray('litellm.chat.defaultVectorStoreIds'),
         maxRequestBudget: config.getOptionalNumber('litellm.chat.maxRequestBudget'),
         fetchContextMaxChars: config.getOptionalNumber('litellm.chat.fetchContext.maxChars'),
+        persistence: {
+            enabled: config.getOptionalBoolean('litellm.chat.persistence.enabled') ?? false,
+            ttlDays: config.getOptionalNumber('litellm.chat.persistence.ttlDays') ??
+                DEFAULT_PERSISTENCE_TTL_DAYS,
+        },
     };
 }
 /** Parses a `range` query param like "24h"/"7d"/"30d"/"all" into a cutoff
@@ -70,7 +80,7 @@ function rangeToCutoff(range) {
     return new Date(Date.now() - ms);
 }
 async function createRouter(options) {
-    const { config, logger, auth, catalog, database, urlReader } = options;
+    const { config, logger, auth, catalog, database, urlReader, scheduler } = options;
     const chatConfig = readChatConfig(config);
     const scm = integration_1.ScmIntegrations.fromConfig(config);
     const promptDeps = { reader: urlReader, scm };
@@ -81,6 +91,26 @@ async function createRouter(options) {
     if (!database.migrations?.skip) {
         await dbClient.migrate.latest({
             directory: (0, backend_plugin_api_1.resolvePackagePath)('@acarmisc/backstage-plugin-litellm-chat-backend', 'migrations'),
+        });
+    }
+    // Periodic sweep of expired persisted threads. Uses the scheduler service
+    // (rather than a plain setInterval) so the job is coordinated across
+    // replicas via a DB-backed lock — with multiple backend pods running
+    // (see AGENTS.md target environment), a naive interval would run the
+    // sweep once per pod. No-ops when persistence is disabled, or when
+    // ttlDays is 0 (unlimited retention — see purgeExpiredThreads).
+    if (chatConfig.persistence.enabled && chatConfig.persistence.ttlDays > 0) {
+        await scheduler.scheduleTask({
+            id: THREAD_CLEANUP_TASK_ID,
+            frequency: { hours: 24 },
+            timeout: { minutes: 5 },
+            initialDelay: { seconds: 30 },
+            fn: async () => {
+                const deleted = await (0, persistence_1.purgeExpiredThreads)(dbClient, chatConfig.persistence.ttlDays);
+                if (deleted > 0) {
+                    logger.info(`Purged ${deleted} expired chat thread(s) (ttlDays=${chatConfig.persistence.ttlDays})`);
+                }
+            },
         });
     }
     // Resolves and caches a persona's system prompt by entity ref. Resolved
@@ -241,6 +271,7 @@ async function createRouter(options) {
             defaultModel: chatConfig.defaultModel ?? null,
             defaultVectorStoreIds: chatConfig.defaultVectorStoreIds ?? null,
             maxRequestBudget: chatConfig.maxRequestBudget ?? null,
+            persistence: chatConfig.persistence,
         });
     });
     router.get('/personas', async (_req, res) => {
@@ -510,6 +541,70 @@ async function createRouter(options) {
         }
         catch (err) {
             logger.error('Failed to summarize usage', err);
+            res.status(500).json({ error: err.message });
+        }
+    });
+    // Server-side chat history (thread) persistence — opt-in via
+    // litellm.chat.persistence.enabled (see config.d.ts). Off by default, in
+    // which case threads stay client-side-only (React state + localStorage,
+    // see AGENTS.md). `data` is stored and returned opaquely: the backend
+    // never interprets the frontend's Thread shape, only validates its size
+    // (see persistence.ts). Rows are scoped to the authenticated user's
+    // entity ref and never cross users.
+    router.get('/threads', async (req, res) => {
+        if (!chatConfig.persistence.enabled) {
+            res.status(404).json({ error: 'chat history persistence is disabled' });
+            return;
+        }
+        try {
+            const tokenEntityRef = await (0, backstage_plugin_litellm_backend_1.resolveUserId)(req, auth);
+            if (!tokenEntityRef) {
+                res.status(401).json({ error: 'unauthenticated' });
+                return;
+            }
+            const threads = await (0, persistence_1.listThreads)(dbClient, tokenEntityRef);
+            res.json(threads);
+        }
+        catch (err) {
+            logger.error('Failed to list persisted threads', err);
+            res.status(500).json({ error: err.message });
+        }
+    });
+    router.put('/threads/:id', async (req, res) => {
+        if (!chatConfig.persistence.enabled) {
+            res.status(404).json({ error: 'chat history persistence is disabled' });
+            return;
+        }
+        try {
+            const tokenEntityRef = await (0, backstage_plugin_litellm_backend_1.resolveUserId)(req, auth);
+            if (!tokenEntityRef) {
+                res.status(401).json({ error: 'unauthenticated' });
+                return;
+            }
+            await (0, persistence_1.saveThread)(dbClient, tokenEntityRef, req.params.id, req.body);
+            res.json({ success: true });
+        }
+        catch (err) {
+            logger.warn(`Failed to save thread ${req.params.id}: ${err.message}`);
+            res.status(err.status ?? 500).json({ error: err.message });
+        }
+    });
+    router.delete('/threads/:id', async (req, res) => {
+        if (!chatConfig.persistence.enabled) {
+            res.status(404).json({ error: 'chat history persistence is disabled' });
+            return;
+        }
+        try {
+            const tokenEntityRef = await (0, backstage_plugin_litellm_backend_1.resolveUserId)(req, auth);
+            if (!tokenEntityRef) {
+                res.status(401).json({ error: 'unauthenticated' });
+                return;
+            }
+            await (0, persistence_1.deleteThread)(dbClient, tokenEntityRef, req.params.id);
+            res.json({ success: true });
+        }
+        catch (err) {
+            logger.error(`Failed to delete thread ${req.params.id}`, err);
             res.status(500).json({ error: err.message });
         }
     });
