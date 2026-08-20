@@ -120,7 +120,17 @@ export class LiteLlmChatApi implements LiteLlmChatApiInterface {
         persistence: { enabled: false, ttlDays: 30 },
       };
     }
-    return res.json();
+    const data = await res.json();
+    return {
+      defaultModel: data.defaultModel ?? null,
+      defaultVectorStoreIds: data.defaultVectorStoreIds ?? null,
+      maxRequestBudget: data.maxRequestBudget ?? null,
+      // The two plugins version independently — an older backend's /config
+      // may predate the persistence flag. Fall back to off-by-default (the
+      // backend's own default, see readChatConfig in router.ts) so ChatPage
+      // never reads `config.persistence.enabled` off undefined.
+      persistence: data.persistence ?? { enabled: false, ttlDays: 30 },
+    };
   }
 
   async getChatTraits(): Promise<ChatTraits> {

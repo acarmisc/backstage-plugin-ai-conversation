@@ -262,7 +262,13 @@ async function createRouter(options) {
     // (messages + model + key). The SSE *response* stream is not affected
     // by the request body parser. Backstage's HttpRouterService does not
     // add compression by default, so the response stream is not buffered.
-    router.use(express_1.default.json());
+    // Limit matters: the default 100kb body-parser cap would silently reject
+    // a persisted thread whose payload is well under our own 1MB cap (see
+    // MAX_THREAD_PAYLOAD_BYTES in persistence.ts) — the raw body wraps the
+    // data JSON in title/pinned, so give ~50% headroom over that cap and let
+    // serializeThreadPayload enforce the real 1MB data limit with a proper
+    // 413.
+    router.use(express_1.default.json({ limit: '1.5mb' }));
     router.get('/health', (_req, res) => {
         res.json({ status: 'ok' });
     });
@@ -551,18 +557,32 @@ async function createRouter(options) {
     // never interprets the frontend's Thread shape, only validates its size
     // (see persistence.ts). Rows are scoped to the authenticated user's
     // entity ref and never cross users.
-    router.get('/threads', async (req, res) => {
+    //
+    // The three /threads routes share one guard: 404 when persistence is
+    // disabled, and a single user-ref resolution (dropped into res.locals)
+    // instead of the identical block each handler would otherwise repeat.
+    function requirePersistenceUser(req, res, next) {
         if (!chatConfig.persistence.enabled) {
             res.status(404).json({ error: 'chat history persistence is disabled' });
             return;
         }
-        try {
-            const tokenEntityRef = await (0, backstage_plugin_litellm_backend_1.resolveUserId)(req, auth);
-            if (!tokenEntityRef) {
+        (0, backstage_plugin_litellm_backend_1.resolveUserId)(req, auth)
+            .then(entityRef => {
+            if (!entityRef) {
                 res.status(401).json({ error: 'unauthenticated' });
                 return;
             }
-            const threads = await (0, persistence_1.listThreads)(dbClient, tokenEntityRef);
+            res.locals.threadUserRef = entityRef;
+            next();
+        })
+            .catch(err => {
+            logger.warn('Failed to resolve thread route user', err);
+            res.status(500).json({ error: err.message });
+        });
+    }
+    router.get('/threads', requirePersistenceUser, async (_req, res) => {
+        try {
+            const threads = await (0, persistence_1.listThreads)(dbClient, res.locals.threadUserRef);
             res.json(threads);
         }
         catch (err) {
@@ -570,18 +590,9 @@ async function createRouter(options) {
             res.status(500).json({ error: err.message });
         }
     });
-    router.put('/threads/:id', async (req, res) => {
-        if (!chatConfig.persistence.enabled) {
-            res.status(404).json({ error: 'chat history persistence is disabled' });
-            return;
-        }
+    router.put('/threads/:id', requirePersistenceUser, async (req, res) => {
         try {
-            const tokenEntityRef = await (0, backstage_plugin_litellm_backend_1.resolveUserId)(req, auth);
-            if (!tokenEntityRef) {
-                res.status(401).json({ error: 'unauthenticated' });
-                return;
-            }
-            await (0, persistence_1.saveThread)(dbClient, tokenEntityRef, req.params.id, req.body);
+            await (0, persistence_1.saveThread)(dbClient, res.locals.threadUserRef, req.params.id, req.body);
             res.json({ success: true });
         }
         catch (err) {
@@ -589,18 +600,9 @@ async function createRouter(options) {
             res.status(err.status ?? 500).json({ error: err.message });
         }
     });
-    router.delete('/threads/:id', async (req, res) => {
-        if (!chatConfig.persistence.enabled) {
-            res.status(404).json({ error: 'chat history persistence is disabled' });
-            return;
-        }
+    router.delete('/threads/:id', requirePersistenceUser, async (req, res) => {
         try {
-            const tokenEntityRef = await (0, backstage_plugin_litellm_backend_1.resolveUserId)(req, auth);
-            if (!tokenEntityRef) {
-                res.status(401).json({ error: 'unauthenticated' });
-                return;
-            }
-            await (0, persistence_1.deleteThread)(dbClient, tokenEntityRef, req.params.id);
+            await (0, persistence_1.deleteThread)(dbClient, res.locals.threadUserRef, req.params.id);
             res.json({ success: true });
         }
         catch (err) {

@@ -298,7 +298,13 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
   // (messages + model + key). The SSE *response* stream is not affected
   // by the request body parser. Backstage's HttpRouterService does not
   // add compression by default, so the response stream is not buffered.
-  router.use(express.json());
+  // Limit matters: the default 100kb body-parser cap would silently reject
+  // a persisted thread whose payload is well under our own 1MB cap (see
+  // MAX_THREAD_PAYLOAD_BYTES in persistence.ts) — the raw body wraps the
+  // data JSON in title/pinned, so give ~50% headroom over that cap and let
+  // serializeThreadPayload enforce the real 1MB data limit with a proper
+  // 413.
+  router.use(express.json({ limit: '1.5mb' }));
 
   router.get('/health', (_req: Request, res: Response) => {
     res.json({ status: 'ok' });
@@ -596,18 +602,33 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
   // never interprets the frontend's Thread shape, only validates its size
   // (see persistence.ts). Rows are scoped to the authenticated user's
   // entity ref and never cross users.
-  router.get('/threads', async (req: Request, res: Response) => {
+  //
+  // The three /threads routes share one guard: 404 when persistence is
+  // disabled, and a single user-ref resolution (dropped into res.locals)
+  // instead of the identical block each handler would otherwise repeat.
+  function requirePersistenceUser(req: Request, res: Response, next: express.NextFunction) {
     if (!chatConfig.persistence.enabled) {
       res.status(404).json({ error: 'chat history persistence is disabled' });
       return;
     }
+    resolveUserId(req, auth)
+      .then(entityRef => {
+        if (!entityRef) {
+          res.status(401).json({ error: 'unauthenticated' });
+          return;
+        }
+        res.locals.threadUserRef = entityRef;
+        next();
+      })
+      .catch(err => {
+        logger.warn('Failed to resolve thread route user', err);
+        res.status(500).json({ error: err.message });
+      });
+  }
+
+  router.get('/threads', requirePersistenceUser, async (_req: Request, res: Response) => {
     try {
-      const tokenEntityRef = await resolveUserId(req, auth);
-      if (!tokenEntityRef) {
-        res.status(401).json({ error: 'unauthenticated' });
-        return;
-      }
-      const threads = await listPersistedThreads(dbClient, tokenEntityRef);
+      const threads = await listPersistedThreads(dbClient, res.locals.threadUserRef);
       res.json(threads);
     } catch (err: any) {
       logger.error('Failed to list persisted threads', err);
@@ -615,20 +636,11 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
     }
   });
 
-  router.put('/threads/:id', async (req: Request, res: Response) => {
-    if (!chatConfig.persistence.enabled) {
-      res.status(404).json({ error: 'chat history persistence is disabled' });
-      return;
-    }
+  router.put('/threads/:id', requirePersistenceUser, async (req: Request, res: Response) => {
     try {
-      const tokenEntityRef = await resolveUserId(req, auth);
-      if (!tokenEntityRef) {
-        res.status(401).json({ error: 'unauthenticated' });
-        return;
-      }
       await savePersistedThread(
         dbClient,
-        tokenEntityRef,
+        res.locals.threadUserRef,
         req.params.id,
         req.body as SaveThreadRequest,
       );
@@ -639,18 +651,9 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
     }
   });
 
-  router.delete('/threads/:id', async (req: Request, res: Response) => {
-    if (!chatConfig.persistence.enabled) {
-      res.status(404).json({ error: 'chat history persistence is disabled' });
-      return;
-    }
+  router.delete('/threads/:id', requirePersistenceUser, async (req: Request, res: Response) => {
     try {
-      const tokenEntityRef = await resolveUserId(req, auth);
-      if (!tokenEntityRef) {
-        res.status(401).json({ error: 'unauthenticated' });
-        return;
-      }
-      await deletePersistedThread(dbClient, tokenEntityRef, req.params.id);
+      await deletePersistedThread(dbClient, res.locals.threadUserRef, req.params.id);
       res.json({ success: true });
     } catch (err: any) {
       logger.error(`Failed to delete thread ${req.params.id}`, err);

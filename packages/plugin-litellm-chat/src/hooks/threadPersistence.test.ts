@@ -87,4 +87,49 @@ describe('fromPersisted', () => {
     const restored = fromPersisted(persisted);
     expect(restored).toEqual({ ...original, keyToken: '', keyAlias: '' });
   });
+
+  it('survives a null data payload (corrupt DB row) instead of crashing', () => {
+    const restored = fromPersisted({
+      id: 't1',
+      title: 'Recoverable title',
+      pinned: true,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+      data: null as any,
+    });
+    expect(restored.id).toBe('t1');
+    expect(restored.title).toBe('Recoverable title');
+    expect(restored.pinned).toBe(true);
+    expect(restored.messages).toEqual([]);
+    expect(restored.keyToken).toBe('');
+    expect(restored.keyAlias).toBe('');
+    expect(typeof restored.updatedAt).toBe('number');
+  });
+
+  it('survives a non-object data payload without leaking its keys', () => {
+    const restored = fromPersisted({
+      id: 't1',
+      title: 'Fallback',
+      pinned: false,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+      data: 'garbage' as any,
+    });
+    expect(restored.title).toBe('Fallback');
+    expect(restored.messages).toEqual([]);
+    expect(restored.model).toBe('');
+    expect((restored as any)['0']).toBeUndefined();
+  });
+
+  it('rejects a blank title by falling back to the row title', () => {
+    const restored = fromPersisted({
+      id: 't1',
+      title: 'Fallback',
+      pinned: false,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+      data: { id: 't1', title: '', messages: [] } as any,
+    });
+    expect(restored.title).toBe('Fallback');
+  });
 });

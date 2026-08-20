@@ -180,10 +180,16 @@ export function useChat(opts: UseChatOptions): UseChatResult {
   }, [userId, syncActiveThreadToBackend]);
 
   // When persistence is enabled, the backend's thread list is authoritative
-  // — load it once and replace whatever localStorage had (which may be
-  // stale or from before persistence was turned on). A fetch failure
-  // degrades to the localStorage-loaded threads already in state rather
-  // than clearing the sidebar.
+  // — but merge, don't replace: an operator flipping persistence on for a
+  // user with existing localStorage-only threads must not have the (empty)
+  // server list wipe the UI, nor the debounced save persist that empty list
+  // back to localStorage 400ms later. Local threads are kept as-is — they
+  // carry the live keyToken and any content streamed after the last server
+  // sync — and only *new* server threads (another device, or a thread synced
+  // after this one was created) are pulled in. The debounced save pushes
+  // local-only threads up to the server. A fetch failure degrades to the
+  // localStorage-loaded threads already in state rather than clearing the
+  // sidebar.
   useEffect(() => {
     if (!persistenceEnabled) return;
     let cancelled = false;
@@ -191,7 +197,11 @@ export function useChat(opts: UseChatOptions): UseChatResult {
       .listThreads()
       .then(persisted => {
         if (cancelled) return;
-        setThreads(persisted.map(fromPersisted));
+        setThreads(prev => {
+          const localIds = new Set(prev.map(t => t.id));
+          const fresh = persisted.map(fromPersisted).filter(t => !localIds.has(t.id));
+          return fresh.length ? [...fresh, ...prev] : prev;
+        });
       })
       .catch(err => {
         if (!cancelled) setError(err.message);
@@ -227,9 +237,15 @@ export function useChat(opts: UseChatOptions): UseChatResult {
     };
     setThreads(prev => [thread, ...prev]);
     setActiveId(thread.id);
-    if (persistenceEnabled) api.saveThread(thread).catch(() => {});
+    // No immediate saveThread here — the thread is set active right above,
+    // so the debounced sync effect (which tracks persistenceEnabled) picks
+    // it up within SAVE_DEBOUNCE_MS. Firing a PUT now and again on the
+    // debounce would be a duplicate write of the same thread. persistence
+    // and api are deps so a config load that flips persistence on after
+    // this effect already ran doesn't leave a stale-false closure behind —
+    // the debounce re-arms on the identity change and syncs the thread.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [keyToken, activeId]);
+  }, [keyToken, activeId, persistenceEnabled, api]);
 
   const newThread = useCallback(() => {
     const thread: Thread = {
@@ -252,7 +268,9 @@ export function useChat(opts: UseChatOptions): UseChatResult {
     setError(null);
     setCitations([]);
     setKeySpend(null);
-    if (persistenceEnabled) api.saveThread(thread).catch(() => {});
+    // No immediate saveThread — the thread is active, so the debounced
+    // sync effect covers it within SAVE_DEBOUNCE_MS (an explicit PUT here
+    // would just duplicate that write).
   }, [
     model,
     vectorStoreIds,
@@ -642,15 +660,22 @@ export function useChat(opts: UseChatOptions): UseChatResult {
 
   const togglePin = useCallback(
     (id: string) => {
-      // Computed from the ref (not the `prev` inside setThreads' updater,
-      // which React may not invoke synchronously) so the value handed to
-      // saveThread below is available right after this call, not on some
-      // later render.
+      // Toggle from `prev` inside the updater, never threadsRef.current —
+      // the ref holds the last-render snapshot, so pinning mid-stream would
+      // replace a just-streamed token with the stale content the snapshot
+      // was built from. The save below reads the ref (needed synchronously
+      // outside the updater), so it may hold a slightly stale copy for an
+      // actively-streaming thread — the debounced active-thread sync corrects
+      // it within SAVE_DEBOUNCE_MS.
+      setThreads(prev => prev.map(t => (t.id === id ? { ...t, pinned: !t.pinned } : t)));
+      if (!persistenceEnabled) return;
       const current = threadsRef.current.find(t => t.id === id);
       if (!current) return;
-      const toggled: Thread = { ...current, pinned: !current.pinned };
-      setThreads(prev => prev.map(t => (t.id === id ? toggled : t)));
-      if (persistenceEnabled) api.saveThread(toggled).catch(() => {});
+      // Non-active threads never stream, so their ref snapshot is up to date
+      // at mutation time — and they're NOT covered by the debounced sync
+      // (which only syncs the active thread), so they need this explicit PUT.
+      if (current.id === activeIdRef.current) return;
+      api.saveThread({ ...current, pinned: !current.pinned }).catch(() => {});
     },
     [persistenceEnabled, api],
   );
@@ -711,8 +736,9 @@ export function useChat(opts: UseChatOptions): UseChatResult {
     };
     setThreads(prev => [imported, ...prev]);
     setActiveId(imported.id);
-    if (persistenceEnabled) api.saveThread(imported).catch(() => {});
-  }, [persistenceEnabled, api]);
+    // No immediate saveThread — the imported thread is active, so the
+    // debounced sync effect (and the beforeunload flush) covers it.
+  }, []);
 
   const submitFeedback = useCallback(
     (messageId: string, vote: 'up' | 'down') => {

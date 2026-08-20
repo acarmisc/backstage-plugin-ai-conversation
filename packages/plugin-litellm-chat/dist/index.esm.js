@@ -19,7 +19,24 @@ function toSaveThreadBody(thread) {
   return { title: thread.title, pinned: !!thread.pinned, data };
 }
 function fromPersisted(persisted) {
-  return { ...persisted.data, keyToken: "", keyAlias: "" };
+  const raw = persisted.data && typeof persisted.data === "object" && !Array.isArray(persisted.data) ? persisted.data : {};
+  return {
+    ...raw,
+    keyToken: "",
+    keyAlias: "",
+    id: typeof raw.id === "string" ? raw.id : persisted.id,
+    title: typeof raw.title === "string" && raw.title ? raw.title : persisted.title,
+    pinned: typeof raw.pinned === "boolean" ? raw.pinned : persisted.pinned,
+    messages: Array.isArray(raw.messages) ? raw.messages : [],
+    model: typeof raw.model === "string" ? raw.model : "",
+    vectorStoreIds: Array.isArray(raw.vectorStoreIds) ? raw.vectorStoreIds : [],
+    personaId: typeof raw.personaId === "string" ? raw.personaId : "",
+    customSystemPrompt: typeof raw.customSystemPrompt === "string" ? raw.customSystemPrompt : "",
+    createdAt: typeof raw.createdAt === "number" ? raw.createdAt : Date.now(),
+    updatedAt: typeof raw.updatedAt === "number" ? raw.updatedAt : Date.now(),
+    totalTokens: typeof raw.totalTokens === "number" ? raw.totalTokens : 0,
+    lastTurnUsage: raw.lastTurnUsage ?? null
+  };
 }
 var init_threadPersistence = __esm({
   "src/hooks/threadPersistence.ts"() {
@@ -91,7 +108,17 @@ var init_api = __esm({
             persistence: { enabled: false, ttlDays: 30 }
           };
         }
-        return res.json();
+        const data = await res.json();
+        return {
+          defaultModel: data.defaultModel ?? null,
+          defaultVectorStoreIds: data.defaultVectorStoreIds ?? null,
+          maxRequestBudget: data.maxRequestBudget ?? null,
+          // The two plugins version independently — an older backend's /config
+          // may predate the persistence flag. Fall back to off-by-default (the
+          // backend's own default, see readChatConfig in router.ts) so ChatPage
+          // never reads `config.persistence.enabled` off undefined.
+          persistence: data.persistence ?? { enabled: false, ttlDays: 30 }
+        };
       }
       async getChatTraits() {
         const res = await this.fetchApi.fetch(`${BASE_PATH}/chat/traits`);
@@ -390,7 +417,11 @@ function useChat(opts) {
     let cancelled = false;
     api.listThreads().then((persisted) => {
       if (cancelled) return;
-      setThreads(persisted.map(fromPersisted));
+      setThreads((prev) => {
+        const localIds = new Set(prev.map((t) => t.id));
+        const fresh = persisted.map(fromPersisted).filter((t) => !localIds.has(t.id));
+        return fresh.length ? [...fresh, ...prev] : prev;
+      });
     }).catch((err) => {
       if (!cancelled) setError(err.message);
     });
@@ -418,9 +449,7 @@ function useChat(opts) {
     };
     setThreads((prev) => [thread, ...prev]);
     setActiveId(thread.id);
-    if (persistenceEnabled) api.saveThread(thread).catch(() => {
-    });
-  }, [keyToken, activeId]);
+  }, [keyToken, activeId, persistenceEnabled, api]);
   const newThread = useCallback(() => {
     const thread = {
       id: genId(),
@@ -442,8 +471,6 @@ function useChat(opts) {
     setError(null);
     setCitations([]);
     setKeySpend(null);
-    if (persistenceEnabled) api.saveThread(thread).catch(() => {
-    });
   }, [
     model,
     vectorStoreIds,
@@ -763,11 +790,12 @@ function useChat(opts) {
   );
   const togglePin = useCallback(
     (id) => {
+      setThreads((prev) => prev.map((t) => t.id === id ? { ...t, pinned: !t.pinned } : t));
+      if (!persistenceEnabled) return;
       const current = threadsRef.current.find((t) => t.id === id);
       if (!current) return;
-      const toggled = { ...current, pinned: !current.pinned };
-      setThreads((prev) => prev.map((t) => t.id === id ? toggled : t));
-      if (persistenceEnabled) api.saveThread(toggled).catch(() => {
+      if (current.id === activeIdRef.current) return;
+      api.saveThread({ ...current, pinned: !current.pinned }).catch(() => {
       });
     },
     [persistenceEnabled, api]
@@ -821,9 +849,7 @@ function useChat(opts) {
     };
     setThreads((prev) => [imported, ...prev]);
     setActiveId(imported.id);
-    if (persistenceEnabled) api.saveThread(imported).catch(() => {
-    });
-  }, [persistenceEnabled, api]);
+  }, []);
   const submitFeedback = useCallback(
     (messageId, vote) => {
       if (!activeThread) return;

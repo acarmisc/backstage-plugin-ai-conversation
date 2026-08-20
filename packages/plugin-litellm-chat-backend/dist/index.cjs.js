@@ -81861,7 +81861,7 @@ async function createRouter(options) {
     }));
   }
   const router = (0, import_express.Router)();
-  router.use(import_express.default.json());
+  router.use(import_express.default.json({ limit: "1.5mb" }));
   router.get("/health", (_req, res) => {
     res.json({ status: "ok" });
   });
@@ -82097,38 +82097,37 @@ async function createRouter(options) {
       res.status(500).json({ error: err.message });
     }
   });
-  router.get("/threads", async (req, res) => {
+  function requirePersistenceUser(req, res, next) {
     if (!chatConfig.persistence.enabled) {
       res.status(404).json({ error: "chat history persistence is disabled" });
       return;
     }
-    try {
-      const tokenEntityRef = await (0, import_backstage_plugin_litellm_backend.resolveUserId)(req, auth);
-      if (!tokenEntityRef) {
+    (0, import_backstage_plugin_litellm_backend.resolveUserId)(req, auth).then((entityRef2) => {
+      if (!entityRef2) {
         res.status(401).json({ error: "unauthenticated" });
         return;
       }
-      const threads = await listThreads(dbClient, tokenEntityRef);
+      res.locals.threadUserRef = entityRef2;
+      next();
+    }).catch((err) => {
+      logger.warn("Failed to resolve thread route user", err);
+      res.status(500).json({ error: err.message });
+    });
+  }
+  router.get("/threads", requirePersistenceUser, async (_req, res) => {
+    try {
+      const threads = await listThreads(dbClient, res.locals.threadUserRef);
       res.json(threads);
     } catch (err) {
       logger.error("Failed to list persisted threads", err);
       res.status(500).json({ error: err.message });
     }
   });
-  router.put("/threads/:id", async (req, res) => {
-    if (!chatConfig.persistence.enabled) {
-      res.status(404).json({ error: "chat history persistence is disabled" });
-      return;
-    }
+  router.put("/threads/:id", requirePersistenceUser, async (req, res) => {
     try {
-      const tokenEntityRef = await (0, import_backstage_plugin_litellm_backend.resolveUserId)(req, auth);
-      if (!tokenEntityRef) {
-        res.status(401).json({ error: "unauthenticated" });
-        return;
-      }
       await saveThread(
         dbClient,
-        tokenEntityRef,
+        res.locals.threadUserRef,
         req.params.id,
         req.body
       );
@@ -82138,18 +82137,9 @@ async function createRouter(options) {
       res.status(err.status ?? 500).json({ error: err.message });
     }
   });
-  router.delete("/threads/:id", async (req, res) => {
-    if (!chatConfig.persistence.enabled) {
-      res.status(404).json({ error: "chat history persistence is disabled" });
-      return;
-    }
+  router.delete("/threads/:id", requirePersistenceUser, async (req, res) => {
     try {
-      const tokenEntityRef = await (0, import_backstage_plugin_litellm_backend.resolveUserId)(req, auth);
-      if (!tokenEntityRef) {
-        res.status(401).json({ error: "unauthenticated" });
-        return;
-      }
-      await deleteThread(dbClient, tokenEntityRef, req.params.id);
+      await deleteThread(dbClient, res.locals.threadUserRef, req.params.id);
       res.json({ success: true });
     } catch (err) {
       logger.error(`Failed to delete thread ${req.params.id}`, err);
