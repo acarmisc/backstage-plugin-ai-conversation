@@ -1,5 +1,5 @@
 import { FetchApi } from '@backstage/core-plugin-api';
-import type { VectorStore, Persona, ChatRequest, ChatFeedbackRequest, ChatStreamChunk, ChatResult, ChatConfig, ChatTraits, KeySpend, UrlContextPreview, FeedbackSummary, UsageSummaryRow } from './types';
+import type { VectorStore, Persona, ChatRequest, ChatFeedbackRequest, ChatStreamChunk, ChatResult, ChatConfig, ChatTraits, KeySpend, UrlContextPreview, FeedbackSummary, UsageSummaryRow, PersistedThread, Thread } from './types';
 export interface LiteLlmChatApiInterface {
     listVectorStores(): Promise<VectorStore[]>;
     listPersonas(): Promise<Persona[]>;
@@ -24,6 +24,9 @@ export interface LiteLlmChatApiInterface {
     sendFeedback(req: ChatFeedbackRequest): Promise<{
         success: boolean;
     }>;
+    listThreads(): Promise<PersistedThread[]>;
+    saveThread(thread: Thread): Promise<void>;
+    deleteThread(id: string): Promise<void>;
 }
 export interface ChatKey {
     key: string;
@@ -58,4 +61,7 @@ export declare class LiteLlmChatApi implements LiteLlmChatApiInterface {
     sendFeedback(req: ChatFeedbackRequest): Promise<{
         success: boolean;
     }>;
+    listThreads(): Promise<PersistedThread[]>;
+    saveThread(thread: Thread): Promise<void>;
+    deleteThread(id: string): Promise<void>;
 }

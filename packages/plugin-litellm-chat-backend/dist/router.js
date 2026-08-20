@@ -42,7 +42,12 @@ const stream_1 = require("./stream");
 const persona_1 = require("./persona");
 const urlContext_1 = require("./urlContext");
 const traits_1 = require("./traits");
+const persistence_1 = require("./persistence");
 const types_1 = require("./types");
+const DEFAULT_PERSISTENCE_TTL_DAYS = 30;
+/** Task id for the periodic expired-thread cleanup — must be unique within
+ * the plugin's scheduler namespace. */
+const THREAD_CLEANUP_TASK_ID = 'litellm-chat:thread-cleanup';
 /** How long a composed persona prompt is cached before it's re-fetched and
  * re-expanded from source. Keeps message sends off the SCM hot path while
  * still picking up prompt edits within a few minutes. */
@@ -54,6 +59,11 @@ function readChatConfig(config) {
         defaultVectorStoreIds: config.getOptionalStringArray('litellm.chat.defaultVectorStoreIds'),
         maxRequestBudget: config.getOptionalNumber('litellm.chat.maxRequestBudget'),
         fetchContextMaxChars: config.getOptionalNumber('litellm.chat.fetchContext.maxChars'),
+        persistence: {
+            enabled: config.getOptionalBoolean('litellm.chat.persistence.enabled') ?? false,
+            ttlDays: config.getOptionalNumber('litellm.chat.persistence.ttlDays') ??
+                DEFAULT_PERSISTENCE_TTL_DAYS,
+        },
     };
 }
 /** Parses a `range` query param like "24h"/"7d"/"30d"/"all" into a cutoff
@@ -70,7 +80,7 @@ function rangeToCutoff(range) {
     return new Date(Date.now() - ms);
 }
 async function createRouter(options) {
-    const { config, logger, auth, catalog, database, urlReader } = options;
+    const { config, logger, auth, catalog, database, urlReader, scheduler } = options;
     const chatConfig = readChatConfig(config);
     const scm = integration_1.ScmIntegrations.fromConfig(config);
     const promptDeps = { reader: urlReader, scm };
@@ -81,6 +91,26 @@ async function createRouter(options) {
     if (!database.migrations?.skip) {
         await dbClient.migrate.latest({
             directory: (0, backend_plugin_api_1.resolvePackagePath)('@acarmisc/backstage-plugin-litellm-chat-backend', 'migrations'),
+        });
+    }
+    // Periodic sweep of expired persisted threads. Uses the scheduler service
+    // (rather than a plain setInterval) so the job is coordinated across
+    // replicas via a DB-backed lock — with multiple backend pods running
+    // (see AGENTS.md target environment), a naive interval would run the
+    // sweep once per pod. No-ops when persistence is disabled, or when
+    // ttlDays is 0 (unlimited retention — see purgeExpiredThreads).
+    if (chatConfig.persistence.enabled && chatConfig.persistence.ttlDays > 0) {
+        await scheduler.scheduleTask({
+            id: THREAD_CLEANUP_TASK_ID,
+            frequency: { hours: 24 },
+            timeout: { minutes: 5 },
+            initialDelay: { seconds: 30 },
+            fn: async () => {
+                const deleted = await (0, persistence_1.purgeExpiredThreads)(dbClient, chatConfig.persistence.ttlDays);
+                if (deleted > 0) {
+                    logger.info(`Purged ${deleted} expired chat thread(s) (ttlDays=${chatConfig.persistence.ttlDays})`);
+                }
+            },
         });
     }
     // Resolves and caches a persona's system prompt by entity ref. Resolved
@@ -232,7 +262,13 @@ async function createRouter(options) {
     // (messages + model + key). The SSE *response* stream is not affected
     // by the request body parser. Backstage's HttpRouterService does not
     // add compression by default, so the response stream is not buffered.
-    router.use(express_1.default.json());
+    // Limit matters: the default 100kb body-parser cap would silently reject
+    // a persisted thread whose payload is well under our own 1MB cap (see
+    // MAX_THREAD_PAYLOAD_BYTES in persistence.ts) — the raw body wraps the
+    // data JSON in title/pinned, so give ~50% headroom over that cap and let
+    // serializeThreadPayload enforce the real 1MB data limit with a proper
+    // 413.
+    router.use(express_1.default.json({ limit: '1.5mb' }));
     router.get('/health', (_req, res) => {
         res.json({ status: 'ok' });
     });
@@ -241,6 +277,7 @@ async function createRouter(options) {
             defaultModel: chatConfig.defaultModel ?? null,
             defaultVectorStoreIds: chatConfig.defaultVectorStoreIds ?? null,
             maxRequestBudget: chatConfig.maxRequestBudget ?? null,
+            persistence: chatConfig.persistence,
         });
     });
     router.get('/personas', async (_req, res) => {
@@ -510,6 +547,66 @@ async function createRouter(options) {
         }
         catch (err) {
             logger.error('Failed to summarize usage', err);
+            res.status(500).json({ error: err.message });
+        }
+    });
+    // Server-side chat history (thread) persistence — opt-in via
+    // litellm.chat.persistence.enabled (see config.d.ts). Off by default, in
+    // which case threads stay client-side-only (React state + localStorage,
+    // see AGENTS.md). `data` is stored and returned opaquely: the backend
+    // never interprets the frontend's Thread shape, only validates its size
+    // (see persistence.ts). Rows are scoped to the authenticated user's
+    // entity ref and never cross users.
+    //
+    // The three /threads routes share one guard: 404 when persistence is
+    // disabled, and a single user-ref resolution (dropped into res.locals)
+    // instead of the identical block each handler would otherwise repeat.
+    function requirePersistenceUser(req, res, next) {
+        if (!chatConfig.persistence.enabled) {
+            res.status(404).json({ error: 'chat history persistence is disabled' });
+            return;
+        }
+        (0, backstage_plugin_litellm_backend_1.resolveUserId)(req, auth)
+            .then(entityRef => {
+            if (!entityRef) {
+                res.status(401).json({ error: 'unauthenticated' });
+                return;
+            }
+            res.locals.threadUserRef = entityRef;
+            next();
+        })
+            .catch(err => {
+            logger.warn('Failed to resolve thread route user', err);
+            res.status(500).json({ error: err.message });
+        });
+    }
+    router.get('/threads', requirePersistenceUser, async (_req, res) => {
+        try {
+            const threads = await (0, persistence_1.listThreads)(dbClient, res.locals.threadUserRef);
+            res.json(threads);
+        }
+        catch (err) {
+            logger.error('Failed to list persisted threads', err);
+            res.status(500).json({ error: err.message });
+        }
+    });
+    router.put('/threads/:id', requirePersistenceUser, async (req, res) => {
+        try {
+            await (0, persistence_1.saveThread)(dbClient, res.locals.threadUserRef, req.params.id, req.body);
+            res.json({ success: true });
+        }
+        catch (err) {
+            logger.warn(`Failed to save thread ${req.params.id}: ${err.message}`);
+            res.status(err.status ?? 500).json({ error: err.message });
+        }
+    });
+    router.delete('/threads/:id', requirePersistenceUser, async (req, res) => {
+        try {
+            await (0, persistence_1.deleteThread)(dbClient, res.locals.threadUserRef, req.params.id);
+            res.json({ success: true });
+        }
+        catch (err) {
+            logger.error(`Failed to delete thread ${req.params.id}`, err);
             res.status(500).json({ error: err.message });
         }
     });

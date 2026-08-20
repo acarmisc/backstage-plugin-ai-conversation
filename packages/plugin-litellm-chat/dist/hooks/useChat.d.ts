@@ -13,6 +13,12 @@ export interface UseChatOptions {
     keyToken: string;
     topK?: number;
     webSearch?: boolean;
+    /** Mirrors `litellm.chat.persistence.enabled` (see config.d.ts). When
+     * true, threads are synced to the backend in addition to localStorage —
+     * on enable, the backend's thread list replaces local state (server is
+     * authoritative once persistence is on). When false (default), behavior
+     * is unchanged from client-side-only threads. */
+    persistenceEnabled?: boolean;
 }
 export interface UseChatResult {
     threads: Thread[];

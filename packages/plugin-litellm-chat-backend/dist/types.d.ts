@@ -124,10 +124,33 @@ export interface UsageSummaryRow {
     key: string;
     count: number;
 }
+export interface ChatPersistenceConfig {
+    enabled: boolean;
+    /** 0 means unlimited (never auto-deleted). */
+    ttlDays: number;
+}
 export interface LiteLLMChatConfig {
     baseUrl: string;
     defaultModel?: string;
     defaultVectorStoreIds?: string[];
     maxRequestBudget?: number;
     fetchContextMaxChars?: number;
+    persistence: ChatPersistenceConfig;
+}
+/** Body of `PUT /threads/:id`. `data` is stored and returned opaquely — the
+ * backend never interprets its shape, so it doesn't need to duplicate the
+ * frontend's `Thread` type. */
+export interface SaveThreadRequest {
+    title: string;
+    pinned?: boolean;
+    data: unknown;
+}
+/** A persisted thread row as returned to the frontend. */
+export interface ThreadRecord {
+    id: string;
+    title: string;
+    pinned: boolean;
+    createdAt: string;
+    updatedAt: string;
+    data: unknown;
 }

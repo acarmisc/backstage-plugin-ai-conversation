@@ -15,8 +15,19 @@ export const litellmChatPlugin = createBackendPlugin({
         catalog: catalogServiceRef,
         database: coreServices.database,
         urlReader: coreServices.urlReader,
+        scheduler: coreServices.scheduler,
       },
-      async init({ httpRouter, config, logger, auth, discovery, catalog, database, urlReader }) {
+      async init({
+        httpRouter,
+        config,
+        logger,
+        auth,
+        discovery,
+        catalog,
+        database,
+        urlReader,
+        scheduler,
+      }) {
         const router = await createRouter({
           config,
           logger,
@@ -25,6 +36,7 @@ export const litellmChatPlugin = createBackendPlugin({
           catalog,
           database,
           urlReader,
+          scheduler,
         });
         httpRouter.use(router);
       },

@@ -96,6 +96,7 @@ export const ChatPage: React.FC = () => {
     defaultModel: null,
     defaultVectorStoreIds: null,
     maxRequestBudget: null,
+    persistence: { enabled: false, ttlDays: 30 },
   });
 
   const [model, setModel] = useState('');
@@ -172,6 +173,7 @@ export const ChatPage: React.FC = () => {
     keyToken: keyVal.token,
     topK: 5,
     webSearch,
+    persistenceEnabled: config.persistence.enabled,
   });
 
   // Restore the selected thread's own model/KBs/persona/key into Settings
@@ -543,6 +545,26 @@ export const ChatPage: React.FC = () => {
                 </Typography>
               </Box>
             )}
+
+            {/* Persistence status — transparency for where thread history
+                actually lives, driven by litellm.chat.persistence config. */}
+            <Box sx={{ px: 1.5, pb: 1 }}>
+              <Tooltip
+                title={
+                  config.persistence.enabled
+                    ? config.persistence.ttlDays > 0
+                      ? `Threads are saved to your account and auto-deleted after ${config.persistence.ttlDays} days of inactivity.`
+                      : 'Threads are saved to your account and kept indefinitely.'
+                    : 'Threads are stored only in this browser (localStorage) and are lost if browser data is cleared.'
+                }
+              >
+                <Typography variant="caption" color="text.secondary">
+                  {config.persistence.enabled
+                    ? `History saved to your account${config.persistence.ttlDays > 0 ? ` · ${config.persistence.ttlDays}d retention` : ''}`
+                    : 'History stored only in this browser'}
+                </Typography>
+              </Tooltip>
+            </Box>
 
             {/* Search */}
             <Box sx={{ px: 1.5, pb: 1 }}>

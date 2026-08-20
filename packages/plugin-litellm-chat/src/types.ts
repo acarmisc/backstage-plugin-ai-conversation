@@ -150,10 +150,30 @@ export interface ChatResult {
   citations: Citation[];
 }
 
+export interface ChatPersistenceConfig {
+  enabled: boolean;
+  /** 0 means unlimited (never auto-deleted). */
+  ttlDays: number;
+}
+
 export interface ChatConfig {
   defaultModel: string | null;
   defaultVectorStoreIds: string[] | null;
   maxRequestBudget: number | null;
+  persistence: ChatPersistenceConfig;
+}
+
+/** A thread as persisted server-side (see `litellm.chat.persistence` config).
+ * `data` mirrors `ThreadExport['thread']` — the same portable shape used by
+ * export/import, deliberately excluding the live `keyToken`/`keyAlias`
+ * credential, which never leaves the browser it was minted in. */
+export interface PersistedThread {
+  id: string;
+  title: string;
+  pinned: boolean;
+  createdAt: string;
+  updatedAt: string;
+  data: Omit<Thread, 'keyToken' | 'keyAlias'>;
 }
 
 export interface KeySpend {

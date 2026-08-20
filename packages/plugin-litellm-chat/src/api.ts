@@ -13,7 +13,10 @@ import type {
   UrlContextPreview,
   FeedbackSummary,
   UsageSummaryRow,
+  PersistedThread,
+  Thread,
 } from './types';
+import { toSaveThreadBody } from './hooks/threadPersistence';
 
 export interface LiteLlmChatApiInterface {
   listVectorStores(): Promise<VectorStore[]>;
@@ -34,6 +37,9 @@ export interface LiteLlmChatApiInterface {
   deleteChatKey(key: string): Promise<{ success: boolean }>;
   getKeySpend(alias: string): Promise<KeySpend | null>;
   sendFeedback(req: ChatFeedbackRequest): Promise<{ success: boolean }>;
+  listThreads(): Promise<PersistedThread[]>;
+  saveThread(thread: Thread): Promise<void>;
+  deleteThread(id: string): Promise<void>;
 }
 
 export interface ChatKey {
@@ -107,9 +113,24 @@ export class LiteLlmChatApi implements LiteLlmChatApiInterface {
   async getChatConfig(): Promise<ChatConfig> {
     const res = await this.fetchApi.fetch(`${BASE_PATH}/config`);
     if (!res.ok) {
-      return { defaultModel: null, defaultVectorStoreIds: null, maxRequestBudget: null };
+      return {
+        defaultModel: null,
+        defaultVectorStoreIds: null,
+        maxRequestBudget: null,
+        persistence: { enabled: false, ttlDays: 30 },
+      };
     }
-    return res.json();
+    const data = await res.json();
+    return {
+      defaultModel: data.defaultModel ?? null,
+      defaultVectorStoreIds: data.defaultVectorStoreIds ?? null,
+      maxRequestBudget: data.maxRequestBudget ?? null,
+      // The two plugins version independently — an older backend's /config
+      // may predate the persistence flag. Fall back to off-by-default (the
+      // backend's own default, see readChatConfig in router.ts) so ChatPage
+      // never reads `config.persistence.enabled` off undefined.
+      persistence: data.persistence ?? { enabled: false, ttlDays: 30 },
+    };
   }
 
   async getChatTraits(): Promise<ChatTraits> {
@@ -280,5 +301,33 @@ export class LiteLlmChatApi implements LiteLlmChatApiInterface {
       throw new Error(`feedback ${res.status}: ${text}`);
     }
     return res.json();
+  }
+
+  async listThreads(): Promise<PersistedThread[]> {
+    const res = await this.fetchApi.fetch(`${BASE_PATH}/threads`);
+    if (!res.ok) throw new Error(`threads ${res.status}`);
+    return res.json();
+  }
+
+  async saveThread(thread: Thread): Promise<void> {
+    const res = await this.fetchApi.fetch(`${BASE_PATH}/threads/${encodeURIComponent(thread.id)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(toSaveThreadBody(thread)),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`save thread ${res.status}: ${text}`);
+    }
+  }
+
+  async deleteThread(id: string): Promise<void> {
+    const res = await this.fetchApi.fetch(`${BASE_PATH}/threads/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`delete thread ${res.status}: ${text}`);
+    }
   }
 }

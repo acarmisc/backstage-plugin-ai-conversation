@@ -66,6 +66,9 @@ Personas are `chat-persona` catalog Components (not app-config) — self-service
 | `/api/litellm-chat/chat/key/:alias/spend` | GET | Current spend/max_budget for a chat key, by alias |
 | `/api/litellm-chat/chat/stream` | POST | SSE streaming chat (RAG or plain) |
 | `/api/litellm-chat/chat/completions` | POST | Non-streaming chat |
+| `/api/litellm-chat/threads` | GET | List the caller's persisted threads. 404 if `litellm.chat.persistence.enabled` is false |
+| `/api/litellm-chat/threads/:id` | PUT | Upsert a persisted thread (title/pinned/data) |
+| `/api/litellm-chat/threads/:id` | DELETE | Delete a persisted thread |
 
 ## Config
 
@@ -78,6 +81,9 @@ litellm:
     defaultModel: claude-3-5-sonnet        # optional
     defaultVectorStoreIds: []               # optional, list of vector store ids
     maxRequestBudget:                       # optional, advisory
+    persistence:                            # optional, off by default
+      enabled: false                        # persist chat threads server-side (chat_threads table)
+      ttlDays: 30                           # auto-delete after N days of inactivity; 0 = unlimited
 ```
 
 ## Repos
@@ -144,9 +150,9 @@ GitLab CI (`.gitlab-ci.yml`) on push to `main`:
 
 3. **No markdown sanitization**: `react-markdown` + `remark-gfm` render assistant content. No `rehype-raw` (good — no raw HTML). But no DOMPurify either. Low risk since content is LLM-generated, not user-injected.
 
-4. **Thread persistence is localStorage only**: threads lost on browser data clear. Key stored in thread too — if localStorage cleared, orphaned `sk-` keys remain in LiteLLM (24h expiry mitigates).
+4. **Thread persistence is localStorage-only by default**: threads lost on browser data clear unless the operator opts into `litellm.chat.persistence.enabled` (see Config above). Key stored in thread too — if localStorage cleared, orphaned `sk-` keys remain in LiteLLM (24h expiry mitigates); this is unaffected by server-side thread persistence, since `keyToken`/`keyAlias` are deliberately never persisted server-side either.
 
-5. **No DB-backed threads**: AGENTS.md decision — v1 is ephemeral. Revisit if users ask. Exception: message thumbs-up/down feedback is persisted in a new `chat_message_feedback` table (first DB schema this plugin has ever had — see `plugin-litellm-chat-backend/migrations/`), storing a snapshot of the Q&A rather than the full thread.
+5. **DB-backed threads are opt-in (phase16)**: `chat_threads` table (`plugin-litellm-chat-backend/migrations/20260819130000_chat_threads.js`), gated behind `litellm.chat.persistence.enabled` (default `false`). When on, `useChat` treats the backend as authoritative and syncs to/from it; when off, behavior is unchanged from the original client-side-only design. A background task (`coreServices.scheduler`) auto-deletes threads after `ttlDays` (default 30, `0` = unlimited). Message thumbs-up/down feedback remains a separate `chat_message_feedback` table, storing a snapshot of the Q&A rather than the full thread.
 
 6. **CSP still references `abssrv.it`**: `connect-src` has both domains now, but Keycloak auth endpoint is `auth.ces.abssrv.it`. If Keycloak moves to `abstractstaging.it`, CSP needs update.
 

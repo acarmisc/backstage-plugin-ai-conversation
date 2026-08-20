@@ -40,6 +40,28 @@ export interface Config {
        * in LiteLLM; this is advisory only.
        */
       maxRequestBudget?: number;
+
+      /**
+       * Server-side chat history (thread) persistence. Off by default —
+       * threads stay client-side-only (React state + localStorage) unless
+       * explicitly opted in here.
+       * @visibility frontend
+       */
+      persistence?: {
+        /**
+         * Persist chat threads server-side in the plugin's own database
+         * instead of (in addition to) the browser's localStorage. Defaults
+         * to false.
+         */
+        enabled?: boolean;
+
+        /**
+         * Days a persisted thread is kept before automatic deletion by the
+         * background cleanup task. 0 means unlimited — threads are never
+         * auto-deleted. Defaults to 30. Ignored when `enabled` is false.
+         */
+        ttlDays?: number;
+      };
     };
   };
 }
