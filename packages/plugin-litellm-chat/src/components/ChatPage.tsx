@@ -199,7 +199,9 @@ export const ChatPage: React.FC = () => {
   }, [activeThreadId]);
 
   // Auto-scroll to bottom when messages update or streaming.
-  const messages = chat.activeThread?.messages ?? [];
+  const messages = useMemo(() => chat.activeThread?.messages ?? [], [
+    chat.activeThread,
+  ]);
   const isStreaming = chat.isStreaming;
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -328,6 +330,49 @@ export const ChatPage: React.FC = () => {
     if (chat.keySpend.max_budget != null) {
       statusParts.push(`$${chat.keySpend.spend.toFixed(2)} / $${chat.keySpend.max_budget.toFixed(2)} budget`);
     }
+  }
+
+  let persistenceTooltip: string;
+  if (config.persistence.enabled) {
+    persistenceTooltip =
+      config.persistence.ttlDays > 0
+        ? `Threads are saved to your account and auto-deleted after ${config.persistence.ttlDays} days of inactivity.`
+        : 'Threads are saved to your account and kept indefinitely.';
+  } else {
+    persistenceTooltip =
+      'Threads are stored only in this browser (localStorage) and are lost if browser data is cleared.';
+  }
+
+  let urlPreviewChip: React.ReactNode = null;
+  if (urlPreviewLoading) {
+    urlPreviewChip = (
+      <Chip size="small" icon={<LinkIcon fontSize="small" />} label="Fetching page…" variant="outlined" />
+    );
+  } else if (urlPreviewError) {
+    urlPreviewChip = (
+      <Chip
+        size="small"
+        color="error"
+        icon={<LinkIcon fontSize="small" />}
+        label={urlPreviewError}
+        variant="outlined"
+        onDelete={dismissUrlPreview}
+        deleteIcon={<CloseIcon fontSize="small" />}
+      />
+    );
+  } else if (urlPreview) {
+    urlPreviewChip = (
+      <Tooltip title={urlPreview.url}>
+        <Chip
+          size="small"
+          icon={<LinkIcon fontSize="small" />}
+          label={`Page attached: ${urlPreview.title}`}
+          variant="outlined"
+          onDelete={dismissUrlPreview}
+          deleteIcon={<CloseIcon fontSize="small" />}
+        />
+      </Tooltip>
+    );
   }
 
   return (
@@ -549,15 +594,7 @@ export const ChatPage: React.FC = () => {
             {/* Persistence status — transparency for where thread history
                 actually lives, driven by litellm.chat.persistence config. */}
             <Box sx={{ px: 1.5, pb: 1 }}>
-              <Tooltip
-                title={
-                  config.persistence.enabled
-                    ? config.persistence.ttlDays > 0
-                      ? `Threads are saved to your account and auto-deleted after ${config.persistence.ttlDays} days of inactivity.`
-                      : 'Threads are saved to your account and kept indefinitely.'
-                    : 'Threads are stored only in this browser (localStorage) and are lost if browser data is cleared.'
-                }
-              >
+              <Tooltip title={persistenceTooltip}>
                 <Typography variant="caption" color="text.secondary">
                   {config.persistence.enabled
                     ? `History saved to your account${config.persistence.ttlDays > 0 ? ` · ${config.persistence.ttlDays}d retention` : ''}`
@@ -744,30 +781,7 @@ export const ChatPage: React.FC = () => {
           {/* #url attachment chip */}
           {(urlPreviewLoading || urlPreview || urlPreviewError) && (
             <Box sx={{ px: 2, pt: 1 }}>
-              {urlPreviewLoading ? (
-                <Chip size="small" icon={<LinkIcon fontSize="small" />} label="Fetching page…" variant="outlined" />
-              ) : urlPreviewError ? (
-                <Chip
-                  size="small"
-                  color="error"
-                  icon={<LinkIcon fontSize="small" />}
-                  label={urlPreviewError}
-                  variant="outlined"
-                  onDelete={dismissUrlPreview}
-                  deleteIcon={<CloseIcon fontSize="small" />}
-                />
-              ) : urlPreview ? (
-                <Tooltip title={urlPreview.url}>
-                  <Chip
-                    size="small"
-                    icon={<LinkIcon fontSize="small" />}
-                    label={`Page attached: ${urlPreview.title}`}
-                    variant="outlined"
-                    onDelete={dismissUrlPreview}
-                    deleteIcon={<CloseIcon fontSize="small" />}
-                  />
-                </Tooltip>
-              ) : null}
+              {urlPreviewChip}
             </Box>
           )}
 

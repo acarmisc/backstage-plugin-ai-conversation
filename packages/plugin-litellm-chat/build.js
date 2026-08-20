@@ -22,6 +22,7 @@ async function build() {
       format: 'cjs',
     }),
   ]);
+  // eslint-disable-next-line no-console
   console.log('Build complete');
 }
 

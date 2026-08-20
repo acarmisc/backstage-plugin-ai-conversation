@@ -433,18 +433,19 @@ function useChat(opts) {
     };
   }, [userId, syncActiveThreadToBackend]);
   (0, import_react.useEffect)(() => {
-    if (!persistenceEnabled) return;
     let cancelled = false;
-    api.listThreads().then((persisted) => {
-      if (cancelled) return;
-      setThreads((prev) => {
-        const localIds = new Set(prev.map((t) => t.id));
-        const fresh = persisted.map(fromPersisted).filter((t) => !localIds.has(t.id));
-        return fresh.length ? [...fresh, ...prev] : prev;
+    if (persistenceEnabled) {
+      api.listThreads().then((persisted) => {
+        if (cancelled) return;
+        setThreads((prev) => {
+          const localIds = new Set(prev.map((t) => t.id));
+          const fresh = persisted.map(fromPersisted).filter((t) => !localIds.has(t.id));
+          return fresh.length ? [...fresh, ...prev] : prev;
+        });
+      }).catch((err) => {
+        if (!cancelled) setError(err.message);
       });
-    }).catch((err) => {
-      if (!cancelled) setError(err.message);
-    });
+    }
     return () => {
       cancelled = true;
     };
@@ -497,9 +498,7 @@ function useChat(opts) {
     personaId,
     customSystemPrompt,
     keyAlias,
-    keyToken,
-    persistenceEnabled,
-    api
+    keyToken
   ]);
   const selectThread = (0, import_react.useCallback)((id) => {
     setActiveId(id);
@@ -1539,6 +1538,36 @@ var init_AssistantMessage = __esm({
           setTimeout(() => setCopied(false), 1500);
         });
       };
+      let body;
+      if (message.content) {
+        body = /* @__PURE__ */ import_react11.default.createElement(
+          import_react_markdown.default,
+          {
+            remarkPlugins: [import_remark_gfm.default, import_remark_math.default],
+            rehypePlugins: [import_rehype_katex.default],
+            components: { code: CodeBlock }
+          },
+          message.content
+        );
+      } else if (isStreaming) {
+        body = /* @__PURE__ */ import_react11.default.createElement(
+          import_material10.Box,
+          {
+            component: "span",
+            sx: {
+              display: "inline-block",
+              width: 8,
+              height: 16,
+              bgcolor: "text.primary",
+              animation: "blink 1s step-end infinite",
+              verticalAlign: "text-bottom",
+              ...blink
+            }
+          }
+        );
+      } else {
+        body = null;
+      }
       return /* @__PURE__ */ import_react11.default.createElement(
         import_material10.Box,
         {
@@ -1569,29 +1598,7 @@ var init_AssistantMessage = __esm({
               "& pre code": { bgcolor: "transparent", px: 0 }
             }
           },
-          message.content ? /* @__PURE__ */ import_react11.default.createElement(
-            import_react_markdown.default,
-            {
-              remarkPlugins: [import_remark_gfm.default, import_remark_math.default],
-              rehypePlugins: [import_rehype_katex.default],
-              components: { code: CodeBlock }
-            },
-            message.content
-          ) : isStreaming ? /* @__PURE__ */ import_react11.default.createElement(
-            import_material10.Box,
-            {
-              component: "span",
-              sx: {
-                display: "inline-block",
-                width: 8,
-                height: 16,
-                bgcolor: "text.primary",
-                animation: "blink 1s step-end infinite",
-                verticalAlign: "text-bottom",
-                ...blink
-              }
-            }
-          ) : null
+          body
         ), showActions && /* @__PURE__ */ import_react11.default.createElement(
           import_material10.Box,
           {
@@ -1684,7 +1691,6 @@ var init_UserMessage = __esm({
             minRows: 1,
             maxRows: 8,
             size: "small",
-            autoFocus: true,
             fullWidth: true
           }
         ), /* @__PURE__ */ import_react12.default.createElement(import_material11.Box, { sx: { display: "flex", gap: 1, justifyContent: "flex-end" } }, /* @__PURE__ */ import_react12.default.createElement(import_material11.Button, { size: "small", onClick: () => setEditing(false) }, "Cancel"), /* @__PURE__ */ import_react12.default.createElement(import_material11.Button, { size: "small", variant: "contained", onClick: saveEdit, disabled: !draft.trim() }, "Save & resend")));
@@ -2050,7 +2056,9 @@ var init_ChatPage = __esm({
         setCompareModelsSel(chat.activeThread.compareModels ?? []);
         setWebSearch(!!chat.activeThread.webSearch);
       }, [activeThreadId]);
-      const messages = chat.activeThread?.messages ?? [];
+      const messages = (0, import_react17.useMemo)(() => chat.activeThread?.messages ?? [], [
+        chat.activeThread
+      ]);
       const isStreaming = chat.isStreaming;
       (0, import_react17.useEffect)(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -2154,6 +2162,41 @@ var init_ChatPage = __esm({
         if (chat.keySpend.max_budget != null) {
           statusParts.push(`$${chat.keySpend.spend.toFixed(2)} / $${chat.keySpend.max_budget.toFixed(2)} budget`);
         }
+      }
+      let persistenceTooltip;
+      if (config.persistence.enabled) {
+        persistenceTooltip = config.persistence.ttlDays > 0 ? `Threads are saved to your account and auto-deleted after ${config.persistence.ttlDays} days of inactivity.` : "Threads are saved to your account and kept indefinitely.";
+      } else {
+        persistenceTooltip = "Threads are stored only in this browser (localStorage) and are lost if browser data is cleared.";
+      }
+      let urlPreviewChip = null;
+      if (urlPreviewLoading) {
+        urlPreviewChip = /* @__PURE__ */ import_react17.default.createElement(import_material16.Chip, { size: "small", icon: /* @__PURE__ */ import_react17.default.createElement(import_Link2.default, { fontSize: "small" }), label: "Fetching page\u2026", variant: "outlined" });
+      } else if (urlPreviewError) {
+        urlPreviewChip = /* @__PURE__ */ import_react17.default.createElement(
+          import_material16.Chip,
+          {
+            size: "small",
+            color: "error",
+            icon: /* @__PURE__ */ import_react17.default.createElement(import_Link2.default, { fontSize: "small" }),
+            label: urlPreviewError,
+            variant: "outlined",
+            onDelete: dismissUrlPreview,
+            deleteIcon: /* @__PURE__ */ import_react17.default.createElement(import_Close.default, { fontSize: "small" })
+          }
+        );
+      } else if (urlPreview) {
+        urlPreviewChip = /* @__PURE__ */ import_react17.default.createElement(import_material16.Tooltip, { title: urlPreview.url }, /* @__PURE__ */ import_react17.default.createElement(
+          import_material16.Chip,
+          {
+            size: "small",
+            icon: /* @__PURE__ */ import_react17.default.createElement(import_Link2.default, { fontSize: "small" }),
+            label: `Page attached: ${urlPreview.title}`,
+            variant: "outlined",
+            onDelete: dismissUrlPreview,
+            deleteIcon: /* @__PURE__ */ import_react17.default.createElement(import_Close.default, { fontSize: "small" })
+          }
+        ));
       }
       return /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { display: "flex", height: "100dvh", overflow: "hidden" } }, /* @__PURE__ */ import_react17.default.createElement(
         import_material16.Box,
@@ -2326,13 +2369,7 @@ var init_ChatPage = __esm({
             hidden: true,
             onChange: handleImportFile
           }
-        )), importError && /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { px: 1.5, pb: 1 } }, /* @__PURE__ */ import_react17.default.createElement(import_material16.Typography, { variant: "caption", color: "error" }, importError)), /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { px: 1.5, pb: 1 } }, /* @__PURE__ */ import_react17.default.createElement(
-          import_material16.Tooltip,
-          {
-            title: config.persistence.enabled ? config.persistence.ttlDays > 0 ? `Threads are saved to your account and auto-deleted after ${config.persistence.ttlDays} days of inactivity.` : "Threads are saved to your account and kept indefinitely." : "Threads are stored only in this browser (localStorage) and are lost if browser data is cleared."
-          },
-          /* @__PURE__ */ import_react17.default.createElement(import_material16.Typography, { variant: "caption", color: "text.secondary" }, config.persistence.enabled ? `History saved to your account${config.persistence.ttlDays > 0 ? ` \xB7 ${config.persistence.ttlDays}d retention` : ""}` : "History stored only in this browser")
-        )), /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { px: 1.5, pb: 1 } }, /* @__PURE__ */ import_react17.default.createElement(
+        )), importError && /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { px: 1.5, pb: 1 } }, /* @__PURE__ */ import_react17.default.createElement(import_material16.Typography, { variant: "caption", color: "error" }, importError)), /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { px: 1.5, pb: 1 } }, /* @__PURE__ */ import_react17.default.createElement(import_material16.Tooltip, { title: persistenceTooltip }, /* @__PURE__ */ import_react17.default.createElement(import_material16.Typography, { variant: "caption", color: "text.secondary" }, config.persistence.enabled ? `History saved to your account${config.persistence.ttlDays > 0 ? ` \xB7 ${config.persistence.ttlDays}d retention` : ""}` : "History stored only in this browser"))), /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { px: 1.5, pb: 1 } }, /* @__PURE__ */ import_react17.default.createElement(
           import_material16.InputBase,
           {
             fullWidth: true,
@@ -2476,28 +2513,7 @@ var init_ChatPage = __esm({
             ),
             /* @__PURE__ */ import_react17.default.createElement("div", { ref: messagesEndRef })
           ),
-          (urlPreviewLoading || urlPreview || urlPreviewError) && /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { px: 2, pt: 1 } }, urlPreviewLoading ? /* @__PURE__ */ import_react17.default.createElement(import_material16.Chip, { size: "small", icon: /* @__PURE__ */ import_react17.default.createElement(import_Link2.default, { fontSize: "small" }), label: "Fetching page\u2026", variant: "outlined" }) : urlPreviewError ? /* @__PURE__ */ import_react17.default.createElement(
-            import_material16.Chip,
-            {
-              size: "small",
-              color: "error",
-              icon: /* @__PURE__ */ import_react17.default.createElement(import_Link2.default, { fontSize: "small" }),
-              label: urlPreviewError,
-              variant: "outlined",
-              onDelete: dismissUrlPreview,
-              deleteIcon: /* @__PURE__ */ import_react17.default.createElement(import_Close.default, { fontSize: "small" })
-            }
-          ) : urlPreview ? /* @__PURE__ */ import_react17.default.createElement(import_material16.Tooltip, { title: urlPreview.url }, /* @__PURE__ */ import_react17.default.createElement(
-            import_material16.Chip,
-            {
-              size: "small",
-              icon: /* @__PURE__ */ import_react17.default.createElement(import_Link2.default, { fontSize: "small" }),
-              label: `Page attached: ${urlPreview.title}`,
-              variant: "outlined",
-              onDelete: dismissUrlPreview,
-              deleteIcon: /* @__PURE__ */ import_react17.default.createElement(import_Close.default, { fontSize: "small" })
-            }
-          )) : null),
+          (urlPreviewLoading || urlPreview || urlPreviewError) && /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { px: 2, pt: 1 } }, urlPreviewChip),
           /* @__PURE__ */ import_react17.default.createElement(
             import_material16.Box,
             {

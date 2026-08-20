@@ -191,21 +191,22 @@ export function useChat(opts: UseChatOptions): UseChatResult {
   // localStorage-loaded threads already in state rather than clearing the
   // sidebar.
   useEffect(() => {
-    if (!persistenceEnabled) return;
     let cancelled = false;
-    api
-      .listThreads()
-      .then(persisted => {
-        if (cancelled) return;
-        setThreads(prev => {
-          const localIds = new Set(prev.map(t => t.id));
-          const fresh = persisted.map(fromPersisted).filter(t => !localIds.has(t.id));
-          return fresh.length ? [...fresh, ...prev] : prev;
+    if (persistenceEnabled) {
+      api
+        .listThreads()
+        .then(persisted => {
+          if (cancelled) return;
+          setThreads(prev => {
+            const localIds = new Set(prev.map(t => t.id));
+            const fresh = persisted.map(fromPersisted).filter(t => !localIds.has(t.id));
+            return fresh.length ? [...fresh, ...prev] : prev;
+          });
+        })
+        .catch(err => {
+          if (!cancelled) setError(err.message);
         });
-      })
-      .catch(err => {
-        if (!cancelled) setError(err.message);
-      });
+    }
     return () => {
       cancelled = true;
     };
@@ -278,8 +279,6 @@ export function useChat(opts: UseChatOptions): UseChatResult {
     customSystemPrompt,
     keyAlias,
     keyToken,
-    persistenceEnabled,
-    api,
   ]);
 
   const selectThread = useCallback((id: string) => {

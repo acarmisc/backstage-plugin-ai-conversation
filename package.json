@@ -10,7 +10,7 @@
   "scripts": {
     "build": "yarn workspace @acarmisc/backstage-plugin-litellm-chat build && yarn workspace @acarmisc/backstage-plugin-litellm-chat-backend build",
     "test": "echo 'Use from Backstage monorepo: yarn workspace @acarmisc/backstage-plugin-litellm-chat test'",
-    "lint": "echo 'Use from Backstage monorepo: yarn workspace @acarmisc/backstage-plugin-litellm-chat lint'"
+    "lint": "yarn workspace @acarmisc/backstage-plugin-litellm-chat lint && yarn workspace @acarmisc/backstage-plugin-litellm-chat-backend lint"
   },
   "devDependencies": {
     "typescript": "^5.0.0"

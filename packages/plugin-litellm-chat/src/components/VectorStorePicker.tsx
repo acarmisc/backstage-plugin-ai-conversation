@@ -41,6 +41,7 @@ export const VectorStorePicker: React.FC<VectorStorePickerProps> = ({
       })
       .finally(() => alive && setLoading(false));
     return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const selected = stores.filter(s => value.includes(s.id));

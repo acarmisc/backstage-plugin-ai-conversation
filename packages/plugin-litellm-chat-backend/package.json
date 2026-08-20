@@ -34,6 +34,7 @@
   ],
   "scripts": {
     "build": "node build.js && tsc -p tsconfig.json",
+    "lint": "backstage-cli package lint",
     "test": "backstage-cli package test",
     "prepack": "npm run build",
     "postpack": ""

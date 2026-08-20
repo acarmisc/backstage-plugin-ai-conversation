@@ -47,6 +47,36 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
     });
   };
 
+  let body: React.ReactNode;
+  if (message.content) {
+    body = (
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm, remarkMath]}
+        rehypePlugins={[rehypeKatex]}
+        components={{ code: CodeBlock }}
+      >
+        {message.content}
+      </ReactMarkdown>
+    );
+  } else if (isStreaming) {
+    body = (
+      <Box
+        component="span"
+        sx={{
+          display: 'inline-block',
+          width: 8,
+          height: 16,
+          bgcolor: 'text.primary',
+          animation: 'blink 1s step-end infinite',
+          verticalAlign: 'text-bottom',
+          ...blink,
+        }}
+      />
+    );
+  } else {
+    body = null;
+  }
+
   return (
     <Box
       sx={{
@@ -75,28 +105,7 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
             '& pre code': { bgcolor: 'transparent', px: 0 },
           }}
         >
-          {message.content ? (
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm, remarkMath]}
-              rehypePlugins={[rehypeKatex]}
-              components={{ code: CodeBlock }}
-            >
-              {message.content}
-            </ReactMarkdown>
-          ) : isStreaming ? (
-            <Box
-              component="span"
-              sx={{
-                display: 'inline-block',
-                width: 8,
-                height: 16,
-                bgcolor: 'text.primary',
-                animation: 'blink 1s step-end infinite',
-                verticalAlign: 'text-bottom',
-                ...blink,
-              }}
-            />
-          ) : null}
+          {body}
         </Box>
         {showActions && (
           <Box

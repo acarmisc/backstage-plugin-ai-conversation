@@ -47,7 +47,6 @@ export const UserMessage: React.FC<UserMessageProps> = ({ message, onEditAndRese
           minRows={1}
           maxRows={8}
           size="small"
-          autoFocus
           fullWidth
         />
         <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>

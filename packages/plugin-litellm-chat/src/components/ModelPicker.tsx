@@ -45,6 +45,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
       })
       .finally(() => alive && setLoading(false));
     return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
