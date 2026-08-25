@@ -483,6 +483,15 @@ export const ChatPage: React.FC = () => {
                     size="small"
                     fullWidth
                   />
+                  <KeyPicker
+                    value={keyVal}
+                    onChange={setKeyVal}
+                    onDelete={() => {
+                      if (chat.activeThread?.keyToken) {
+                        chatApi.deleteChatKey(chat.activeThread.keyToken).catch(() => {});
+                      }
+                    }}
+                  />
                   <FormControlLabel
                     control={
                       <Switch
@@ -542,15 +551,6 @@ export const ChatPage: React.FC = () => {
                           noneLabel="Model default"
                         />
                       </Box>
-                      <KeyPicker
-                        value={keyVal}
-                        onChange={setKeyVal}
-                        onDelete={() => {
-                          if (chat.activeThread?.keyToken) {
-                            chatApi.deleteChatKey(chat.activeThread.keyToken).catch(() => {});
-                          }
-                        }}
-                      />
                     </AccordionDetails>
                   </Accordion>
                 </Box>

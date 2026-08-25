@@ -2281,6 +2281,18 @@ var init_ChatPage = __esm({
             fullWidth: true
           }
         ), /* @__PURE__ */ import_react17.default.createElement(
+          KeyPicker,
+          {
+            value: keyVal,
+            onChange: setKeyVal,
+            onDelete: () => {
+              if (chat.activeThread?.keyToken) {
+                chatApi.deleteChatKey(chat.activeThread.keyToken).catch(() => {
+                });
+              }
+            }
+          }
+        ), /* @__PURE__ */ import_react17.default.createElement(
           import_material16.FormControlLabel,
           {
             control: /* @__PURE__ */ import_react17.default.createElement(
@@ -2339,19 +2351,7 @@ var init_ChatPage = __esm({
               onChange: (id) => setReasoningEffort(id),
               noneLabel: "Model default"
             }
-          )), /* @__PURE__ */ import_react17.default.createElement(
-            KeyPicker,
-            {
-              value: keyVal,
-              onChange: setKeyVal,
-              onDelete: () => {
-                if (chat.activeThread?.keyToken) {
-                  chatApi.deleteChatKey(chat.activeThread.keyToken).catch(() => {
-                  });
-                }
-              }
-            }
-          ))
+          )))
         )))), /* @__PURE__ */ import_react17.default.createElement(import_material16.Divider, null), /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { p: 1.5, display: "flex", gap: 1 } }, /* @__PURE__ */ import_react17.default.createElement(
           import_material16.Button,
           {
