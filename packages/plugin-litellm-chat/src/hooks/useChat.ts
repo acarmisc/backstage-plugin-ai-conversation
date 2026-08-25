@@ -222,6 +222,7 @@ export function useChat(opts: UseChatOptions): UseChatResult {
   // are deleted.
   useEffect(() => {
     if (!keyToken || activeId) return;
+    // Include trait selection and mode so a new thread preserves the current UI state
     const thread: Thread = {
       id: genId(),
       title: 'New chat',
@@ -236,6 +237,13 @@ export function useChat(opts: UseChatOptions): UseChatResult {
       updatedAt: Date.now(),
       totalTokens: 0,
       lastTurnUsage: null,
+      toneId,
+      focusId,
+      verbosityId,
+      reasoningEffort: reasoningEffort || undefined,
+      webSearch,
+      mode: 'single',
+      compareModels: [],
     };
     setThreads(prev => [thread, ...prev]);
     setActiveId(thread.id);
@@ -250,6 +258,7 @@ export function useChat(opts: UseChatOptions): UseChatResult {
   }, [keyToken, activeId, persistenceEnabled, api]);
 
   const newThread = useCallback(() => {
+    // Include trait selection and mode so a new thread preserves the current UI state
     const thread: Thread = {
       id: genId(),
       title: 'New chat',
@@ -264,6 +273,13 @@ export function useChat(opts: UseChatOptions): UseChatResult {
       updatedAt: Date.now(),
       totalTokens: 0,
       lastTurnUsage: null,
+      toneId,
+      focusId,
+      verbosityId,
+      reasoningEffort: reasoningEffort || undefined,
+      webSearch,
+      mode: 'single',
+      compareModels: [],
     };
     setThreads(prev => [thread, ...prev]);
     setActiveId(thread.id);
@@ -280,6 +296,11 @@ export function useChat(opts: UseChatOptions): UseChatResult {
     customSystemPrompt,
     keyAlias,
     keyToken,
+    toneId,
+    focusId,
+    verbosityId,
+    reasoningEffort,
+    webSearch,
   ]);
 
   const selectThread = useCallback((id: string) => {

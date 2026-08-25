@@ -466,7 +466,14 @@ function useChat(opts) {
       createdAt: Date.now(),
       updatedAt: Date.now(),
       totalTokens: 0,
-      lastTurnUsage: null
+      lastTurnUsage: null,
+      toneId,
+      focusId,
+      verbosityId,
+      reasoningEffort: reasoningEffort || void 0,
+      webSearch,
+      mode: "single",
+      compareModels: []
     };
     setThreads((prev) => [thread, ...prev]);
     setActiveId(thread.id);
@@ -485,7 +492,14 @@ function useChat(opts) {
       createdAt: Date.now(),
       updatedAt: Date.now(),
       totalTokens: 0,
-      lastTurnUsage: null
+      lastTurnUsage: null,
+      toneId,
+      focusId,
+      verbosityId,
+      reasoningEffort: reasoningEffort || void 0,
+      webSearch,
+      mode: "single",
+      compareModels: []
     };
     setThreads((prev) => [thread, ...prev]);
     setActiveId(thread.id);
@@ -498,7 +512,12 @@ function useChat(opts) {
     personaId,
     customSystemPrompt,
     keyAlias,
-    keyToken
+    keyToken,
+    toneId,
+    focusId,
+    verbosityId,
+    reasoningEffort,
+    webSearch
   ]);
   const selectThread = (0, import_react.useCallback)((id) => {
     setActiveId(id);

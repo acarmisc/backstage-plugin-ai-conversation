@@ -60,6 +60,8 @@
   "devDependencies": {
     "@backstage/cli": "^0.36.2",
     "@jest/environment-jsdom-abstract": "^30.0.0",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
     "@types/jest": "^30.0.0",
     "@types/react": "^18.3.0",
     "esbuild": "^0.28.1",
