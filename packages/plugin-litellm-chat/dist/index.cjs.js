@@ -2082,7 +2082,11 @@ var init_ChatPage = __esm({
       ]);
       const isStreaming = chat.isStreaming;
       (0, import_react17.useEffect)(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        const container = messagesContainerRef.current;
+        const isNearBottom = !container || container.scrollHeight - container.scrollTop - container.clientHeight < 120;
+        if (isNearBottom) {
+          messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        }
       }, [messages, isStreaming]);
       (0, import_react17.useEffect)(() => {
         const match = input.match(URL_TOKEN_RE);

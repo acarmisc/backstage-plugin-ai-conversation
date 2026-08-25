@@ -2083,7 +2083,11 @@ var init_ChatPage = __esm({
       ]);
       const isStreaming = chat.isStreaming;
       useEffect5(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        const container = messagesContainerRef.current;
+        const isNearBottom = !container || container.scrollHeight - container.scrollTop - container.clientHeight < 120;
+        if (isNearBottom) {
+          messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        }
       }, [messages, isStreaming]);
       useEffect5(() => {
         const match = input.match(URL_TOKEN_RE);

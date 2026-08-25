@@ -204,7 +204,14 @@ export const ChatPage: React.FC = () => {
   ]);
   const isStreaming = chat.isStreaming;
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Only auto-scroll if the user hasn't scrolled away from the bottom.
+    // Threshold of 120px allows for minor scroll variance.
+    const container = messagesContainerRef.current;
+    const isNearBottom =
+      !container || container.scrollHeight - container.scrollTop - container.clientHeight < 120;
+    if (isNearBottom) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages, isStreaming]);
 
   // Detect a `#https://...` token in the composer, debounced, and resolve
