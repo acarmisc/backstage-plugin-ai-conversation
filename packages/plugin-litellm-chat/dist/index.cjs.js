@@ -2273,6 +2273,80 @@ var init_SettingsPanel = __esm({
   }
 });
 
+// src/components/ChatComposer.tsx
+var import_react19, import_material18, import_Send, import_Stop, ChatComposer;
+var init_ChatComposer = __esm({
+  "src/components/ChatComposer.tsx"() {
+    "use strict";
+    import_react19 = __toESM(require("react"));
+    import_material18 = require("@mui/material");
+    import_Send = __toESM(require("@mui/icons-material/Send"));
+    import_Stop = __toESM(require("@mui/icons-material/Stop"));
+    ChatComposer = ({
+      urlPreviewChip,
+      urlPreviewLoading,
+      urlPreview,
+      urlPreviewError,
+      input,
+      onInputChange,
+      onKeyDown,
+      keyVal,
+      isStreaming,
+      onStop,
+      onSend,
+      sendDisabled,
+      statusParts
+    }) => {
+      return /* @__PURE__ */ import_react19.default.createElement(import_react19.default.Fragment, null, (urlPreviewLoading || urlPreview || urlPreviewError) && /* @__PURE__ */ import_react19.default.createElement(import_material18.Box, { sx: { px: 2, pt: 1 } }, urlPreviewChip), /* @__PURE__ */ import_react19.default.createElement(
+        import_material18.Box,
+        {
+          sx: {
+            flexShrink: 0,
+            borderTop: 1,
+            borderColor: "divider",
+            px: 2,
+            py: 1.5,
+            display: "flex",
+            gap: 1,
+            alignItems: "flex-end"
+          }
+        },
+        /* @__PURE__ */ import_react19.default.createElement(
+          import_material18.InputBase,
+          {
+            multiline: true,
+            minRows: 1,
+            maxRows: 5,
+            fullWidth: true,
+            placeholder: keyVal.token ? "Send a message\u2026  (Enter to send, Shift+Enter for newline)" : "Generate a chat key in Settings to start\u2026",
+            value: input,
+            onChange: (e) => onInputChange(e.target.value),
+            onKeyDown,
+            disabled: !keyVal.token,
+            sx: {
+              border: 1,
+              borderColor: "divider",
+              borderRadius: 2,
+              px: 1.5,
+              py: 0.75,
+              fontSize: "0.9rem"
+            }
+          }
+        ),
+        isStreaming ? /* @__PURE__ */ import_react19.default.createElement(import_material18.Tooltip, { title: "Stop" }, /* @__PURE__ */ import_react19.default.createElement(import_material18.IconButton, { color: "error", onClick: onStop }, /* @__PURE__ */ import_react19.default.createElement(import_Stop.default, null))) : /* @__PURE__ */ import_react19.default.createElement(import_material18.Tooltip, { title: "Send" }, /* @__PURE__ */ import_react19.default.createElement(
+          import_material18.IconButton,
+          {
+            color: "primary",
+            onClick: onSend,
+            disabled: sendDisabled
+          },
+          /* @__PURE__ */ import_react19.default.createElement(import_Send.default, null)
+        ))
+      ), statusParts.length > 0 && /* @__PURE__ */ import_react19.default.createElement(import_material18.Box, { sx: { px: 2, pb: 1 } }, /* @__PURE__ */ import_react19.default.createElement(import_material18.Typography, { variant: "caption", color: "text.secondary" }, statusParts.join(" \xB7 "))));
+    };
+  }
+});
+
 // src/components/ChatPage.tsx
 var ChatPage_exports = {};
 __export(ChatPage_exports, {
@@ -2290,15 +2364,13 @@ function sortThreads(threads) {
     return b.updatedAt - a.updatedAt;
   });
 }
-var import_react19, import_material18, import_Chat, import_Send, import_Stop, import_ChevronLeft2, import_ChevronRight2, import_Link2, import_Close, import_core_plugin_api7, RIGHT_RAIL_WIDTH, CHAT_MAX_WIDTH, URL_TOKEN_RE, URL_PREVIEW_DEBOUNCE_MS, ChatPage;
+var import_react20, import_material19, import_Chat, import_ChevronLeft2, import_ChevronRight2, import_Link2, import_Close, import_core_plugin_api7, RIGHT_RAIL_WIDTH, CHAT_MAX_WIDTH, URL_TOKEN_RE, URL_PREVIEW_DEBOUNCE_MS, ChatPage;
 var init_ChatPage = __esm({
   "src/components/ChatPage.tsx"() {
     "use strict";
-    import_react19 = __toESM(require("react"));
-    import_material18 = require("@mui/material");
+    import_react20 = __toESM(require("react"));
+    import_material19 = require("@mui/material");
     import_Chat = __toESM(require("@mui/icons-material/Chat"));
-    import_Send = __toESM(require("@mui/icons-material/Send"));
-    import_Stop = __toESM(require("@mui/icons-material/Stop"));
     import_ChevronLeft2 = __toESM(require("@mui/icons-material/ChevronLeft"));
     import_ChevronRight2 = __toESM(require("@mui/icons-material/ChevronRight"));
     import_Link2 = __toESM(require("@mui/icons-material/Link"));
@@ -2314,6 +2386,7 @@ var init_ChatPage = __esm({
     init_UsagePanel();
     init_ThreadSidebar();
     init_SettingsPanel();
+    init_ChatComposer();
     RIGHT_RAIL_WIDTH = 300;
     CHAT_MAX_WIDTH = 900;
     URL_TOKEN_RE = /#(https:\/\/\S+)/;
@@ -2321,50 +2394,50 @@ var init_ChatPage = __esm({
     ChatPage = () => {
       const chatApi = (0, import_core_plugin_api7.useApi)(liteLlmChatApiRef);
       const identityApi = (0, import_core_plugin_api7.useApi)(import_core_plugin_api7.identityApiRef);
-      const [userId, setUserId] = (0, import_react19.useState)("default");
-      const [config, setConfig] = (0, import_react19.useState)({
+      const [userId, setUserId] = (0, import_react20.useState)("default");
+      const [config, setConfig] = (0, import_react20.useState)({
         defaultModel: null,
         defaultVectorStoreIds: null,
         maxRequestBudget: null,
         persistence: { enabled: false, ttlDays: 30 }
       });
-      const [model, setModel] = (0, import_react19.useState)("");
-      const [compareMode, setCompareModeUi] = (0, import_react19.useState)(false);
-      const [compareModelsSel, setCompareModelsSel] = (0, import_react19.useState)([]);
-      const [vectorStoreIds, setVectorStoreIds] = (0, import_react19.useState)([]);
-      const [webSearch, setWebSearch] = (0, import_react19.useState)(false);
-      const [personaId, setPersonaId] = (0, import_react19.useState)("");
-      const [customSystemPrompt, setCustomSystemPrompt] = (0, import_react19.useState)("");
-      const [toneId, setToneId] = (0, import_react19.useState)("");
-      const [focusId, setFocusId] = (0, import_react19.useState)("");
-      const [verbosityId, setVerbosityId] = (0, import_react19.useState)("");
-      const [reasoningEffort, setReasoningEffort] = (0, import_react19.useState)("");
-      const [keyVal, setKeyVal] = (0, import_react19.useState)({
+      const [model, setModel] = (0, import_react20.useState)("");
+      const [compareMode, setCompareModeUi] = (0, import_react20.useState)(false);
+      const [compareModelsSel, setCompareModelsSel] = (0, import_react20.useState)([]);
+      const [vectorStoreIds, setVectorStoreIds] = (0, import_react20.useState)([]);
+      const [webSearch, setWebSearch] = (0, import_react20.useState)(false);
+      const [personaId, setPersonaId] = (0, import_react20.useState)("");
+      const [customSystemPrompt, setCustomSystemPrompt] = (0, import_react20.useState)("");
+      const [toneId, setToneId] = (0, import_react20.useState)("");
+      const [focusId, setFocusId] = (0, import_react20.useState)("");
+      const [verbosityId, setVerbosityId] = (0, import_react20.useState)("");
+      const [reasoningEffort, setReasoningEffort] = (0, import_react20.useState)("");
+      const [keyVal, setKeyVal] = (0, import_react20.useState)({
         alias: "",
         token: ""
       });
-      const [showSettings, setShowSettings] = (0, import_react19.useState)(true);
-      const [input, setInput] = (0, import_react19.useState)("");
-      const [configError, setConfigError] = (0, import_react19.useState)(null);
-      const [personas, setPersonas] = (0, import_react19.useState)([]);
-      const [personasLoading, setPersonasLoading] = (0, import_react19.useState)(true);
-      const [personasError, setPersonasError] = (0, import_react19.useState)(null);
-      const [searchQuery, setSearchQuery] = (0, import_react19.useState)("");
-      const [sidebarCollapsed, setSidebarCollapsed] = (0, import_react19.useState)(false);
-      const [rightPanelCollapsed, setRightPanelCollapsed] = (0, import_react19.useState)(false);
-      const [threadMenuAnchor, setThreadMenuAnchor] = (0, import_react19.useState)(null);
-      const [threadMenuTarget, setThreadMenuTarget] = (0, import_react19.useState)(null);
-      const [importError, setImportError] = (0, import_react19.useState)(null);
-      const [urlPreview, setUrlPreview] = (0, import_react19.useState)(null);
-      const [urlPreviewLoading, setUrlPreviewLoading] = (0, import_react19.useState)(false);
-      const [urlPreviewError, setUrlPreviewError] = (0, import_react19.useState)(null);
-      const [dismissedUrl, setDismissedUrl] = (0, import_react19.useState)(null);
-      const [traits, setTraits] = (0, import_react19.useState)({ tones: [], focuses: [], verbosities: [] });
-      const [traitsLoading, setTraitsLoading] = (0, import_react19.useState)(true);
-      const messagesEndRef = (0, import_react19.useRef)(null);
-      const messagesContainerRef = (0, import_react19.useRef)(null);
-      const importInputRef = (0, import_react19.useRef)(null);
-      (0, import_react19.useEffect)(() => {
+      const [showSettings, setShowSettings] = (0, import_react20.useState)(true);
+      const [input, setInput] = (0, import_react20.useState)("");
+      const [configError, setConfigError] = (0, import_react20.useState)(null);
+      const [personas, setPersonas] = (0, import_react20.useState)([]);
+      const [personasLoading, setPersonasLoading] = (0, import_react20.useState)(true);
+      const [personasError, setPersonasError] = (0, import_react20.useState)(null);
+      const [searchQuery, setSearchQuery] = (0, import_react20.useState)("");
+      const [sidebarCollapsed, setSidebarCollapsed] = (0, import_react20.useState)(false);
+      const [rightPanelCollapsed, setRightPanelCollapsed] = (0, import_react20.useState)(false);
+      const [threadMenuAnchor, setThreadMenuAnchor] = (0, import_react20.useState)(null);
+      const [threadMenuTarget, setThreadMenuTarget] = (0, import_react20.useState)(null);
+      const [importError, setImportError] = (0, import_react20.useState)(null);
+      const [urlPreview, setUrlPreview] = (0, import_react20.useState)(null);
+      const [urlPreviewLoading, setUrlPreviewLoading] = (0, import_react20.useState)(false);
+      const [urlPreviewError, setUrlPreviewError] = (0, import_react20.useState)(null);
+      const [dismissedUrl, setDismissedUrl] = (0, import_react20.useState)(null);
+      const [traits, setTraits] = (0, import_react20.useState)({ tones: [], focuses: [], verbosities: [] });
+      const [traitsLoading, setTraitsLoading] = (0, import_react20.useState)(true);
+      const messagesEndRef = (0, import_react20.useRef)(null);
+      const messagesContainerRef = (0, import_react20.useRef)(null);
+      const importInputRef = (0, import_react20.useRef)(null);
+      (0, import_react20.useEffect)(() => {
         injectDesignSystemAssets();
         chatApi.getChatConfig().then(setConfig).catch((err) => setConfigError(err.message ?? "Failed to reach the chat backend"));
         chatApi.listPersonas().then(setPersonas).catch((err) => setPersonasError(err.message ?? "Failed to load personas")).finally(() => setPersonasLoading(false));
@@ -2390,7 +2463,7 @@ var init_ChatPage = __esm({
         persistenceEnabled: config.persistence.enabled
       });
       const activeThreadId = chat.activeThread?.id ?? null;
-      (0, import_react19.useEffect)(() => {
+      (0, import_react20.useEffect)(() => {
         if (!chat.activeThread) return;
         setModel(chat.activeThread.model);
         setVectorStoreIds(chat.activeThread.vectorStoreIds);
@@ -2405,18 +2478,18 @@ var init_ChatPage = __esm({
         setCompareModelsSel(chat.activeThread.compareModels ?? []);
         setWebSearch(!!chat.activeThread.webSearch);
       }, [activeThreadId]);
-      const messages = (0, import_react19.useMemo)(() => chat.activeThread?.messages ?? [], [
+      const messages = (0, import_react20.useMemo)(() => chat.activeThread?.messages ?? [], [
         chat.activeThread
       ]);
       const isStreaming = chat.isStreaming;
-      (0, import_react19.useEffect)(() => {
+      (0, import_react20.useEffect)(() => {
         const container = messagesContainerRef.current;
         const isNearBottom = !container || container.scrollHeight - container.scrollTop - container.clientHeight < 120;
         if (isNearBottom) {
           messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
         }
       }, [messages, isStreaming]);
-      (0, import_react19.useEffect)(() => {
+      (0, import_react20.useEffect)(() => {
         const match = input.match(URL_TOKEN_RE);
         const url = match?.[1];
         if (!url) {
@@ -2439,7 +2512,7 @@ var init_ChatPage = __esm({
         }, URL_PREVIEW_DEBOUNCE_MS);
         return () => clearTimeout(timer);
       }, [input, dismissedUrl]);
-      const visibleThreads = (0, import_react19.useMemo)(
+      const visibleThreads = (0, import_react20.useMemo)(
         () => sortThreads(chat.threads.filter((t) => threadMatchesQuery(t, searchQuery))),
         [chat.threads, searchQuery]
       );
@@ -2523,41 +2596,41 @@ var init_ChatPage = __esm({
       }
       let urlPreviewChip = null;
       if (urlPreviewLoading) {
-        urlPreviewChip = /* @__PURE__ */ import_react19.default.createElement(import_material18.Chip, { size: "small", icon: /* @__PURE__ */ import_react19.default.createElement(import_Link2.default, { fontSize: "small" }), label: "Fetching page\u2026", variant: "outlined" });
+        urlPreviewChip = /* @__PURE__ */ import_react20.default.createElement(import_material19.Chip, { size: "small", icon: /* @__PURE__ */ import_react20.default.createElement(import_Link2.default, { fontSize: "small" }), label: "Fetching page\u2026", variant: "outlined" });
       } else if (urlPreviewError) {
-        urlPreviewChip = /* @__PURE__ */ import_react19.default.createElement(
-          import_material18.Chip,
+        urlPreviewChip = /* @__PURE__ */ import_react20.default.createElement(
+          import_material19.Chip,
           {
             size: "small",
             color: "error",
-            icon: /* @__PURE__ */ import_react19.default.createElement(import_Link2.default, { fontSize: "small" }),
+            icon: /* @__PURE__ */ import_react20.default.createElement(import_Link2.default, { fontSize: "small" }),
             label: urlPreviewError,
             variant: "outlined",
             onDelete: dismissUrlPreview,
-            deleteIcon: /* @__PURE__ */ import_react19.default.createElement(import_Close.default, { fontSize: "small" })
+            deleteIcon: /* @__PURE__ */ import_react20.default.createElement(import_Close.default, { fontSize: "small" })
           }
         );
       } else if (urlPreview) {
-        urlPreviewChip = /* @__PURE__ */ import_react19.default.createElement(import_material18.Tooltip, { title: urlPreview.url }, /* @__PURE__ */ import_react19.default.createElement(
-          import_material18.Chip,
+        urlPreviewChip = /* @__PURE__ */ import_react20.default.createElement(import_material19.Tooltip, { title: urlPreview.url }, /* @__PURE__ */ import_react20.default.createElement(
+          import_material19.Chip,
           {
             size: "small",
-            icon: /* @__PURE__ */ import_react19.default.createElement(import_Link2.default, { fontSize: "small" }),
+            icon: /* @__PURE__ */ import_react20.default.createElement(import_Link2.default, { fontSize: "small" }),
             label: `Page attached: ${urlPreview.title}`,
             variant: "outlined",
             onDelete: dismissUrlPreview,
-            deleteIcon: /* @__PURE__ */ import_react19.default.createElement(import_Close.default, { fontSize: "small" })
+            deleteIcon: /* @__PURE__ */ import_react20.default.createElement(import_Close.default, { fontSize: "small" })
           }
         ));
       }
-      return /* @__PURE__ */ import_react19.default.createElement(import_material18.Box, { sx: { display: "flex", height: "100dvh", overflow: "hidden" } }, /* @__PURE__ */ import_react19.default.createElement(
+      return /* @__PURE__ */ import_react20.default.createElement(import_material19.Box, { sx: { display: "flex", height: "100dvh", overflow: "hidden" } }, /* @__PURE__ */ import_react20.default.createElement(
         ThreadSidebar,
         {
           collapsed: sidebarCollapsed,
           onToggleCollapsed: () => setSidebarCollapsed((v) => !v),
           showSettings,
           onToggleShowSettings: () => setShowSettings((v) => !v),
-          settingsSlot: /* @__PURE__ */ import_react19.default.createElement(
+          settingsSlot: /* @__PURE__ */ import_react20.default.createElement(
             SettingsPanel,
             {
               configError,
@@ -2619,8 +2692,8 @@ var init_ChatPage = __esm({
           onExport: (id) => chat.exportThread(id),
           onDelete: (id) => chat.deleteThread(id)
         }
-      ), /* @__PURE__ */ import_react19.default.createElement(
-        import_material18.Box,
+      ), /* @__PURE__ */ import_react20.default.createElement(
+        import_material19.Box,
         {
           sx: {
             flex: 3,
@@ -2629,8 +2702,8 @@ var init_ChatPage = __esm({
             overflow: "hidden"
           }
         },
-        /* @__PURE__ */ import_react19.default.createElement(
-          import_material18.Box,
+        /* @__PURE__ */ import_react20.default.createElement(
+          import_material19.Box,
           {
             sx: {
               width: "100%",
@@ -2640,8 +2713,8 @@ var init_ChatPage = __esm({
               overflow: "hidden"
             }
           },
-          /* @__PURE__ */ import_react19.default.createElement(
-            import_material18.Box,
+          /* @__PURE__ */ import_react20.default.createElement(
+            import_material19.Box,
             {
               sx: {
                 flexShrink: 0,
@@ -2654,13 +2727,13 @@ var init_ChatPage = __esm({
                 gap: 1
               }
             },
-            /* @__PURE__ */ import_react19.default.createElement(import_Chat.default, { fontSize: "small", color: "action" }),
-            /* @__PURE__ */ import_react19.default.createElement(import_material18.Typography, { variant: "subtitle2", noWrap: true, sx: { flex: 1 } }, chat.activeThread?.title ?? "AI Chat"),
-            /* @__PURE__ */ import_react19.default.createElement(import_material18.Tooltip, { title: rightPanelCollapsed ? "Show context panel" : "Hide context panel" }, /* @__PURE__ */ import_react19.default.createElement(import_material18.IconButton, { size: "small", onClick: () => setRightPanelCollapsed((v) => !v) }, rightPanelCollapsed ? /* @__PURE__ */ import_react19.default.createElement(import_ChevronLeft2.default, { fontSize: "small" }) : /* @__PURE__ */ import_react19.default.createElement(import_ChevronRight2.default, { fontSize: "small" })))
+            /* @__PURE__ */ import_react20.default.createElement(import_Chat.default, { fontSize: "small", color: "action" }),
+            /* @__PURE__ */ import_react20.default.createElement(import_material19.Typography, { variant: "subtitle2", noWrap: true, sx: { flex: 1 } }, chat.activeThread?.title ?? "AI Chat"),
+            /* @__PURE__ */ import_react20.default.createElement(import_material19.Tooltip, { title: rightPanelCollapsed ? "Show context panel" : "Hide context panel" }, /* @__PURE__ */ import_react20.default.createElement(import_material19.IconButton, { size: "small", onClick: () => setRightPanelCollapsed((v) => !v) }, rightPanelCollapsed ? /* @__PURE__ */ import_react20.default.createElement(import_ChevronLeft2.default, { fontSize: "small" }) : /* @__PURE__ */ import_react20.default.createElement(import_ChevronRight2.default, { fontSize: "small" })))
           ),
-          chat.error && /* @__PURE__ */ import_react19.default.createElement(import_material18.Box, { sx: { px: 2, pt: 1 } }, /* @__PURE__ */ import_react19.default.createElement(ErrorBanner, { error: chat.error, onDismiss: chat.clearError })),
-          /* @__PURE__ */ import_react19.default.createElement(
-            import_material18.Box,
+          chat.error && /* @__PURE__ */ import_react20.default.createElement(import_material19.Box, { sx: { px: 2, pt: 1 } }, /* @__PURE__ */ import_react20.default.createElement(ErrorBanner, { error: chat.error, onDismiss: chat.clearError })),
+          /* @__PURE__ */ import_react20.default.createElement(
+            import_material19.Box,
             {
               ref: messagesContainerRef,
               sx: {
@@ -2669,7 +2742,7 @@ var init_ChatPage = __esm({
                 minHeight: 0
               }
             },
-            messages.length === 0 ? /* @__PURE__ */ import_react19.default.createElement(
+            messages.length === 0 ? /* @__PURE__ */ import_react20.default.createElement(
               PersonaHomepage,
               {
                 personas,
@@ -2678,7 +2751,7 @@ var init_ChatPage = __esm({
                 selectedId: personaId,
                 onSelect: handlePersonaChange
               }
-            ) : /* @__PURE__ */ import_react19.default.createElement(
+            ) : /* @__PURE__ */ import_react20.default.createElement(
               MessageList,
               {
                 messages,
@@ -2688,59 +2761,29 @@ var init_ChatPage = __esm({
                 onEditAndResend: chat.editAndResend
               }
             ),
-            /* @__PURE__ */ import_react19.default.createElement("div", { ref: messagesEndRef })
+            /* @__PURE__ */ import_react20.default.createElement("div", { ref: messagesEndRef })
           ),
-          (urlPreviewLoading || urlPreview || urlPreviewError) && /* @__PURE__ */ import_react19.default.createElement(import_material18.Box, { sx: { px: 2, pt: 1 } }, urlPreviewChip),
-          /* @__PURE__ */ import_react19.default.createElement(
-            import_material18.Box,
+          /* @__PURE__ */ import_react20.default.createElement(
+            ChatComposer,
             {
-              sx: {
-                flexShrink: 0,
-                borderTop: 1,
-                borderColor: "divider",
-                px: 2,
-                py: 1.5,
-                display: "flex",
-                gap: 1,
-                alignItems: "flex-end"
-              }
-            },
-            /* @__PURE__ */ import_react19.default.createElement(
-              import_material18.InputBase,
-              {
-                multiline: true,
-                minRows: 1,
-                maxRows: 5,
-                fullWidth: true,
-                placeholder: keyVal.token ? "Send a message\u2026  (Enter to send, Shift+Enter for newline)" : "Generate a chat key in Settings to start\u2026",
-                value: input,
-                onChange: (e) => setInput(e.target.value),
-                onKeyDown: handleKeyDown,
-                disabled: !keyVal.token,
-                sx: {
-                  border: 1,
-                  borderColor: "divider",
-                  borderRadius: 2,
-                  px: 1.5,
-                  py: 0.75,
-                  fontSize: "0.9rem"
-                }
-              }
-            ),
-            isStreaming ? /* @__PURE__ */ import_react19.default.createElement(import_material18.Tooltip, { title: "Stop" }, /* @__PURE__ */ import_react19.default.createElement(import_material18.IconButton, { color: "error", onClick: chat.stopGeneration }, /* @__PURE__ */ import_react19.default.createElement(import_Stop.default, null))) : /* @__PURE__ */ import_react19.default.createElement(import_material18.Tooltip, { title: "Send" }, /* @__PURE__ */ import_react19.default.createElement(
-              import_material18.IconButton,
-              {
-                color: "primary",
-                onClick: handleSend,
-                disabled: !input.trim() || !keyVal.token || compareMode && compareModelsSel.length === 0
-              },
-              /* @__PURE__ */ import_react19.default.createElement(import_Send.default, null)
-            ))
-          ),
-          statusParts.length > 0 && /* @__PURE__ */ import_react19.default.createElement(import_material18.Box, { sx: { px: 2, pb: 1 } }, /* @__PURE__ */ import_react19.default.createElement(import_material18.Typography, { variant: "caption", color: "text.secondary" }, statusParts.join(" \xB7 ")))
+              urlPreviewChip,
+              urlPreviewLoading,
+              urlPreview,
+              urlPreviewError,
+              input,
+              onInputChange: setInput,
+              onKeyDown: handleKeyDown,
+              keyVal,
+              isStreaming,
+              onStop: chat.stopGeneration,
+              onSend: handleSend,
+              sendDisabled: !input.trim() || !keyVal.token || compareMode && compareModelsSel.length === 0,
+              statusParts
+            }
+          )
         )
-      ), !rightPanelCollapsed && /* @__PURE__ */ import_react19.default.createElement(
-        import_material18.Box,
+      ), !rightPanelCollapsed && /* @__PURE__ */ import_react20.default.createElement(
+        import_material19.Box,
         {
           sx: {
             width: RIGHT_RAIL_WIDTH,
@@ -2752,9 +2795,9 @@ var init_ChatPage = __esm({
             overflowY: "auto"
           }
         },
-        /* @__PURE__ */ import_react19.default.createElement(SourcesPanel, { citations: chat.citations }),
-        /* @__PURE__ */ import_react19.default.createElement(import_material18.Divider, null),
-        /* @__PURE__ */ import_react19.default.createElement(
+        /* @__PURE__ */ import_react20.default.createElement(SourcesPanel, { citations: chat.citations }),
+        /* @__PURE__ */ import_react20.default.createElement(import_material19.Divider, null),
+        /* @__PURE__ */ import_react20.default.createElement(
           UsagePanel,
           {
             lastTurnUsage,
@@ -2768,19 +2811,19 @@ var init_ChatPage = __esm({
 });
 
 // src/components/BarList.tsx
-var import_react20, import_material19, BarList;
+var import_react21, import_material20, BarList;
 var init_BarList = __esm({
   "src/components/BarList.tsx"() {
     "use strict";
-    import_react20 = __toESM(require("react"));
-    import_material19 = require("@mui/material");
+    import_react21 = __toESM(require("react"));
+    import_material20 = require("@mui/material");
     BarList = ({ rows, emptyLabel = "No data yet." }) => {
       if (rows.length === 0) {
-        return /* @__PURE__ */ import_react20.default.createElement(import_material19.Typography, { variant: "body2", color: "text.secondary" }, emptyLabel);
+        return /* @__PURE__ */ import_react21.default.createElement(import_material20.Typography, { variant: "body2", color: "text.secondary" }, emptyLabel);
       }
       const max = Math.max(...rows.map((r) => r.count), 1);
-      return /* @__PURE__ */ import_react20.default.createElement(import_material19.Box, { sx: { display: "flex", flexDirection: "column", gap: 1 } }, rows.map((row) => /* @__PURE__ */ import_react20.default.createElement(import_material19.Box, { key: row.key, sx: { display: "flex", alignItems: "center", gap: 1 } }, /* @__PURE__ */ import_react20.default.createElement(import_material19.Typography, { variant: "body2", sx: { width: 180, flexShrink: 0 }, noWrap: true, title: row.key }, row.key), /* @__PURE__ */ import_react20.default.createElement(import_material19.Box, { sx: { flex: 1, bgcolor: "action.hover", borderRadius: 1, overflow: "hidden", height: 18 } }, /* @__PURE__ */ import_react20.default.createElement(
-        import_material19.Box,
+      return /* @__PURE__ */ import_react21.default.createElement(import_material20.Box, { sx: { display: "flex", flexDirection: "column", gap: 1 } }, rows.map((row) => /* @__PURE__ */ import_react21.default.createElement(import_material20.Box, { key: row.key, sx: { display: "flex", alignItems: "center", gap: 1 } }, /* @__PURE__ */ import_react21.default.createElement(import_material20.Typography, { variant: "body2", sx: { width: 180, flexShrink: 0 }, noWrap: true, title: row.key }, row.key), /* @__PURE__ */ import_react21.default.createElement(import_material20.Box, { sx: { flex: 1, bgcolor: "action.hover", borderRadius: 1, overflow: "hidden", height: 18 } }, /* @__PURE__ */ import_react21.default.createElement(
+        import_material20.Box,
         {
           sx: {
             width: `${row.count / max * 100}%`,
@@ -2789,7 +2832,7 @@ var init_BarList = __esm({
             borderRadius: 1
           }
         }
-      )), /* @__PURE__ */ import_react20.default.createElement(import_material19.Typography, { variant: "body2", sx: { width: 40, textAlign: "right", flexShrink: 0 } }, row.count))));
+      )), /* @__PURE__ */ import_react21.default.createElement(import_material20.Typography, { variant: "body2", sx: { width: 40, textAlign: "right", flexShrink: 0 } }, row.count))));
     };
   }
 });
@@ -2799,12 +2842,12 @@ var AnalyticsPage_exports = {};
 __export(AnalyticsPage_exports, {
   AnalyticsPage: () => AnalyticsPage
 });
-var import_react21, import_material20, import_core_plugin_api8, RANGES, AnalyticsPage;
+var import_react22, import_material21, import_core_plugin_api8, RANGES, AnalyticsPage;
 var init_AnalyticsPage = __esm({
   "src/components/AnalyticsPage.tsx"() {
     "use strict";
-    import_react21 = __toESM(require("react"));
-    import_material20 = require("@mui/material");
+    import_react22 = __toESM(require("react"));
+    import_material21 = require("@mui/material");
     import_core_plugin_api8 = require("@backstage/core-plugin-api");
     init_api();
     init_BarList();
@@ -2816,13 +2859,13 @@ var init_AnalyticsPage = __esm({
     ];
     AnalyticsPage = () => {
       const chatApi = (0, import_core_plugin_api8.useApi)(liteLlmChatApiRef);
-      const [range, setRange] = (0, import_react21.useState)("30d");
-      const [byPersona, setByPersona] = (0, import_react21.useState)([]);
-      const [byModel, setByModel] = (0, import_react21.useState)([]);
-      const [feedback, setFeedback] = (0, import_react21.useState)(null);
-      const [error, setError] = (0, import_react21.useState)(null);
-      const [loading, setLoading] = (0, import_react21.useState)(true);
-      (0, import_react21.useEffect)(() => {
+      const [range, setRange] = (0, import_react22.useState)("30d");
+      const [byPersona, setByPersona] = (0, import_react22.useState)([]);
+      const [byModel, setByModel] = (0, import_react22.useState)([]);
+      const [feedback, setFeedback] = (0, import_react22.useState)(null);
+      const [error, setError] = (0, import_react22.useState)(null);
+      const [loading, setLoading] = (0, import_react22.useState)(true);
+      (0, import_react22.useEffect)(() => {
         let alive = true;
         setLoading(true);
         setError(null);
@@ -2843,7 +2886,7 @@ var init_AnalyticsPage = __esm({
         };
       }, [chatApi, range]);
       const feedbackRows = feedback ? [{ key: "\u{1F44D} up", count: feedback.up }, { key: "\u{1F44E} down", count: feedback.down }] : [];
-      return /* @__PURE__ */ import_react21.default.createElement(import_material20.Box, { sx: { p: 3, maxWidth: 900, mx: "auto" } }, /* @__PURE__ */ import_react21.default.createElement(import_material20.Box, { sx: { display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 } }, /* @__PURE__ */ import_react21.default.createElement(import_material20.Typography, { variant: "h5" }, "AI Chat analytics"), /* @__PURE__ */ import_react21.default.createElement(import_material20.Select, { size: "small", value: range, onChange: (e) => setRange(e.target.value) }, RANGES.map((r) => /* @__PURE__ */ import_react21.default.createElement(import_material20.MenuItem, { key: r.value, value: r.value }, r.label)))), error && /* @__PURE__ */ import_react21.default.createElement(import_material20.Alert, { severity: "error", sx: { mb: 2 } }, error), /* @__PURE__ */ import_react21.default.createElement(import_material20.Box, { sx: { display: "flex", flexDirection: "column", gap: 2 } }, /* @__PURE__ */ import_react21.default.createElement(import_material20.Paper, { variant: "outlined", sx: { p: 2 } }, /* @__PURE__ */ import_react21.default.createElement(import_material20.Typography, { variant: "subtitle1", sx: { mb: 1.5 } }, "Turns by persona"), /* @__PURE__ */ import_react21.default.createElement(BarList, { rows: byPersona, emptyLabel: loading ? "Loading\u2026" : "No chat turns in this range." })), /* @__PURE__ */ import_react21.default.createElement(import_material20.Paper, { variant: "outlined", sx: { p: 2 } }, /* @__PURE__ */ import_react21.default.createElement(import_material20.Typography, { variant: "subtitle1", sx: { mb: 1.5 } }, "Turns by model"), /* @__PURE__ */ import_react21.default.createElement(BarList, { rows: byModel, emptyLabel: loading ? "Loading\u2026" : "No chat turns in this range." })), /* @__PURE__ */ import_react21.default.createElement(import_material20.Paper, { variant: "outlined", sx: { p: 2 } }, /* @__PURE__ */ import_react21.default.createElement(import_material20.Typography, { variant: "subtitle1", sx: { mb: 1.5 } }, "Feedback (all time)"), /* @__PURE__ */ import_react21.default.createElement(BarList, { rows: feedbackRows, emptyLabel: loading ? "Loading\u2026" : "No feedback recorded yet." }))));
+      return /* @__PURE__ */ import_react22.default.createElement(import_material21.Box, { sx: { p: 3, maxWidth: 900, mx: "auto" } }, /* @__PURE__ */ import_react22.default.createElement(import_material21.Box, { sx: { display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 } }, /* @__PURE__ */ import_react22.default.createElement(import_material21.Typography, { variant: "h5" }, "AI Chat analytics"), /* @__PURE__ */ import_react22.default.createElement(import_material21.Select, { size: "small", value: range, onChange: (e) => setRange(e.target.value) }, RANGES.map((r) => /* @__PURE__ */ import_react22.default.createElement(import_material21.MenuItem, { key: r.value, value: r.value }, r.label)))), error && /* @__PURE__ */ import_react22.default.createElement(import_material21.Alert, { severity: "error", sx: { mb: 2 } }, error), /* @__PURE__ */ import_react22.default.createElement(import_material21.Box, { sx: { display: "flex", flexDirection: "column", gap: 2 } }, /* @__PURE__ */ import_react22.default.createElement(import_material21.Paper, { variant: "outlined", sx: { p: 2 } }, /* @__PURE__ */ import_react22.default.createElement(import_material21.Typography, { variant: "subtitle1", sx: { mb: 1.5 } }, "Turns by persona"), /* @__PURE__ */ import_react22.default.createElement(BarList, { rows: byPersona, emptyLabel: loading ? "Loading\u2026" : "No chat turns in this range." })), /* @__PURE__ */ import_react22.default.createElement(import_material21.Paper, { variant: "outlined", sx: { p: 2 } }, /* @__PURE__ */ import_react22.default.createElement(import_material21.Typography, { variant: "subtitle1", sx: { mb: 1.5 } }, "Turns by model"), /* @__PURE__ */ import_react22.default.createElement(BarList, { rows: byModel, emptyLabel: loading ? "Loading\u2026" : "No chat turns in this range." })), /* @__PURE__ */ import_react22.default.createElement(import_material21.Paper, { variant: "outlined", sx: { p: 2 } }, /* @__PURE__ */ import_react22.default.createElement(import_material21.Typography, { variant: "subtitle1", sx: { mb: 1.5 } }, "Feedback (all time)"), /* @__PURE__ */ import_react22.default.createElement(BarList, { rows: feedbackRows, emptyLabel: loading ? "Loading\u2026" : "No feedback recorded yet." }))));
     };
   }
 });
@@ -2860,7 +2903,7 @@ __export(index_exports, {
 module.exports = __toCommonJS(index_exports);
 
 // src/plugin.tsx
-var import_react22 = __toESM(require("react"));
+var import_react23 = __toESM(require("react"));
 var import_icons_material = require("@mui/icons-material");
 var import_frontend_plugin_api = require("@backstage/frontend-plugin-api");
 init_api();
@@ -2875,10 +2918,10 @@ var chatPage = import_frontend_plugin_api.PageBlueprint.make({
   params: {
     path: "/ai-chat",
     title: "AI Chat",
-    icon: /* @__PURE__ */ import_react22.default.createElement(import_icons_material.Chat, null),
+    icon: /* @__PURE__ */ import_react23.default.createElement(import_icons_material.Chat, null),
     loader: async () => {
       const { ChatPage: ChatPage2 } = await Promise.resolve().then(() => (init_ChatPage(), ChatPage_exports));
-      return /* @__PURE__ */ import_react22.default.createElement(ChatPage2, null);
+      return /* @__PURE__ */ import_react23.default.createElement(ChatPage2, null);
     }
   }
 });
@@ -2887,10 +2930,10 @@ var analyticsPage = import_frontend_plugin_api.PageBlueprint.make({
   params: {
     path: "/ai-chat/analytics",
     title: "AI Chat Analytics",
-    icon: /* @__PURE__ */ import_react22.default.createElement(import_icons_material.BarChart, null),
+    icon: /* @__PURE__ */ import_react23.default.createElement(import_icons_material.BarChart, null),
     loader: async () => {
       const { AnalyticsPage: AnalyticsPage2 } = await Promise.resolve().then(() => (init_AnalyticsPage(), AnalyticsPage_exports));
-      return /* @__PURE__ */ import_react22.default.createElement(AnalyticsPage2, null);
+      return /* @__PURE__ */ import_react23.default.createElement(AnalyticsPage2, null);
     }
   }
 });

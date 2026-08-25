@@ -2276,24 +2276,101 @@ var init_SettingsPanel = __esm({
   }
 });
 
+// src/components/ChatComposer.tsx
+import React18 from "react";
+import {
+  Box as Box14,
+  IconButton as IconButton6,
+  Typography as Typography12,
+  Tooltip as Tooltip6,
+  InputBase as InputBase2
+} from "@mui/material";
+import SendIcon from "@mui/icons-material/Send";
+import StopIcon from "@mui/icons-material/Stop";
+var ChatComposer;
+var init_ChatComposer = __esm({
+  "src/components/ChatComposer.tsx"() {
+    "use strict";
+    ChatComposer = ({
+      urlPreviewChip,
+      urlPreviewLoading,
+      urlPreview,
+      urlPreviewError,
+      input,
+      onInputChange,
+      onKeyDown,
+      keyVal,
+      isStreaming,
+      onStop,
+      onSend,
+      sendDisabled,
+      statusParts
+    }) => {
+      return /* @__PURE__ */ React18.createElement(React18.Fragment, null, (urlPreviewLoading || urlPreview || urlPreviewError) && /* @__PURE__ */ React18.createElement(Box14, { sx: { px: 2, pt: 1 } }, urlPreviewChip), /* @__PURE__ */ React18.createElement(
+        Box14,
+        {
+          sx: {
+            flexShrink: 0,
+            borderTop: 1,
+            borderColor: "divider",
+            px: 2,
+            py: 1.5,
+            display: "flex",
+            gap: 1,
+            alignItems: "flex-end"
+          }
+        },
+        /* @__PURE__ */ React18.createElement(
+          InputBase2,
+          {
+            multiline: true,
+            minRows: 1,
+            maxRows: 5,
+            fullWidth: true,
+            placeholder: keyVal.token ? "Send a message\u2026  (Enter to send, Shift+Enter for newline)" : "Generate a chat key in Settings to start\u2026",
+            value: input,
+            onChange: (e) => onInputChange(e.target.value),
+            onKeyDown,
+            disabled: !keyVal.token,
+            sx: {
+              border: 1,
+              borderColor: "divider",
+              borderRadius: 2,
+              px: 1.5,
+              py: 0.75,
+              fontSize: "0.9rem"
+            }
+          }
+        ),
+        isStreaming ? /* @__PURE__ */ React18.createElement(Tooltip6, { title: "Stop" }, /* @__PURE__ */ React18.createElement(IconButton6, { color: "error", onClick: onStop }, /* @__PURE__ */ React18.createElement(StopIcon, null))) : /* @__PURE__ */ React18.createElement(Tooltip6, { title: "Send" }, /* @__PURE__ */ React18.createElement(
+          IconButton6,
+          {
+            color: "primary",
+            onClick: onSend,
+            disabled: sendDisabled
+          },
+          /* @__PURE__ */ React18.createElement(SendIcon, null)
+        ))
+      ), statusParts.length > 0 && /* @__PURE__ */ React18.createElement(Box14, { sx: { px: 2, pb: 1 } }, /* @__PURE__ */ React18.createElement(Typography12, { variant: "caption", color: "text.secondary" }, statusParts.join(" \xB7 "))));
+    };
+  }
+});
+
 // src/components/ChatPage.tsx
 var ChatPage_exports = {};
 __export(ChatPage_exports, {
   ChatPage: () => ChatPage
 });
-import React18, { useEffect as useEffect5, useMemo, useRef as useRef2, useState as useState9 } from "react";
+import React19, { useEffect as useEffect5, useMemo, useRef as useRef2, useState as useState9 } from "react";
 import {
-  Box as Box14,
-  IconButton as IconButton6,
+  Box as Box15,
+  IconButton as IconButton7,
   Divider as Divider3,
-  Typography as Typography12,
-  Tooltip as Tooltip6,
-  InputBase as InputBase2,
+  Typography as Typography13,
+  Tooltip as Tooltip7,
   Chip as Chip6
 } from "@mui/material";
 import ChatIcon from "@mui/icons-material/Chat";
-import SendIcon from "@mui/icons-material/Send";
-import StopIcon from "@mui/icons-material/Stop";
 import ChevronLeftIcon2 from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon2 from "@mui/icons-material/ChevronRight";
 import LinkIcon2 from "@mui/icons-material/Link";
@@ -2325,6 +2402,7 @@ var init_ChatPage = __esm({
     init_UsagePanel();
     init_ThreadSidebar();
     init_SettingsPanel();
+    init_ChatComposer();
     RIGHT_RAIL_WIDTH = 300;
     CHAT_MAX_WIDTH = 900;
     URL_TOKEN_RE = /#(https:\/\/\S+)/;
@@ -2534,41 +2612,41 @@ var init_ChatPage = __esm({
       }
       let urlPreviewChip = null;
       if (urlPreviewLoading) {
-        urlPreviewChip = /* @__PURE__ */ React18.createElement(Chip6, { size: "small", icon: /* @__PURE__ */ React18.createElement(LinkIcon2, { fontSize: "small" }), label: "Fetching page\u2026", variant: "outlined" });
+        urlPreviewChip = /* @__PURE__ */ React19.createElement(Chip6, { size: "small", icon: /* @__PURE__ */ React19.createElement(LinkIcon2, { fontSize: "small" }), label: "Fetching page\u2026", variant: "outlined" });
       } else if (urlPreviewError) {
-        urlPreviewChip = /* @__PURE__ */ React18.createElement(
+        urlPreviewChip = /* @__PURE__ */ React19.createElement(
           Chip6,
           {
             size: "small",
             color: "error",
-            icon: /* @__PURE__ */ React18.createElement(LinkIcon2, { fontSize: "small" }),
+            icon: /* @__PURE__ */ React19.createElement(LinkIcon2, { fontSize: "small" }),
             label: urlPreviewError,
             variant: "outlined",
             onDelete: dismissUrlPreview,
-            deleteIcon: /* @__PURE__ */ React18.createElement(CloseIcon, { fontSize: "small" })
+            deleteIcon: /* @__PURE__ */ React19.createElement(CloseIcon, { fontSize: "small" })
           }
         );
       } else if (urlPreview) {
-        urlPreviewChip = /* @__PURE__ */ React18.createElement(Tooltip6, { title: urlPreview.url }, /* @__PURE__ */ React18.createElement(
+        urlPreviewChip = /* @__PURE__ */ React19.createElement(Tooltip7, { title: urlPreview.url }, /* @__PURE__ */ React19.createElement(
           Chip6,
           {
             size: "small",
-            icon: /* @__PURE__ */ React18.createElement(LinkIcon2, { fontSize: "small" }),
+            icon: /* @__PURE__ */ React19.createElement(LinkIcon2, { fontSize: "small" }),
             label: `Page attached: ${urlPreview.title}`,
             variant: "outlined",
             onDelete: dismissUrlPreview,
-            deleteIcon: /* @__PURE__ */ React18.createElement(CloseIcon, { fontSize: "small" })
+            deleteIcon: /* @__PURE__ */ React19.createElement(CloseIcon, { fontSize: "small" })
           }
         ));
       }
-      return /* @__PURE__ */ React18.createElement(Box14, { sx: { display: "flex", height: "100dvh", overflow: "hidden" } }, /* @__PURE__ */ React18.createElement(
+      return /* @__PURE__ */ React19.createElement(Box15, { sx: { display: "flex", height: "100dvh", overflow: "hidden" } }, /* @__PURE__ */ React19.createElement(
         ThreadSidebar,
         {
           collapsed: sidebarCollapsed,
           onToggleCollapsed: () => setSidebarCollapsed((v) => !v),
           showSettings,
           onToggleShowSettings: () => setShowSettings((v) => !v),
-          settingsSlot: /* @__PURE__ */ React18.createElement(
+          settingsSlot: /* @__PURE__ */ React19.createElement(
             SettingsPanel,
             {
               configError,
@@ -2630,8 +2708,8 @@ var init_ChatPage = __esm({
           onExport: (id) => chat.exportThread(id),
           onDelete: (id) => chat.deleteThread(id)
         }
-      ), /* @__PURE__ */ React18.createElement(
-        Box14,
+      ), /* @__PURE__ */ React19.createElement(
+        Box15,
         {
           sx: {
             flex: 3,
@@ -2640,8 +2718,8 @@ var init_ChatPage = __esm({
             overflow: "hidden"
           }
         },
-        /* @__PURE__ */ React18.createElement(
-          Box14,
+        /* @__PURE__ */ React19.createElement(
+          Box15,
           {
             sx: {
               width: "100%",
@@ -2651,8 +2729,8 @@ var init_ChatPage = __esm({
               overflow: "hidden"
             }
           },
-          /* @__PURE__ */ React18.createElement(
-            Box14,
+          /* @__PURE__ */ React19.createElement(
+            Box15,
             {
               sx: {
                 flexShrink: 0,
@@ -2665,13 +2743,13 @@ var init_ChatPage = __esm({
                 gap: 1
               }
             },
-            /* @__PURE__ */ React18.createElement(ChatIcon, { fontSize: "small", color: "action" }),
-            /* @__PURE__ */ React18.createElement(Typography12, { variant: "subtitle2", noWrap: true, sx: { flex: 1 } }, chat.activeThread?.title ?? "AI Chat"),
-            /* @__PURE__ */ React18.createElement(Tooltip6, { title: rightPanelCollapsed ? "Show context panel" : "Hide context panel" }, /* @__PURE__ */ React18.createElement(IconButton6, { size: "small", onClick: () => setRightPanelCollapsed((v) => !v) }, rightPanelCollapsed ? /* @__PURE__ */ React18.createElement(ChevronLeftIcon2, { fontSize: "small" }) : /* @__PURE__ */ React18.createElement(ChevronRightIcon2, { fontSize: "small" })))
+            /* @__PURE__ */ React19.createElement(ChatIcon, { fontSize: "small", color: "action" }),
+            /* @__PURE__ */ React19.createElement(Typography13, { variant: "subtitle2", noWrap: true, sx: { flex: 1 } }, chat.activeThread?.title ?? "AI Chat"),
+            /* @__PURE__ */ React19.createElement(Tooltip7, { title: rightPanelCollapsed ? "Show context panel" : "Hide context panel" }, /* @__PURE__ */ React19.createElement(IconButton7, { size: "small", onClick: () => setRightPanelCollapsed((v) => !v) }, rightPanelCollapsed ? /* @__PURE__ */ React19.createElement(ChevronLeftIcon2, { fontSize: "small" }) : /* @__PURE__ */ React19.createElement(ChevronRightIcon2, { fontSize: "small" })))
           ),
-          chat.error && /* @__PURE__ */ React18.createElement(Box14, { sx: { px: 2, pt: 1 } }, /* @__PURE__ */ React18.createElement(ErrorBanner, { error: chat.error, onDismiss: chat.clearError })),
-          /* @__PURE__ */ React18.createElement(
-            Box14,
+          chat.error && /* @__PURE__ */ React19.createElement(Box15, { sx: { px: 2, pt: 1 } }, /* @__PURE__ */ React19.createElement(ErrorBanner, { error: chat.error, onDismiss: chat.clearError })),
+          /* @__PURE__ */ React19.createElement(
+            Box15,
             {
               ref: messagesContainerRef,
               sx: {
@@ -2680,7 +2758,7 @@ var init_ChatPage = __esm({
                 minHeight: 0
               }
             },
-            messages.length === 0 ? /* @__PURE__ */ React18.createElement(
+            messages.length === 0 ? /* @__PURE__ */ React19.createElement(
               PersonaHomepage,
               {
                 personas,
@@ -2689,7 +2767,7 @@ var init_ChatPage = __esm({
                 selectedId: personaId,
                 onSelect: handlePersonaChange
               }
-            ) : /* @__PURE__ */ React18.createElement(
+            ) : /* @__PURE__ */ React19.createElement(
               MessageList,
               {
                 messages,
@@ -2699,59 +2777,29 @@ var init_ChatPage = __esm({
                 onEditAndResend: chat.editAndResend
               }
             ),
-            /* @__PURE__ */ React18.createElement("div", { ref: messagesEndRef })
+            /* @__PURE__ */ React19.createElement("div", { ref: messagesEndRef })
           ),
-          (urlPreviewLoading || urlPreview || urlPreviewError) && /* @__PURE__ */ React18.createElement(Box14, { sx: { px: 2, pt: 1 } }, urlPreviewChip),
-          /* @__PURE__ */ React18.createElement(
-            Box14,
+          /* @__PURE__ */ React19.createElement(
+            ChatComposer,
             {
-              sx: {
-                flexShrink: 0,
-                borderTop: 1,
-                borderColor: "divider",
-                px: 2,
-                py: 1.5,
-                display: "flex",
-                gap: 1,
-                alignItems: "flex-end"
-              }
-            },
-            /* @__PURE__ */ React18.createElement(
-              InputBase2,
-              {
-                multiline: true,
-                minRows: 1,
-                maxRows: 5,
-                fullWidth: true,
-                placeholder: keyVal.token ? "Send a message\u2026  (Enter to send, Shift+Enter for newline)" : "Generate a chat key in Settings to start\u2026",
-                value: input,
-                onChange: (e) => setInput(e.target.value),
-                onKeyDown: handleKeyDown,
-                disabled: !keyVal.token,
-                sx: {
-                  border: 1,
-                  borderColor: "divider",
-                  borderRadius: 2,
-                  px: 1.5,
-                  py: 0.75,
-                  fontSize: "0.9rem"
-                }
-              }
-            ),
-            isStreaming ? /* @__PURE__ */ React18.createElement(Tooltip6, { title: "Stop" }, /* @__PURE__ */ React18.createElement(IconButton6, { color: "error", onClick: chat.stopGeneration }, /* @__PURE__ */ React18.createElement(StopIcon, null))) : /* @__PURE__ */ React18.createElement(Tooltip6, { title: "Send" }, /* @__PURE__ */ React18.createElement(
-              IconButton6,
-              {
-                color: "primary",
-                onClick: handleSend,
-                disabled: !input.trim() || !keyVal.token || compareMode && compareModelsSel.length === 0
-              },
-              /* @__PURE__ */ React18.createElement(SendIcon, null)
-            ))
-          ),
-          statusParts.length > 0 && /* @__PURE__ */ React18.createElement(Box14, { sx: { px: 2, pb: 1 } }, /* @__PURE__ */ React18.createElement(Typography12, { variant: "caption", color: "text.secondary" }, statusParts.join(" \xB7 ")))
+              urlPreviewChip,
+              urlPreviewLoading,
+              urlPreview,
+              urlPreviewError,
+              input,
+              onInputChange: setInput,
+              onKeyDown: handleKeyDown,
+              keyVal,
+              isStreaming,
+              onStop: chat.stopGeneration,
+              onSend: handleSend,
+              sendDisabled: !input.trim() || !keyVal.token || compareMode && compareModelsSel.length === 0,
+              statusParts
+            }
+          )
         )
-      ), !rightPanelCollapsed && /* @__PURE__ */ React18.createElement(
-        Box14,
+      ), !rightPanelCollapsed && /* @__PURE__ */ React19.createElement(
+        Box15,
         {
           sx: {
             width: RIGHT_RAIL_WIDTH,
@@ -2763,9 +2811,9 @@ var init_ChatPage = __esm({
             overflowY: "auto"
           }
         },
-        /* @__PURE__ */ React18.createElement(SourcesPanel, { citations: chat.citations }),
-        /* @__PURE__ */ React18.createElement(Divider3, null),
-        /* @__PURE__ */ React18.createElement(
+        /* @__PURE__ */ React19.createElement(SourcesPanel, { citations: chat.citations }),
+        /* @__PURE__ */ React19.createElement(Divider3, null),
+        /* @__PURE__ */ React19.createElement(
           UsagePanel,
           {
             lastTurnUsage,
@@ -2779,19 +2827,19 @@ var init_ChatPage = __esm({
 });
 
 // src/components/BarList.tsx
-import React19 from "react";
-import { Box as Box15, Typography as Typography13 } from "@mui/material";
+import React20 from "react";
+import { Box as Box16, Typography as Typography14 } from "@mui/material";
 var BarList;
 var init_BarList = __esm({
   "src/components/BarList.tsx"() {
     "use strict";
     BarList = ({ rows, emptyLabel = "No data yet." }) => {
       if (rows.length === 0) {
-        return /* @__PURE__ */ React19.createElement(Typography13, { variant: "body2", color: "text.secondary" }, emptyLabel);
+        return /* @__PURE__ */ React20.createElement(Typography14, { variant: "body2", color: "text.secondary" }, emptyLabel);
       }
       const max = Math.max(...rows.map((r) => r.count), 1);
-      return /* @__PURE__ */ React19.createElement(Box15, { sx: { display: "flex", flexDirection: "column", gap: 1 } }, rows.map((row) => /* @__PURE__ */ React19.createElement(Box15, { key: row.key, sx: { display: "flex", alignItems: "center", gap: 1 } }, /* @__PURE__ */ React19.createElement(Typography13, { variant: "body2", sx: { width: 180, flexShrink: 0 }, noWrap: true, title: row.key }, row.key), /* @__PURE__ */ React19.createElement(Box15, { sx: { flex: 1, bgcolor: "action.hover", borderRadius: 1, overflow: "hidden", height: 18 } }, /* @__PURE__ */ React19.createElement(
-        Box15,
+      return /* @__PURE__ */ React20.createElement(Box16, { sx: { display: "flex", flexDirection: "column", gap: 1 } }, rows.map((row) => /* @__PURE__ */ React20.createElement(Box16, { key: row.key, sx: { display: "flex", alignItems: "center", gap: 1 } }, /* @__PURE__ */ React20.createElement(Typography14, { variant: "body2", sx: { width: 180, flexShrink: 0 }, noWrap: true, title: row.key }, row.key), /* @__PURE__ */ React20.createElement(Box16, { sx: { flex: 1, bgcolor: "action.hover", borderRadius: 1, overflow: "hidden", height: 18 } }, /* @__PURE__ */ React20.createElement(
+        Box16,
         {
           sx: {
             width: `${row.count / max * 100}%`,
@@ -2800,7 +2848,7 @@ var init_BarList = __esm({
             borderRadius: 1
           }
         }
-      )), /* @__PURE__ */ React19.createElement(Typography13, { variant: "body2", sx: { width: 40, textAlign: "right", flexShrink: 0 } }, row.count))));
+      )), /* @__PURE__ */ React20.createElement(Typography14, { variant: "body2", sx: { width: 40, textAlign: "right", flexShrink: 0 } }, row.count))));
     };
   }
 });
@@ -2810,8 +2858,8 @@ var AnalyticsPage_exports = {};
 __export(AnalyticsPage_exports, {
   AnalyticsPage: () => AnalyticsPage
 });
-import React20, { useEffect as useEffect6, useState as useState10 } from "react";
-import { Box as Box16, Paper, Select as Select4, MenuItem as MenuItem5, Typography as Typography14, Alert as Alert2 } from "@mui/material";
+import React21, { useEffect as useEffect6, useState as useState10 } from "react";
+import { Box as Box17, Paper, Select as Select4, MenuItem as MenuItem5, Typography as Typography15, Alert as Alert2 } from "@mui/material";
 import { useApi as useApi7 } from "@backstage/core-plugin-api";
 var RANGES, AnalyticsPage;
 var init_AnalyticsPage = __esm({
@@ -2854,14 +2902,14 @@ var init_AnalyticsPage = __esm({
         };
       }, [chatApi, range]);
       const feedbackRows = feedback ? [{ key: "\u{1F44D} up", count: feedback.up }, { key: "\u{1F44E} down", count: feedback.down }] : [];
-      return /* @__PURE__ */ React20.createElement(Box16, { sx: { p: 3, maxWidth: 900, mx: "auto" } }, /* @__PURE__ */ React20.createElement(Box16, { sx: { display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 } }, /* @__PURE__ */ React20.createElement(Typography14, { variant: "h5" }, "AI Chat analytics"), /* @__PURE__ */ React20.createElement(Select4, { size: "small", value: range, onChange: (e) => setRange(e.target.value) }, RANGES.map((r) => /* @__PURE__ */ React20.createElement(MenuItem5, { key: r.value, value: r.value }, r.label)))), error && /* @__PURE__ */ React20.createElement(Alert2, { severity: "error", sx: { mb: 2 } }, error), /* @__PURE__ */ React20.createElement(Box16, { sx: { display: "flex", flexDirection: "column", gap: 2 } }, /* @__PURE__ */ React20.createElement(Paper, { variant: "outlined", sx: { p: 2 } }, /* @__PURE__ */ React20.createElement(Typography14, { variant: "subtitle1", sx: { mb: 1.5 } }, "Turns by persona"), /* @__PURE__ */ React20.createElement(BarList, { rows: byPersona, emptyLabel: loading ? "Loading\u2026" : "No chat turns in this range." })), /* @__PURE__ */ React20.createElement(Paper, { variant: "outlined", sx: { p: 2 } }, /* @__PURE__ */ React20.createElement(Typography14, { variant: "subtitle1", sx: { mb: 1.5 } }, "Turns by model"), /* @__PURE__ */ React20.createElement(BarList, { rows: byModel, emptyLabel: loading ? "Loading\u2026" : "No chat turns in this range." })), /* @__PURE__ */ React20.createElement(Paper, { variant: "outlined", sx: { p: 2 } }, /* @__PURE__ */ React20.createElement(Typography14, { variant: "subtitle1", sx: { mb: 1.5 } }, "Feedback (all time)"), /* @__PURE__ */ React20.createElement(BarList, { rows: feedbackRows, emptyLabel: loading ? "Loading\u2026" : "No feedback recorded yet." }))));
+      return /* @__PURE__ */ React21.createElement(Box17, { sx: { p: 3, maxWidth: 900, mx: "auto" } }, /* @__PURE__ */ React21.createElement(Box17, { sx: { display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 } }, /* @__PURE__ */ React21.createElement(Typography15, { variant: "h5" }, "AI Chat analytics"), /* @__PURE__ */ React21.createElement(Select4, { size: "small", value: range, onChange: (e) => setRange(e.target.value) }, RANGES.map((r) => /* @__PURE__ */ React21.createElement(MenuItem5, { key: r.value, value: r.value }, r.label)))), error && /* @__PURE__ */ React21.createElement(Alert2, { severity: "error", sx: { mb: 2 } }, error), /* @__PURE__ */ React21.createElement(Box17, { sx: { display: "flex", flexDirection: "column", gap: 2 } }, /* @__PURE__ */ React21.createElement(Paper, { variant: "outlined", sx: { p: 2 } }, /* @__PURE__ */ React21.createElement(Typography15, { variant: "subtitle1", sx: { mb: 1.5 } }, "Turns by persona"), /* @__PURE__ */ React21.createElement(BarList, { rows: byPersona, emptyLabel: loading ? "Loading\u2026" : "No chat turns in this range." })), /* @__PURE__ */ React21.createElement(Paper, { variant: "outlined", sx: { p: 2 } }, /* @__PURE__ */ React21.createElement(Typography15, { variant: "subtitle1", sx: { mb: 1.5 } }, "Turns by model"), /* @__PURE__ */ React21.createElement(BarList, { rows: byModel, emptyLabel: loading ? "Loading\u2026" : "No chat turns in this range." })), /* @__PURE__ */ React21.createElement(Paper, { variant: "outlined", sx: { p: 2 } }, /* @__PURE__ */ React21.createElement(Typography15, { variant: "subtitle1", sx: { mb: 1.5 } }, "Feedback (all time)"), /* @__PURE__ */ React21.createElement(BarList, { rows: feedbackRows, emptyLabel: loading ? "Loading\u2026" : "No feedback recorded yet." }))));
     };
   }
 });
 
 // src/plugin.tsx
 init_api();
-import React21 from "react";
+import React22 from "react";
 import { Chat as ChatIcon2, BarChart as BarChartIcon } from "@mui/icons-material";
 import {
   createFrontendPlugin,
@@ -2880,10 +2928,10 @@ var chatPage = PageBlueprint.make({
   params: {
     path: "/ai-chat",
     title: "AI Chat",
-    icon: /* @__PURE__ */ React21.createElement(ChatIcon2, null),
+    icon: /* @__PURE__ */ React22.createElement(ChatIcon2, null),
     loader: async () => {
       const { ChatPage: ChatPage2 } = await Promise.resolve().then(() => (init_ChatPage(), ChatPage_exports));
-      return /* @__PURE__ */ React21.createElement(ChatPage2, null);
+      return /* @__PURE__ */ React22.createElement(ChatPage2, null);
     }
   }
 });
@@ -2892,10 +2940,10 @@ var analyticsPage = PageBlueprint.make({
   params: {
     path: "/ai-chat/analytics",
     title: "AI Chat Analytics",
-    icon: /* @__PURE__ */ React21.createElement(BarChartIcon, null),
+    icon: /* @__PURE__ */ React22.createElement(BarChartIcon, null),
     loader: async () => {
       const { AnalyticsPage: AnalyticsPage2 } = await Promise.resolve().then(() => (init_AnalyticsPage(), AnalyticsPage_exports));
-      return /* @__PURE__ */ React21.createElement(AnalyticsPage2, null);
+      return /* @__PURE__ */ React22.createElement(AnalyticsPage2, null);
     }
   }
 });

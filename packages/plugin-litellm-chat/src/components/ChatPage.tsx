@@ -5,12 +5,9 @@ import {
   Divider,
   Typography,
   Tooltip,
-  InputBase,
   Chip,
 } from '@mui/material';
 import ChatIcon from '@mui/icons-material/Chat';
-import SendIcon from '@mui/icons-material/Send';
-import StopIcon from '@mui/icons-material/Stop';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import LinkIcon from '@mui/icons-material/Link';
@@ -26,6 +23,7 @@ import { SourcesPanel } from './SourcesPanel';
 import { UsagePanel } from './UsagePanel';
 import { ThreadSidebar } from './ThreadSidebar';
 import { SettingsPanel } from './SettingsPanel';
+import { ChatComposer } from './ChatComposer';
 import type { ChatConfig, ChatTraits, Persona, ReasoningEffort, Thread, UrlContextPreview } from '../types';
 
 const RIGHT_RAIL_WIDTH = 300;
@@ -491,78 +489,21 @@ export const ChatPage: React.FC = () => {
             <div ref={messagesEndRef} />
           </Box>
 
-          {/* #url attachment chip */}
-          {(urlPreviewLoading || urlPreview || urlPreviewError) && (
-            <Box sx={{ px: 2, pt: 1 }}>
-              {urlPreviewChip}
-            </Box>
-          )}
-
-          {/* Fixed composer */}
-          <Box
-            sx={{
-              flexShrink: 0,
-              borderTop: 1,
-              borderColor: 'divider',
-              px: 2,
-              py: 1.5,
-              display: 'flex',
-              gap: 1,
-              alignItems: 'flex-end',
-            }}
-          >
-            <InputBase
-              multiline
-              minRows={1}
-              maxRows={5}
-              fullWidth
-              placeholder={
-                keyVal.token
-                  ? 'Send a message…  (Enter to send, Shift+Enter for newline)'
-                  : 'Generate a chat key in Settings to start…'
-              }
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              disabled={!keyVal.token}
-              sx={{
-                border: 1,
-                borderColor: 'divider',
-                borderRadius: 2,
-                px: 1.5,
-                py: 0.75,
-                fontSize: '0.9rem',
-              }}
-            />
-            {isStreaming ? (
-              <Tooltip title="Stop">
-                <IconButton color="error" onClick={chat.stopGeneration}>
-                  <StopIcon />
-                </IconButton>
-              </Tooltip>
-            ) : (
-              <Tooltip title="Send">
-                <IconButton
-                  color="primary"
-                  onClick={handleSend}
-                  disabled={
-                    !input.trim() || !keyVal.token || (compareMode && compareModelsSel.length === 0)
-                  }
-                >
-                  <SendIcon />
-                </IconButton>
-              </Tooltip>
-            )}
-          </Box>
-
-          {/* Status strip */}
-          {statusParts.length > 0 && (
-            <Box sx={{ px: 2, pb: 1 }}>
-              <Typography variant="caption" color="text.secondary">
-                {statusParts.join(' · ')}
-              </Typography>
-            </Box>
-          )}
+          <ChatComposer
+            urlPreviewChip={urlPreviewChip}
+            urlPreviewLoading={urlPreviewLoading}
+            urlPreview={urlPreview}
+            urlPreviewError={urlPreviewError}
+            input={input}
+            onInputChange={setInput}
+            onKeyDown={handleKeyDown}
+            keyVal={keyVal}
+            isStreaming={isStreaming}
+            onStop={chat.stopGeneration}
+            onSend={handleSend}
+            sendDisabled={!input.trim() || !keyVal.token || (compareMode && compareModelsSel.length === 0)}
+            statusParts={statusParts}
+          />
         </Box>
       </Box>
 
