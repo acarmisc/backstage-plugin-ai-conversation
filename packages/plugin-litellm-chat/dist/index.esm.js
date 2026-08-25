@@ -2283,7 +2283,8 @@ import {
   IconButton as IconButton6,
   Typography as Typography12,
   Tooltip as Tooltip6,
-  InputBase as InputBase2
+  InputBase as InputBase2,
+  Chip as Chip6
 } from "@mui/material";
 import SendIcon from "@mui/icons-material/Send";
 import StopIcon from "@mui/icons-material/Stop";
@@ -2304,9 +2305,20 @@ var init_ChatComposer = __esm({
       onStop,
       onSend,
       sendDisabled,
-      statusParts
+      statusParts,
+      compareMode,
+      compareModelsCount
     }) => {
-      return /* @__PURE__ */ React18.createElement(React18.Fragment, null, (urlPreviewLoading || urlPreview || urlPreviewError) && /* @__PURE__ */ React18.createElement(Box14, { sx: { px: 2, pt: 1 } }, urlPreviewChip), /* @__PURE__ */ React18.createElement(
+      const sendTooltipLabel = compareMode && compareModelsCount === 0 ? "Select at least one model to compare" : "Send";
+      return /* @__PURE__ */ React18.createElement(React18.Fragment, null, (urlPreviewLoading || urlPreview || urlPreviewError) && /* @__PURE__ */ React18.createElement(Box14, { sx: { px: 2, pt: 1 } }, urlPreviewChip), compareMode && /* @__PURE__ */ React18.createElement(Box14, { sx: { px: 2, pt: 1 } }, /* @__PURE__ */ React18.createElement(
+        Chip6,
+        {
+          size: "small",
+          label: `Compare \xB7 ${compareModelsCount} model${compareModelsCount !== 1 ? "s" : ""}`,
+          color: "primary",
+          variant: "outlined"
+        }
+      )), /* @__PURE__ */ React18.createElement(
         Box14,
         {
           sx: {
@@ -2327,7 +2339,7 @@ var init_ChatComposer = __esm({
             minRows: 1,
             maxRows: 5,
             fullWidth: true,
-            placeholder: keyVal.token ? "Send a message\u2026  (Enter to send, Shift+Enter for newline)" : "Generate a chat key in Settings to start\u2026",
+            placeholder: keyVal.token ? "Send a message\u2026  (#url to attach a page, Enter to send, Shift+Enter for newline)" : "Generate a chat key in Settings to start\u2026",
             value: input,
             onChange: (e) => onInputChange(e.target.value),
             onKeyDown,
@@ -2342,7 +2354,7 @@ var init_ChatComposer = __esm({
             }
           }
         ),
-        isStreaming ? /* @__PURE__ */ React18.createElement(Tooltip6, { title: "Stop" }, /* @__PURE__ */ React18.createElement(IconButton6, { color: "error", onClick: onStop }, /* @__PURE__ */ React18.createElement(StopIcon, null))) : /* @__PURE__ */ React18.createElement(Tooltip6, { title: "Send" }, /* @__PURE__ */ React18.createElement(
+        isStreaming ? /* @__PURE__ */ React18.createElement(Tooltip6, { title: "Stop" }, /* @__PURE__ */ React18.createElement(IconButton6, { color: "error", onClick: onStop }, /* @__PURE__ */ React18.createElement(StopIcon, null))) : /* @__PURE__ */ React18.createElement(Tooltip6, { title: sendTooltipLabel }, /* @__PURE__ */ React18.createElement(
           IconButton6,
           {
             color: "primary",
@@ -2368,7 +2380,7 @@ import {
   Divider as Divider3,
   Typography as Typography13,
   Tooltip as Tooltip7,
-  Chip as Chip6
+  Chip as Chip7
 } from "@mui/material";
 import ChatIcon from "@mui/icons-material/Chat";
 import ChevronLeftIcon2 from "@mui/icons-material/ChevronLeft";
@@ -2612,10 +2624,10 @@ var init_ChatPage = __esm({
       }
       let urlPreviewChip = null;
       if (urlPreviewLoading) {
-        urlPreviewChip = /* @__PURE__ */ React19.createElement(Chip6, { size: "small", icon: /* @__PURE__ */ React19.createElement(LinkIcon2, { fontSize: "small" }), label: "Fetching page\u2026", variant: "outlined" });
+        urlPreviewChip = /* @__PURE__ */ React19.createElement(Chip7, { size: "small", icon: /* @__PURE__ */ React19.createElement(LinkIcon2, { fontSize: "small" }), label: "Fetching page\u2026", variant: "outlined" });
       } else if (urlPreviewError) {
         urlPreviewChip = /* @__PURE__ */ React19.createElement(
-          Chip6,
+          Chip7,
           {
             size: "small",
             color: "error",
@@ -2628,7 +2640,7 @@ var init_ChatPage = __esm({
         );
       } else if (urlPreview) {
         urlPreviewChip = /* @__PURE__ */ React19.createElement(Tooltip7, { title: urlPreview.url }, /* @__PURE__ */ React19.createElement(
-          Chip6,
+          Chip7,
           {
             size: "small",
             icon: /* @__PURE__ */ React19.createElement(LinkIcon2, { fontSize: "small" }),
@@ -2794,7 +2806,9 @@ var init_ChatPage = __esm({
               onStop: chat.stopGeneration,
               onSend: handleSend,
               sendDisabled: !input.trim() || !keyVal.token || compareMode && compareModelsSel.length === 0,
-              statusParts
+              statusParts,
+              compareMode,
+              compareModelsCount: compareModelsSel.length
             }
           )
         )

@@ -58,5 +58,13 @@ export interface ChatComposerProps {
      * Status parts to display (tokens, budget, etc.)
      */
     statusParts: string[];
+    /**
+     * Whether compare mode is active
+     */
+    compareMode: boolean;
+    /**
+     * Number of models selected for comparison
+     */
+    compareModelsCount: number;
 }
 export declare const ChatComposer: React.FC<ChatComposerProps>;

@@ -2295,9 +2295,20 @@ var init_ChatComposer = __esm({
       onStop,
       onSend,
       sendDisabled,
-      statusParts
+      statusParts,
+      compareMode,
+      compareModelsCount
     }) => {
-      return /* @__PURE__ */ import_react19.default.createElement(import_react19.default.Fragment, null, (urlPreviewLoading || urlPreview || urlPreviewError) && /* @__PURE__ */ import_react19.default.createElement(import_material18.Box, { sx: { px: 2, pt: 1 } }, urlPreviewChip), /* @__PURE__ */ import_react19.default.createElement(
+      const sendTooltipLabel = compareMode && compareModelsCount === 0 ? "Select at least one model to compare" : "Send";
+      return /* @__PURE__ */ import_react19.default.createElement(import_react19.default.Fragment, null, (urlPreviewLoading || urlPreview || urlPreviewError) && /* @__PURE__ */ import_react19.default.createElement(import_material18.Box, { sx: { px: 2, pt: 1 } }, urlPreviewChip), compareMode && /* @__PURE__ */ import_react19.default.createElement(import_material18.Box, { sx: { px: 2, pt: 1 } }, /* @__PURE__ */ import_react19.default.createElement(
+        import_material18.Chip,
+        {
+          size: "small",
+          label: `Compare \xB7 ${compareModelsCount} model${compareModelsCount !== 1 ? "s" : ""}`,
+          color: "primary",
+          variant: "outlined"
+        }
+      )), /* @__PURE__ */ import_react19.default.createElement(
         import_material18.Box,
         {
           sx: {
@@ -2318,7 +2329,7 @@ var init_ChatComposer = __esm({
             minRows: 1,
             maxRows: 5,
             fullWidth: true,
-            placeholder: keyVal.token ? "Send a message\u2026  (Enter to send, Shift+Enter for newline)" : "Generate a chat key in Settings to start\u2026",
+            placeholder: keyVal.token ? "Send a message\u2026  (#url to attach a page, Enter to send, Shift+Enter for newline)" : "Generate a chat key in Settings to start\u2026",
             value: input,
             onChange: (e) => onInputChange(e.target.value),
             onKeyDown,
@@ -2333,7 +2344,7 @@ var init_ChatComposer = __esm({
             }
           }
         ),
-        isStreaming ? /* @__PURE__ */ import_react19.default.createElement(import_material18.Tooltip, { title: "Stop" }, /* @__PURE__ */ import_react19.default.createElement(import_material18.IconButton, { color: "error", onClick: onStop }, /* @__PURE__ */ import_react19.default.createElement(import_Stop.default, null))) : /* @__PURE__ */ import_react19.default.createElement(import_material18.Tooltip, { title: "Send" }, /* @__PURE__ */ import_react19.default.createElement(
+        isStreaming ? /* @__PURE__ */ import_react19.default.createElement(import_material18.Tooltip, { title: "Stop" }, /* @__PURE__ */ import_react19.default.createElement(import_material18.IconButton, { color: "error", onClick: onStop }, /* @__PURE__ */ import_react19.default.createElement(import_Stop.default, null))) : /* @__PURE__ */ import_react19.default.createElement(import_material18.Tooltip, { title: sendTooltipLabel }, /* @__PURE__ */ import_react19.default.createElement(
           import_material18.IconButton,
           {
             color: "primary",
@@ -2778,7 +2789,9 @@ var init_ChatPage = __esm({
               onStop: chat.stopGeneration,
               onSend: handleSend,
               sendDisabled: !input.trim() || !keyVal.token || compareMode && compareModelsSel.length === 0,
-              statusParts
+              statusParts,
+              compareMode,
+              compareModelsCount: compareModelsSel.length
             }
           )
         )

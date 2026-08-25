@@ -5,6 +5,7 @@ import {
   Typography,
   Tooltip,
   InputBase,
+  Chip,
 } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
 import StopIcon from '@mui/icons-material/Stop';
@@ -74,6 +75,16 @@ export interface ChatComposerProps {
    * Status parts to display (tokens, budget, etc.)
    */
   statusParts: string[];
+
+  /**
+   * Whether compare mode is active
+   */
+  compareMode: boolean;
+
+  /**
+   * Number of models selected for comparison
+   */
+  compareModelsCount: number;
 }
 
 export const ChatComposer: React.FC<ChatComposerProps> = ({
@@ -90,13 +101,30 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
   onSend,
   sendDisabled,
   statusParts,
+  compareMode,
+  compareModelsCount,
 }) => {
+  const sendTooltipLabel =
+    compareMode && compareModelsCount === 0 ? 'Select at least one model to compare' : 'Send';
+
   return (
     <>
       {/* #url attachment chip */}
       {(urlPreviewLoading || urlPreview || urlPreviewError) && (
         <Box sx={{ px: 2, pt: 1 }}>
           {urlPreviewChip}
+        </Box>
+      )}
+
+      {/* Compare mode badge */}
+      {compareMode && (
+        <Box sx={{ px: 2, pt: 1 }}>
+          <Chip
+            size="small"
+            label={`Compare · ${compareModelsCount} model${compareModelsCount !== 1 ? 's' : ''}`}
+            color="primary"
+            variant="outlined"
+          />
         </Box>
       )}
 
@@ -120,7 +148,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
           fullWidth
           placeholder={
             keyVal.token
-              ? 'Send a message…  (Enter to send, Shift+Enter for newline)'
+              ? 'Send a message…  (#url to attach a page, Enter to send, Shift+Enter for newline)'
               : 'Generate a chat key in Settings to start…'
           }
           value={input}
@@ -143,7 +171,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
             </IconButton>
           </Tooltip>
         ) : (
-          <Tooltip title="Send">
+          <Tooltip title={sendTooltipLabel}>
             <IconButton
               color="primary"
               onClick={onSend}

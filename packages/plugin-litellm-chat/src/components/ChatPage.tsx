@@ -503,6 +503,8 @@ export const ChatPage: React.FC = () => {
             onSend={handleSend}
             sendDisabled={!input.trim() || !keyVal.token || (compareMode && compareModelsSel.length === 0)}
             statusParts={statusParts}
+            compareMode={compareMode}
+            compareModelsCount={compareModelsSel.length}
           />
         </Box>
       </Box>
