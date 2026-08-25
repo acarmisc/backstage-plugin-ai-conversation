@@ -1,41 +1,23 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Box,
-  Button,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemText,
   IconButton,
   Divider,
   Typography,
-  Collapse,
   Tooltip,
   InputBase,
   TextField,
   Accordion,
   AccordionSummary,
   AccordionDetails,
-  Menu,
-  MenuItem,
-  ListItemIcon,
   Chip,
   Switch,
   FormControlLabel,
 } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
-import DeleteIcon from '@mui/icons-material/Delete';
-import SettingsIcon from '@mui/icons-material/Settings';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ChatIcon from '@mui/icons-material/Chat';
 import SendIcon from '@mui/icons-material/Send';
 import StopIcon from '@mui/icons-material/Stop';
-import SearchIcon from '@mui/icons-material/Search';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
-import PushPinIcon from '@mui/icons-material/PushPin';
-import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
-import FileDownloadIcon from '@mui/icons-material/FileDownload';
-import FileUploadIcon from '@mui/icons-material/FileUpload';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import LinkIcon from '@mui/icons-material/Link';
@@ -55,10 +37,9 @@ import { MessageList } from './MessageList';
 import { ErrorBanner } from './ErrorBanner';
 import { SourcesPanel } from './SourcesPanel';
 import { UsagePanel } from './UsagePanel';
+import { ThreadSidebar } from './ThreadSidebar';
 import type { ChatConfig, ChatTraits, Persona, ReasoningEffort, Thread, UrlContextPreview } from '../types';
 
-const SIDEBAR_WIDTH = 280;
-const SIDEBAR_RAIL_WIDTH = 48;
 const RIGHT_RAIL_WIDTH = 300;
 const CHAT_MAX_WIDTH = 900;
 const URL_TOKEN_RE = /#(https:\/\/\S+)/;
@@ -324,8 +305,6 @@ export const ChatPage: React.FC = () => {
     }
   };
 
-  const menuTargetThread = chat.threads.find(t => t.id === threadMenuTarget) ?? null;
-
   const lastTurnUsage = chat.activeThread?.lastTurnUsage ?? null;
   const totalTokens = chat.activeThread?.totalTokens ?? 0;
   const statusParts: string[] = [];
@@ -385,327 +364,152 @@ export const ChatPage: React.FC = () => {
   return (
     <Box sx={{ display: 'flex', height: '100dvh', overflow: 'hidden' }}>
       {/* ─── Left sidebar: settings on top + threads ─── */}
-      <Box
-        sx={{
-          width: sidebarCollapsed ? SIDEBAR_RAIL_WIDTH : SIDEBAR_WIDTH,
-          flexShrink: 0,
-          borderRight: 1,
-          borderColor: 'divider',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          transition: 'width 0.15s',
-        }}
-      >
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: sidebarCollapsed ? 'center' : 'flex-end', px: 0.5, py: 0.5 }}>
-          <Tooltip title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
-            <IconButton size="small" onClick={() => setSidebarCollapsed(v => !v)}>
-              {sidebarCollapsed ? <ChevronRightIcon fontSize="small" /> : <ChevronLeftIcon fontSize="small" />}
-            </IconButton>
-          </Tooltip>
-        </Box>
-
-        {sidebarCollapsed ? (
-          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, pt: 1 }}>
-            <Tooltip title="New chat" placement="right">
-              <IconButton onClick={chat.newThread}>
-                <AddIcon />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Settings" placement="right">
-              <IconButton onClick={() => setSidebarCollapsed(false)}>
-                <SettingsIcon />
-              </IconButton>
-            </Tooltip>
-          </Box>
-        ) : (
+      <ThreadSidebar
+        collapsed={sidebarCollapsed}
+        onToggleCollapsed={() => setSidebarCollapsed(v => !v)}
+        showSettings={showSettings}
+        onToggleShowSettings={() => setShowSettings(v => !v)}
+        settingsSlot={
           <>
-            {/* Settings panel (collapsible, pinned to top) */}
-            <Box sx={{ flexShrink: 0 }}>
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                  px: 1.5,
-                  py: 1,
-                  bgcolor: 'action.hover',
-                }}
-                onClick={() => setShowSettings(v => !v)}
-              >
-                <SettingsIcon fontSize="small" sx={{ mr: 1 }} />
-                <Typography variant="overline" sx={{ flex: 1 }}>
-                  Settings
-                </Typography>
-                <ExpandMoreIcon
-                  fontSize="small"
-                  sx={{
-                    transform: showSettings ? 'rotate(180deg)' : 'none',
-                    transition: 'transform 0.2s',
-                  }}
-                />
-              </Box>
-              <Collapse in={showSettings}>
-                <Box sx={{ p: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                  {configError && (
-                    <Typography variant="caption" color="error">
-                      Couldn't load chat defaults: {configError}
-                    </Typography>
-                  )}
-                  <PersonaPicker
-                    value={personaId}
-                    personas={personas}
-                    loading={personasLoading}
-                    error={personasError}
-                    onChange={handlePersonaChange}
-                  />
-                  <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-                    <OptionPicker
-                      label="Tone"
-                      value={toneId}
-                      options={traits.tones}
-                      onChange={setToneId}
-                      loading={traitsLoading}
-                    />
-                    <OptionPicker
-                      label="Focus"
-                      value={focusId}
-                      options={traits.focuses}
-                      onChange={setFocusId}
-                      loading={traitsLoading}
-                    />
-                  </Box>
-                  <TextField
-                    label="Custom system prompt"
-                    placeholder={
-                      personaId
-                        ? 'Appended after the persona system prompt…'
-                        : 'Used as the system prompt (no persona selected)…'
-                    }
-                    value={customSystemPrompt}
-                    onChange={e => setCustomSystemPrompt(e.target.value)}
-                    multiline
-                    minRows={2}
-                    maxRows={6}
-                    size="small"
-                    fullWidth
-                  />
-                  <KeyPicker
-                    value={keyVal}
-                    onChange={setKeyVal}
-                    onDelete={() => {
-                      if (chat.activeThread?.keyToken) {
-                        chatApi.deleteChatKey(chat.activeThread.keyToken).catch(() => {});
-                      }
-                    }}
-                  />
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        size="small"
-                        checked={compareMode}
-                        onChange={e => setCompareModeUi(e.target.checked)}
-                      />
-                    }
-                    label={
-                      <Typography variant="body2">Compare models side-by-side</Typography>
-                    }
-                  />
-                  {compareMode ? (
-                    <CompareModelPicker value={compareModelsSel} onChange={setCompareModelsSel} />
-                  ) : (
-                    <ModelPicker value={model} onChange={setModel} defaultModel={config.defaultModel} />
-                  )}
-                  <Accordion
-                    disableGutters
-                    variant="outlined"
-                    sx={{ '&:before': { display: 'none' } }}
-                  >
-                    <AccordionSummary expandIcon={<ExpandMoreIcon fontSize="small" />}>
-                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                        Advanced
-                      </Typography>
-                    </AccordionSummary>
-                    <AccordionDetails sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                      <VectorStorePicker
-                        value={vectorStoreIds}
-                        onChange={setVectorStoreIds}
-                        defaultVectorStoreIds={config.defaultVectorStoreIds}
-                      />
-                      <FormControlLabel
-                        control={
-                          <Switch
-                            size="small"
-                            checked={webSearch}
-                            onChange={e => setWebSearch(e.target.checked)}
-                          />
-                        }
-                        label={<Typography variant="body2">Include web search</Typography>}
-                      />
-                      <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-                        <OptionPicker
-                          label="Verbosity"
-                          value={verbosityId}
-                          options={traits.verbosities}
-                          onChange={setVerbosityId}
-                          loading={traitsLoading}
-                        />
-                        <OptionPicker
-                          label="Reasoning effort"
-                          value={reasoningEffort}
-                          options={REASONING_EFFORT_OPTIONS}
-                          onChange={id => setReasoningEffort(id as ReasoningEffort | '')}
-                          noneLabel="Model default"
-                        />
-                      </Box>
-                    </AccordionDetails>
-                  </Accordion>
-                </Box>
-              </Collapse>
-            </Box>
-
-            <Divider />
-
-            {/* New chat + import */}
-            <Box sx={{ p: 1.5, display: 'flex', gap: 1 }}>
-              <Button
-                fullWidth
-                variant="outlined"
-                startIcon={<AddIcon />}
-                onClick={chat.newThread}
-                size="small"
-              >
-                New chat
-              </Button>
-              <Tooltip title="Import thread">
-                <IconButton size="small" onClick={() => importInputRef.current?.click()}>
-                  <FileUploadIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-              <input
-                ref={importInputRef}
-                type="file"
-                accept="application/json"
-                hidden
-                onChange={handleImportFile}
-              />
-            </Box>
-            {importError && (
-              <Box sx={{ px: 1.5, pb: 1 }}>
-                <Typography variant="caption" color="error">
-                  {importError}
-                </Typography>
-              </Box>
+            {configError && (
+              <Typography variant="caption" color="error">
+                Couldn't load chat defaults: {configError}
+              </Typography>
             )}
-
-            {/* Persistence status — transparency for where thread history
-                actually lives, driven by litellm.chat.persistence config. */}
-            <Box sx={{ px: 1.5, pb: 1 }}>
-              <Tooltip title={persistenceTooltip}>
-                <Typography variant="caption" color="text.secondary">
-                  {config.persistence.enabled
-                    ? `History saved to your account${config.persistence.ttlDays > 0 ? ` · ${config.persistence.ttlDays}d retention` : ''}`
-                    : 'History stored only in this browser'}
-                </Typography>
-              </Tooltip>
-            </Box>
-
-            {/* Search */}
-            <Box sx={{ px: 1.5, pb: 1 }}>
-              <InputBase
-                fullWidth
-                placeholder="Search threads…"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                startAdornment={<SearchIcon fontSize="small" sx={{ mr: 0.75, color: 'text.secondary' }} />}
-                sx={{
-                  border: 1,
-                  borderColor: 'divider',
-                  borderRadius: 2,
-                  px: 1,
-                  py: 0.5,
-                  fontSize: '0.85rem',
-                }}
+            <PersonaPicker
+              value={personaId}
+              personas={personas}
+              loading={personasLoading}
+              error={personasError}
+              onChange={handlePersonaChange}
+            />
+            <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+              <OptionPicker
+                label="Tone"
+                value={toneId}
+                options={traits.tones}
+                onChange={setToneId}
+                loading={traitsLoading}
+              />
+              <OptionPicker
+                label="Focus"
+                value={focusId}
+                options={traits.focuses}
+                onChange={setFocusId}
+                loading={traitsLoading}
               />
             </Box>
-
-            {/* Thread list */}
-            <Box sx={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-              <List dense>
-                {visibleThreads.map(t => (
-                  <ListItem
-                    key={t.id}
-                    disablePadding
-                    secondaryAction={
-                      <IconButton edge="end" size="small" onClick={e => openThreadMenu(e, t.id)}>
-                        <MoreVertIcon fontSize="small" />
-                      </IconButton>
-                    }
-                  >
-                    <ListItemButton
-                      selected={chat.activeThread?.id === t.id}
-                      onClick={() => chat.selectThread(t.id)}
-                      sx={{ pr: 6 }}
-                    >
-                      {t.pinned && <PushPinIcon fontSize="small" sx={{ mr: 0.75, color: 'text.secondary' }} />}
-                      <ListItemText
-                        primary={t.title}
-                        primaryTypographyProps={{ noWrap: true, variant: 'body2' }}
-                        secondaryTypographyProps={{ noWrap: true, variant: 'caption' }}
-                      />
-                    </ListItemButton>
-                  </ListItem>
-                ))}
-                {visibleThreads.length === 0 && (
-                  <Typography variant="caption" color="text.secondary" sx={{ px: 2, py: 1, display: 'block' }}>
-                    {searchQuery ? 'No threads match your search.' : 'No threads yet.'}
-                  </Typography>
-                )}
-              </List>
-            </Box>
-
-            <Menu anchorEl={threadMenuAnchor} open={!!threadMenuAnchor} onClose={closeThreadMenu}>
-              <MenuItem
-                onClick={() => {
-                  if (threadMenuTarget) chat.togglePin(threadMenuTarget);
-                  closeThreadMenu();
-                }}
-              >
-                <ListItemIcon>
-                  {menuTargetThread?.pinned ? (
-                    <PushPinIcon fontSize="small" />
-                  ) : (
-                    <PushPinOutlinedIcon fontSize="small" />
-                  )}
-                </ListItemIcon>
-                {menuTargetThread?.pinned ? 'Unpin' : 'Pin'}
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  if (threadMenuTarget) chat.exportThread(threadMenuTarget);
-                  closeThreadMenu();
-                }}
-              >
-                <ListItemIcon>
-                  <FileDownloadIcon fontSize="small" />
-                </ListItemIcon>
-                Export
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  if (threadMenuTarget) chat.deleteThread(threadMenuTarget);
-                  closeThreadMenu();
-                }}
-              >
-                <ListItemIcon>
-                  <DeleteIcon fontSize="small" />
-                </ListItemIcon>
-                Delete
-              </MenuItem>
-            </Menu>
+            <TextField
+              label="Custom system prompt"
+              placeholder={
+                personaId
+                  ? 'Appended after the persona system prompt…'
+                  : 'Used as the system prompt (no persona selected)…'
+              }
+              value={customSystemPrompt}
+              onChange={e => setCustomSystemPrompt(e.target.value)}
+              multiline
+              minRows={2}
+              maxRows={6}
+              size="small"
+              fullWidth
+            />
+            <KeyPicker
+              value={keyVal}
+              onChange={setKeyVal}
+              onDelete={() => {
+                if (chat.activeThread?.keyToken) {
+                  chatApi.deleteChatKey(chat.activeThread.keyToken).catch(() => {});
+                }
+              }}
+            />
+            <FormControlLabel
+              control={
+                <Switch
+                  size="small"
+                  checked={compareMode}
+                  onChange={e => setCompareModeUi(e.target.checked)}
+                />
+              }
+              label={
+                <Typography variant="body2">Compare models side-by-side</Typography>
+              }
+            />
+            {compareMode ? (
+              <CompareModelPicker value={compareModelsSel} onChange={setCompareModelsSel} />
+            ) : (
+              <ModelPicker value={model} onChange={setModel} defaultModel={config.defaultModel} />
+            )}
+            <Accordion
+              disableGutters
+              variant="outlined"
+              sx={{ '&:before': { display: 'none' } }}
+            >
+              <AccordionSummary expandIcon={<ExpandMoreIcon fontSize="small" />}>
+                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                  Advanced
+                </Typography>
+              </AccordionSummary>
+              <AccordionDetails sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                <VectorStorePicker
+                  value={vectorStoreIds}
+                  onChange={setVectorStoreIds}
+                  defaultVectorStoreIds={config.defaultVectorStoreIds}
+                />
+                <FormControlLabel
+                  control={
+                    <Switch
+                      size="small"
+                      checked={webSearch}
+                      onChange={e => setWebSearch(e.target.checked)}
+                    />
+                  }
+                  label={<Typography variant="body2">Include web search</Typography>}
+                />
+                <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                  <OptionPicker
+                    label="Verbosity"
+                    value={verbosityId}
+                    options={traits.verbosities}
+                    onChange={setVerbosityId}
+                    loading={traitsLoading}
+                  />
+                  <OptionPicker
+                    label="Reasoning effort"
+                    value={reasoningEffort}
+                    options={REASONING_EFFORT_OPTIONS}
+                    onChange={id => setReasoningEffort(id as ReasoningEffort | '')}
+                    noneLabel="Model default"
+                  />
+                </Box>
+              </AccordionDetails>
+            </Accordion>
           </>
-        )}
-      </Box>
+        }
+        onNewThread={chat.newThread}
+        importInputRef={importInputRef}
+        onImportFile={handleImportFile}
+        importError={importError}
+        persistenceTooltip={persistenceTooltip}
+        persistenceText={
+          config.persistence.enabled
+            ? `History saved to your account${config.persistence.ttlDays > 0 ? ` · ${config.persistence.ttlDays}d retention` : ''}`
+            : 'History stored only in this browser'
+        }
+        searchQuery={searchQuery}
+        onSearchQueryChange={v => setSearchQuery(v)}
+        visibleThreads={visibleThreads}
+        activeThreadId={activeThreadId}
+        onSelectThread={id => chat.selectThread(id)}
+        threads={chat.threads}
+        menuAnchor={threadMenuAnchor}
+        menuTarget={threadMenuTarget}
+        onOpenMenu={openThreadMenu}
+        onCloseMenu={closeThreadMenu}
+        onTogglePin={id => chat.togglePin(id)}
+        onExport={id => chat.exportThread(id)}
+        onDelete={id => chat.deleteThread(id)}
+      />
 
       {/* ─── Center: chat column ─── */}
       <Box

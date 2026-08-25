@@ -1,0 +1,32 @@
+import React from 'react';
+import type { Thread } from '../types';
+export declare const SIDEBAR_WIDTH = 280;
+export declare const SIDEBAR_RAIL_WIDTH = 48;
+interface ThreadSidebarProps {
+    collapsed: boolean;
+    onToggleCollapsed: () => void;
+    showSettings: boolean;
+    onToggleShowSettings: () => void;
+    settingsSlot: React.ReactNode;
+    onNewThread: () => void;
+    importInputRef: React.RefObject<HTMLInputElement>;
+    onImportFile: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    importError: string | null;
+    persistenceTooltip: string;
+    persistenceText: string;
+    searchQuery: string;
+    onSearchQueryChange: (query: string) => void;
+    visibleThreads: Thread[];
+    activeThreadId: string | null;
+    onSelectThread: (id: string) => void;
+    threads: Thread[];
+    menuAnchor: HTMLElement | null;
+    menuTarget: string | null;
+    onOpenMenu: (e: React.MouseEvent<HTMLElement>, threadId: string) => void;
+    onCloseMenu: () => void;
+    onTogglePin: (threadId: string) => void;
+    onExport: (threadId: string) => void;
+    onDelete: (threadId: string) => void;
+}
+export declare const ThreadSidebar: React.FC<ThreadSidebarProps>;
+export {};

@@ -1924,6 +1924,190 @@ var init_UsagePanel = __esm({
   }
 });
 
+// src/components/ThreadSidebar.tsx
+var import_react17, import_material16, import_Add, import_Delete2, import_Settings, import_ExpandMore, import_Search, import_MoreVert, import_PushPin, import_PushPinOutlined, import_FileDownload, import_FileUpload, import_ChevronLeft, import_ChevronRight, SIDEBAR_WIDTH, SIDEBAR_RAIL_WIDTH, ThreadSidebar;
+var init_ThreadSidebar = __esm({
+  "src/components/ThreadSidebar.tsx"() {
+    "use strict";
+    import_react17 = __toESM(require("react"));
+    import_material16 = require("@mui/material");
+    import_Add = __toESM(require("@mui/icons-material/Add"));
+    import_Delete2 = __toESM(require("@mui/icons-material/Delete"));
+    import_Settings = __toESM(require("@mui/icons-material/Settings"));
+    import_ExpandMore = __toESM(require("@mui/icons-material/ExpandMore"));
+    import_Search = __toESM(require("@mui/icons-material/Search"));
+    import_MoreVert = __toESM(require("@mui/icons-material/MoreVert"));
+    import_PushPin = __toESM(require("@mui/icons-material/PushPin"));
+    import_PushPinOutlined = __toESM(require("@mui/icons-material/PushPinOutlined"));
+    import_FileDownload = __toESM(require("@mui/icons-material/FileDownload"));
+    import_FileUpload = __toESM(require("@mui/icons-material/FileUpload"));
+    import_ChevronLeft = __toESM(require("@mui/icons-material/ChevronLeft"));
+    import_ChevronRight = __toESM(require("@mui/icons-material/ChevronRight"));
+    SIDEBAR_WIDTH = 280;
+    SIDEBAR_RAIL_WIDTH = 48;
+    ThreadSidebar = ({
+      collapsed,
+      onToggleCollapsed,
+      showSettings,
+      onToggleShowSettings,
+      settingsSlot,
+      onNewThread,
+      importInputRef,
+      onImportFile,
+      importError,
+      persistenceTooltip,
+      persistenceText,
+      searchQuery,
+      onSearchQueryChange,
+      visibleThreads,
+      activeThreadId,
+      onSelectThread,
+      threads,
+      menuAnchor,
+      menuTarget,
+      onOpenMenu,
+      onCloseMenu,
+      onTogglePin,
+      onExport,
+      onDelete
+    }) => {
+      const menuTargetThread = threads.find((t) => t.id === menuTarget) ?? null;
+      return /* @__PURE__ */ import_react17.default.createElement(
+        import_material16.Box,
+        {
+          sx: {
+            width: collapsed ? SIDEBAR_RAIL_WIDTH : SIDEBAR_WIDTH,
+            flexShrink: 0,
+            borderRight: 1,
+            borderColor: "divider",
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+            transition: "width 0.15s"
+          }
+        },
+        /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { display: "flex", alignItems: "center", justifyContent: collapsed ? "center" : "flex-end", px: 0.5, py: 0.5 } }, /* @__PURE__ */ import_react17.default.createElement(import_material16.Tooltip, { title: collapsed ? "Expand sidebar" : "Collapse sidebar" }, /* @__PURE__ */ import_react17.default.createElement(import_material16.IconButton, { size: "small", onClick: onToggleCollapsed }, collapsed ? /* @__PURE__ */ import_react17.default.createElement(import_ChevronRight.default, { fontSize: "small" }) : /* @__PURE__ */ import_react17.default.createElement(import_ChevronLeft.default, { fontSize: "small" })))),
+        collapsed ? /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { display: "flex", flexDirection: "column", alignItems: "center", gap: 1, pt: 1 } }, /* @__PURE__ */ import_react17.default.createElement(import_material16.Tooltip, { title: "New chat", placement: "right" }, /* @__PURE__ */ import_react17.default.createElement(import_material16.IconButton, { onClick: onNewThread }, /* @__PURE__ */ import_react17.default.createElement(import_Add.default, null))), /* @__PURE__ */ import_react17.default.createElement(import_material16.Tooltip, { title: "Settings", placement: "right" }, /* @__PURE__ */ import_react17.default.createElement(import_material16.IconButton, { onClick: onToggleCollapsed }, /* @__PURE__ */ import_react17.default.createElement(import_Settings.default, null)))) : /* @__PURE__ */ import_react17.default.createElement(import_react17.default.Fragment, null, /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { flexShrink: 0 } }, /* @__PURE__ */ import_react17.default.createElement(
+          import_material16.Box,
+          {
+            sx: {
+              display: "flex",
+              alignItems: "center",
+              cursor: "pointer",
+              px: 1.5,
+              py: 1,
+              bgcolor: "action.hover"
+            },
+            onClick: onToggleShowSettings
+          },
+          /* @__PURE__ */ import_react17.default.createElement(import_Settings.default, { fontSize: "small", sx: { mr: 1 } }),
+          /* @__PURE__ */ import_react17.default.createElement(import_material16.Typography, { variant: "overline", sx: { flex: 1 } }, "Settings"),
+          /* @__PURE__ */ import_react17.default.createElement(
+            import_ExpandMore.default,
+            {
+              fontSize: "small",
+              sx: {
+                transform: showSettings ? "rotate(180deg)" : "none",
+                transition: "transform 0.2s"
+              }
+            }
+          )
+        ), /* @__PURE__ */ import_react17.default.createElement(import_material16.Collapse, { in: showSettings }, /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { p: 1.5, display: "flex", flexDirection: "column", gap: 1.5 } }, settingsSlot))), /* @__PURE__ */ import_react17.default.createElement(import_material16.Divider, null), /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { p: 1.5, display: "flex", gap: 1 } }, /* @__PURE__ */ import_react17.default.createElement(
+          import_material16.Button,
+          {
+            fullWidth: true,
+            variant: "outlined",
+            startIcon: /* @__PURE__ */ import_react17.default.createElement(import_Add.default, null),
+            onClick: onNewThread,
+            size: "small"
+          },
+          "New chat"
+        ), /* @__PURE__ */ import_react17.default.createElement(import_material16.Tooltip, { title: "Import thread" }, /* @__PURE__ */ import_react17.default.createElement(import_material16.IconButton, { size: "small", onClick: () => importInputRef.current?.click() }, /* @__PURE__ */ import_react17.default.createElement(import_FileUpload.default, { fontSize: "small" }))), /* @__PURE__ */ import_react17.default.createElement(
+          "input",
+          {
+            ref: importInputRef,
+            type: "file",
+            accept: "application/json",
+            hidden: true,
+            onChange: onImportFile
+          }
+        )), importError && /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { px: 1.5, pb: 1 } }, /* @__PURE__ */ import_react17.default.createElement(import_material16.Typography, { variant: "caption", color: "error" }, importError)), /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { px: 1.5, pb: 1 } }, /* @__PURE__ */ import_react17.default.createElement(import_material16.Tooltip, { title: persistenceTooltip }, /* @__PURE__ */ import_react17.default.createElement(import_material16.Typography, { variant: "caption", color: "text.secondary" }, persistenceText))), /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { px: 1.5, pb: 1 } }, /* @__PURE__ */ import_react17.default.createElement(
+          import_material16.InputBase,
+          {
+            fullWidth: true,
+            placeholder: "Search threads\u2026",
+            value: searchQuery,
+            onChange: (e) => onSearchQueryChange(e.target.value),
+            startAdornment: /* @__PURE__ */ import_react17.default.createElement(import_Search.default, { fontSize: "small", sx: { mr: 0.75, color: "text.secondary" } }),
+            sx: {
+              border: 1,
+              borderColor: "divider",
+              borderRadius: 2,
+              px: 1,
+              py: 0.5,
+              fontSize: "0.85rem"
+            }
+          }
+        )), /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { flex: 1, overflowY: "auto", minHeight: 0 } }, /* @__PURE__ */ import_react17.default.createElement(import_material16.List, { dense: true }, visibleThreads.map((t) => /* @__PURE__ */ import_react17.default.createElement(
+          import_material16.ListItem,
+          {
+            key: t.id,
+            disablePadding: true,
+            secondaryAction: /* @__PURE__ */ import_react17.default.createElement(import_material16.IconButton, { edge: "end", size: "small", onClick: (e) => onOpenMenu(e, t.id) }, /* @__PURE__ */ import_react17.default.createElement(import_MoreVert.default, { fontSize: "small" }))
+          },
+          /* @__PURE__ */ import_react17.default.createElement(
+            import_material16.ListItemButton,
+            {
+              selected: activeThreadId === t.id,
+              onClick: () => onSelectThread(t.id),
+              sx: { pr: 6 }
+            },
+            t.pinned && /* @__PURE__ */ import_react17.default.createElement(import_PushPin.default, { fontSize: "small", sx: { mr: 0.75, color: "text.secondary" } }),
+            /* @__PURE__ */ import_react17.default.createElement(
+              import_material16.ListItemText,
+              {
+                primary: t.title,
+                primaryTypographyProps: { noWrap: true, variant: "body2" },
+                secondaryTypographyProps: { noWrap: true, variant: "caption" }
+              }
+            )
+          )
+        )), visibleThreads.length === 0 && /* @__PURE__ */ import_react17.default.createElement(import_material16.Typography, { variant: "caption", color: "text.secondary", sx: { px: 2, py: 1, display: "block" } }, searchQuery ? "No threads match your search." : "No threads yet."))), /* @__PURE__ */ import_react17.default.createElement(import_material16.Menu, { anchorEl: menuAnchor, open: !!menuAnchor, onClose: onCloseMenu }, /* @__PURE__ */ import_react17.default.createElement(
+          import_material16.MenuItem,
+          {
+            onClick: () => {
+              if (menuTarget) onTogglePin(menuTarget);
+              onCloseMenu();
+            }
+          },
+          /* @__PURE__ */ import_react17.default.createElement(import_material16.ListItemIcon, null, menuTargetThread?.pinned ? /* @__PURE__ */ import_react17.default.createElement(import_PushPin.default, { fontSize: "small" }) : /* @__PURE__ */ import_react17.default.createElement(import_PushPinOutlined.default, { fontSize: "small" })),
+          menuTargetThread?.pinned ? "Unpin" : "Pin"
+        ), /* @__PURE__ */ import_react17.default.createElement(
+          import_material16.MenuItem,
+          {
+            onClick: () => {
+              if (menuTarget) onExport(menuTarget);
+              onCloseMenu();
+            }
+          },
+          /* @__PURE__ */ import_react17.default.createElement(import_material16.ListItemIcon, null, /* @__PURE__ */ import_react17.default.createElement(import_FileDownload.default, { fontSize: "small" })),
+          "Export"
+        ), /* @__PURE__ */ import_react17.default.createElement(
+          import_material16.MenuItem,
+          {
+            onClick: () => {
+              if (menuTarget) onDelete(menuTarget);
+              onCloseMenu();
+            }
+          },
+          /* @__PURE__ */ import_react17.default.createElement(import_material16.ListItemIcon, null, /* @__PURE__ */ import_react17.default.createElement(import_Delete2.default, { fontSize: "small" })),
+          "Delete"
+        )))
+      );
+    };
+  }
+});
+
 // src/components/ChatPage.tsx
 var ChatPage_exports = {};
 __export(ChatPage_exports, {
@@ -1941,27 +2125,18 @@ function sortThreads(threads) {
     return b.updatedAt - a.updatedAt;
   });
 }
-var import_react17, import_material16, import_Add, import_Delete2, import_Settings, import_ExpandMore, import_Chat, import_Send, import_Stop, import_Search, import_MoreVert, import_PushPin, import_PushPinOutlined, import_FileDownload, import_FileUpload, import_ChevronLeft, import_ChevronRight, import_Link2, import_Close, import_core_plugin_api7, SIDEBAR_WIDTH, SIDEBAR_RAIL_WIDTH, RIGHT_RAIL_WIDTH, CHAT_MAX_WIDTH, URL_TOKEN_RE, URL_PREVIEW_DEBOUNCE_MS, REASONING_EFFORT_OPTIONS, ChatPage;
+var import_react18, import_material17, import_ExpandMore2, import_Chat, import_Send, import_Stop, import_ChevronLeft2, import_ChevronRight2, import_Link2, import_Close, import_core_plugin_api7, RIGHT_RAIL_WIDTH, CHAT_MAX_WIDTH, URL_TOKEN_RE, URL_PREVIEW_DEBOUNCE_MS, REASONING_EFFORT_OPTIONS, ChatPage;
 var init_ChatPage = __esm({
   "src/components/ChatPage.tsx"() {
     "use strict";
-    import_react17 = __toESM(require("react"));
-    import_material16 = require("@mui/material");
-    import_Add = __toESM(require("@mui/icons-material/Add"));
-    import_Delete2 = __toESM(require("@mui/icons-material/Delete"));
-    import_Settings = __toESM(require("@mui/icons-material/Settings"));
-    import_ExpandMore = __toESM(require("@mui/icons-material/ExpandMore"));
+    import_react18 = __toESM(require("react"));
+    import_material17 = require("@mui/material");
+    import_ExpandMore2 = __toESM(require("@mui/icons-material/ExpandMore"));
     import_Chat = __toESM(require("@mui/icons-material/Chat"));
     import_Send = __toESM(require("@mui/icons-material/Send"));
     import_Stop = __toESM(require("@mui/icons-material/Stop"));
-    import_Search = __toESM(require("@mui/icons-material/Search"));
-    import_MoreVert = __toESM(require("@mui/icons-material/MoreVert"));
-    import_PushPin = __toESM(require("@mui/icons-material/PushPin"));
-    import_PushPinOutlined = __toESM(require("@mui/icons-material/PushPinOutlined"));
-    import_FileDownload = __toESM(require("@mui/icons-material/FileDownload"));
-    import_FileUpload = __toESM(require("@mui/icons-material/FileUpload"));
-    import_ChevronLeft = __toESM(require("@mui/icons-material/ChevronLeft"));
-    import_ChevronRight = __toESM(require("@mui/icons-material/ChevronRight"));
+    import_ChevronLeft2 = __toESM(require("@mui/icons-material/ChevronLeft"));
+    import_ChevronRight2 = __toESM(require("@mui/icons-material/ChevronRight"));
     import_Link2 = __toESM(require("@mui/icons-material/Link"));
     import_Close = __toESM(require("@mui/icons-material/Close"));
     import_core_plugin_api7 = require("@backstage/core-plugin-api");
@@ -1979,8 +2154,7 @@ var init_ChatPage = __esm({
     init_ErrorBanner();
     init_SourcesPanel();
     init_UsagePanel();
-    SIDEBAR_WIDTH = 280;
-    SIDEBAR_RAIL_WIDTH = 48;
+    init_ThreadSidebar();
     RIGHT_RAIL_WIDTH = 300;
     CHAT_MAX_WIDTH = 900;
     URL_TOKEN_RE = /#(https:\/\/\S+)/;
@@ -1993,50 +2167,50 @@ var init_ChatPage = __esm({
     ChatPage = () => {
       const chatApi = (0, import_core_plugin_api7.useApi)(liteLlmChatApiRef);
       const identityApi = (0, import_core_plugin_api7.useApi)(import_core_plugin_api7.identityApiRef);
-      const [userId, setUserId] = (0, import_react17.useState)("default");
-      const [config, setConfig] = (0, import_react17.useState)({
+      const [userId, setUserId] = (0, import_react18.useState)("default");
+      const [config, setConfig] = (0, import_react18.useState)({
         defaultModel: null,
         defaultVectorStoreIds: null,
         maxRequestBudget: null,
         persistence: { enabled: false, ttlDays: 30 }
       });
-      const [model, setModel] = (0, import_react17.useState)("");
-      const [compareMode, setCompareModeUi] = (0, import_react17.useState)(false);
-      const [compareModelsSel, setCompareModelsSel] = (0, import_react17.useState)([]);
-      const [vectorStoreIds, setVectorStoreIds] = (0, import_react17.useState)([]);
-      const [webSearch, setWebSearch] = (0, import_react17.useState)(false);
-      const [personaId, setPersonaId] = (0, import_react17.useState)("");
-      const [customSystemPrompt, setCustomSystemPrompt] = (0, import_react17.useState)("");
-      const [toneId, setToneId] = (0, import_react17.useState)("");
-      const [focusId, setFocusId] = (0, import_react17.useState)("");
-      const [verbosityId, setVerbosityId] = (0, import_react17.useState)("");
-      const [reasoningEffort, setReasoningEffort] = (0, import_react17.useState)("");
-      const [keyVal, setKeyVal] = (0, import_react17.useState)({
+      const [model, setModel] = (0, import_react18.useState)("");
+      const [compareMode, setCompareModeUi] = (0, import_react18.useState)(false);
+      const [compareModelsSel, setCompareModelsSel] = (0, import_react18.useState)([]);
+      const [vectorStoreIds, setVectorStoreIds] = (0, import_react18.useState)([]);
+      const [webSearch, setWebSearch] = (0, import_react18.useState)(false);
+      const [personaId, setPersonaId] = (0, import_react18.useState)("");
+      const [customSystemPrompt, setCustomSystemPrompt] = (0, import_react18.useState)("");
+      const [toneId, setToneId] = (0, import_react18.useState)("");
+      const [focusId, setFocusId] = (0, import_react18.useState)("");
+      const [verbosityId, setVerbosityId] = (0, import_react18.useState)("");
+      const [reasoningEffort, setReasoningEffort] = (0, import_react18.useState)("");
+      const [keyVal, setKeyVal] = (0, import_react18.useState)({
         alias: "",
         token: ""
       });
-      const [showSettings, setShowSettings] = (0, import_react17.useState)(true);
-      const [input, setInput] = (0, import_react17.useState)("");
-      const [configError, setConfigError] = (0, import_react17.useState)(null);
-      const [personas, setPersonas] = (0, import_react17.useState)([]);
-      const [personasLoading, setPersonasLoading] = (0, import_react17.useState)(true);
-      const [personasError, setPersonasError] = (0, import_react17.useState)(null);
-      const [searchQuery, setSearchQuery] = (0, import_react17.useState)("");
-      const [sidebarCollapsed, setSidebarCollapsed] = (0, import_react17.useState)(false);
-      const [rightPanelCollapsed, setRightPanelCollapsed] = (0, import_react17.useState)(false);
-      const [threadMenuAnchor, setThreadMenuAnchor] = (0, import_react17.useState)(null);
-      const [threadMenuTarget, setThreadMenuTarget] = (0, import_react17.useState)(null);
-      const [importError, setImportError] = (0, import_react17.useState)(null);
-      const [urlPreview, setUrlPreview] = (0, import_react17.useState)(null);
-      const [urlPreviewLoading, setUrlPreviewLoading] = (0, import_react17.useState)(false);
-      const [urlPreviewError, setUrlPreviewError] = (0, import_react17.useState)(null);
-      const [dismissedUrl, setDismissedUrl] = (0, import_react17.useState)(null);
-      const [traits, setTraits] = (0, import_react17.useState)({ tones: [], focuses: [], verbosities: [] });
-      const [traitsLoading, setTraitsLoading] = (0, import_react17.useState)(true);
-      const messagesEndRef = (0, import_react17.useRef)(null);
-      const messagesContainerRef = (0, import_react17.useRef)(null);
-      const importInputRef = (0, import_react17.useRef)(null);
-      (0, import_react17.useEffect)(() => {
+      const [showSettings, setShowSettings] = (0, import_react18.useState)(true);
+      const [input, setInput] = (0, import_react18.useState)("");
+      const [configError, setConfigError] = (0, import_react18.useState)(null);
+      const [personas, setPersonas] = (0, import_react18.useState)([]);
+      const [personasLoading, setPersonasLoading] = (0, import_react18.useState)(true);
+      const [personasError, setPersonasError] = (0, import_react18.useState)(null);
+      const [searchQuery, setSearchQuery] = (0, import_react18.useState)("");
+      const [sidebarCollapsed, setSidebarCollapsed] = (0, import_react18.useState)(false);
+      const [rightPanelCollapsed, setRightPanelCollapsed] = (0, import_react18.useState)(false);
+      const [threadMenuAnchor, setThreadMenuAnchor] = (0, import_react18.useState)(null);
+      const [threadMenuTarget, setThreadMenuTarget] = (0, import_react18.useState)(null);
+      const [importError, setImportError] = (0, import_react18.useState)(null);
+      const [urlPreview, setUrlPreview] = (0, import_react18.useState)(null);
+      const [urlPreviewLoading, setUrlPreviewLoading] = (0, import_react18.useState)(false);
+      const [urlPreviewError, setUrlPreviewError] = (0, import_react18.useState)(null);
+      const [dismissedUrl, setDismissedUrl] = (0, import_react18.useState)(null);
+      const [traits, setTraits] = (0, import_react18.useState)({ tones: [], focuses: [], verbosities: [] });
+      const [traitsLoading, setTraitsLoading] = (0, import_react18.useState)(true);
+      const messagesEndRef = (0, import_react18.useRef)(null);
+      const messagesContainerRef = (0, import_react18.useRef)(null);
+      const importInputRef = (0, import_react18.useRef)(null);
+      (0, import_react18.useEffect)(() => {
         injectDesignSystemAssets();
         chatApi.getChatConfig().then(setConfig).catch((err) => setConfigError(err.message ?? "Failed to reach the chat backend"));
         chatApi.listPersonas().then(setPersonas).catch((err) => setPersonasError(err.message ?? "Failed to load personas")).finally(() => setPersonasLoading(false));
@@ -2062,7 +2236,7 @@ var init_ChatPage = __esm({
         persistenceEnabled: config.persistence.enabled
       });
       const activeThreadId = chat.activeThread?.id ?? null;
-      (0, import_react17.useEffect)(() => {
+      (0, import_react18.useEffect)(() => {
         if (!chat.activeThread) return;
         setModel(chat.activeThread.model);
         setVectorStoreIds(chat.activeThread.vectorStoreIds);
@@ -2077,18 +2251,18 @@ var init_ChatPage = __esm({
         setCompareModelsSel(chat.activeThread.compareModels ?? []);
         setWebSearch(!!chat.activeThread.webSearch);
       }, [activeThreadId]);
-      const messages = (0, import_react17.useMemo)(() => chat.activeThread?.messages ?? [], [
+      const messages = (0, import_react18.useMemo)(() => chat.activeThread?.messages ?? [], [
         chat.activeThread
       ]);
       const isStreaming = chat.isStreaming;
-      (0, import_react17.useEffect)(() => {
+      (0, import_react18.useEffect)(() => {
         const container = messagesContainerRef.current;
         const isNearBottom = !container || container.scrollHeight - container.scrollTop - container.clientHeight < 120;
         if (isNearBottom) {
           messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
         }
       }, [messages, isStreaming]);
-      (0, import_react17.useEffect)(() => {
+      (0, import_react18.useEffect)(() => {
         const match = input.match(URL_TOKEN_RE);
         const url = match?.[1];
         if (!url) {
@@ -2111,7 +2285,7 @@ var init_ChatPage = __esm({
         }, URL_PREVIEW_DEBOUNCE_MS);
         return () => clearTimeout(timer);
       }, [input, dismissedUrl]);
-      const visibleThreads = (0, import_react17.useMemo)(
+      const visibleThreads = (0, import_react18.useMemo)(
         () => sortThreads(chat.threads.filter((t) => threadMatchesQuery(t, searchQuery))),
         [chat.threads, searchQuery]
       );
@@ -2175,7 +2349,6 @@ var init_ChatPage = __esm({
           setImportError(err.message ?? "Failed to import thread");
         }
       };
-      const menuTargetThread = chat.threads.find((t) => t.id === threadMenuTarget) ?? null;
       const lastTurnUsage = chat.activeThread?.lastTurnUsage ?? null;
       const totalTokens = chat.activeThread?.totalTokens ?? 0;
       const statusParts = [];
@@ -2196,278 +2369,175 @@ var init_ChatPage = __esm({
       }
       let urlPreviewChip = null;
       if (urlPreviewLoading) {
-        urlPreviewChip = /* @__PURE__ */ import_react17.default.createElement(import_material16.Chip, { size: "small", icon: /* @__PURE__ */ import_react17.default.createElement(import_Link2.default, { fontSize: "small" }), label: "Fetching page\u2026", variant: "outlined" });
+        urlPreviewChip = /* @__PURE__ */ import_react18.default.createElement(import_material17.Chip, { size: "small", icon: /* @__PURE__ */ import_react18.default.createElement(import_Link2.default, { fontSize: "small" }), label: "Fetching page\u2026", variant: "outlined" });
       } else if (urlPreviewError) {
-        urlPreviewChip = /* @__PURE__ */ import_react17.default.createElement(
-          import_material16.Chip,
+        urlPreviewChip = /* @__PURE__ */ import_react18.default.createElement(
+          import_material17.Chip,
           {
             size: "small",
             color: "error",
-            icon: /* @__PURE__ */ import_react17.default.createElement(import_Link2.default, { fontSize: "small" }),
+            icon: /* @__PURE__ */ import_react18.default.createElement(import_Link2.default, { fontSize: "small" }),
             label: urlPreviewError,
             variant: "outlined",
             onDelete: dismissUrlPreview,
-            deleteIcon: /* @__PURE__ */ import_react17.default.createElement(import_Close.default, { fontSize: "small" })
+            deleteIcon: /* @__PURE__ */ import_react18.default.createElement(import_Close.default, { fontSize: "small" })
           }
         );
       } else if (urlPreview) {
-        urlPreviewChip = /* @__PURE__ */ import_react17.default.createElement(import_material16.Tooltip, { title: urlPreview.url }, /* @__PURE__ */ import_react17.default.createElement(
-          import_material16.Chip,
+        urlPreviewChip = /* @__PURE__ */ import_react18.default.createElement(import_material17.Tooltip, { title: urlPreview.url }, /* @__PURE__ */ import_react18.default.createElement(
+          import_material17.Chip,
           {
             size: "small",
-            icon: /* @__PURE__ */ import_react17.default.createElement(import_Link2.default, { fontSize: "small" }),
+            icon: /* @__PURE__ */ import_react18.default.createElement(import_Link2.default, { fontSize: "small" }),
             label: `Page attached: ${urlPreview.title}`,
             variant: "outlined",
             onDelete: dismissUrlPreview,
-            deleteIcon: /* @__PURE__ */ import_react17.default.createElement(import_Close.default, { fontSize: "small" })
+            deleteIcon: /* @__PURE__ */ import_react18.default.createElement(import_Close.default, { fontSize: "small" })
           }
         ));
       }
-      return /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { display: "flex", height: "100dvh", overflow: "hidden" } }, /* @__PURE__ */ import_react17.default.createElement(
-        import_material16.Box,
+      return /* @__PURE__ */ import_react18.default.createElement(import_material17.Box, { sx: { display: "flex", height: "100dvh", overflow: "hidden" } }, /* @__PURE__ */ import_react18.default.createElement(
+        ThreadSidebar,
         {
-          sx: {
-            width: sidebarCollapsed ? SIDEBAR_RAIL_WIDTH : SIDEBAR_WIDTH,
-            flexShrink: 0,
-            borderRight: 1,
-            borderColor: "divider",
-            display: "flex",
-            flexDirection: "column",
-            overflow: "hidden",
-            transition: "width 0.15s"
-          }
-        },
-        /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { display: "flex", alignItems: "center", justifyContent: sidebarCollapsed ? "center" : "flex-end", px: 0.5, py: 0.5 } }, /* @__PURE__ */ import_react17.default.createElement(import_material16.Tooltip, { title: sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar" }, /* @__PURE__ */ import_react17.default.createElement(import_material16.IconButton, { size: "small", onClick: () => setSidebarCollapsed((v) => !v) }, sidebarCollapsed ? /* @__PURE__ */ import_react17.default.createElement(import_ChevronRight.default, { fontSize: "small" }) : /* @__PURE__ */ import_react17.default.createElement(import_ChevronLeft.default, { fontSize: "small" })))),
-        sidebarCollapsed ? /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { display: "flex", flexDirection: "column", alignItems: "center", gap: 1, pt: 1 } }, /* @__PURE__ */ import_react17.default.createElement(import_material16.Tooltip, { title: "New chat", placement: "right" }, /* @__PURE__ */ import_react17.default.createElement(import_material16.IconButton, { onClick: chat.newThread }, /* @__PURE__ */ import_react17.default.createElement(import_Add.default, null))), /* @__PURE__ */ import_react17.default.createElement(import_material16.Tooltip, { title: "Settings", placement: "right" }, /* @__PURE__ */ import_react17.default.createElement(import_material16.IconButton, { onClick: () => setSidebarCollapsed(false) }, /* @__PURE__ */ import_react17.default.createElement(import_Settings.default, null)))) : /* @__PURE__ */ import_react17.default.createElement(import_react17.default.Fragment, null, /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { flexShrink: 0 } }, /* @__PURE__ */ import_react17.default.createElement(
-          import_material16.Box,
-          {
-            sx: {
-              display: "flex",
-              alignItems: "center",
-              cursor: "pointer",
-              px: 1.5,
-              py: 1,
-              bgcolor: "action.hover"
-            },
-            onClick: () => setShowSettings((v) => !v)
-          },
-          /* @__PURE__ */ import_react17.default.createElement(import_Settings.default, { fontSize: "small", sx: { mr: 1 } }),
-          /* @__PURE__ */ import_react17.default.createElement(import_material16.Typography, { variant: "overline", sx: { flex: 1 } }, "Settings"),
-          /* @__PURE__ */ import_react17.default.createElement(
-            import_ExpandMore.default,
+          collapsed: sidebarCollapsed,
+          onToggleCollapsed: () => setSidebarCollapsed((v) => !v),
+          showSettings,
+          onToggleShowSettings: () => setShowSettings((v) => !v),
+          settingsSlot: /* @__PURE__ */ import_react18.default.createElement(import_react18.default.Fragment, null, configError && /* @__PURE__ */ import_react18.default.createElement(import_material17.Typography, { variant: "caption", color: "error" }, "Couldn't load chat defaults: ", configError), /* @__PURE__ */ import_react18.default.createElement(
+            PersonaPicker,
             {
-              fontSize: "small",
-              sx: {
-                transform: showSettings ? "rotate(180deg)" : "none",
-                transition: "transform 0.2s"
-              }
+              value: personaId,
+              personas,
+              loading: personasLoading,
+              error: personasError,
+              onChange: handlePersonaChange
             }
-          )
-        ), /* @__PURE__ */ import_react17.default.createElement(import_material16.Collapse, { in: showSettings }, /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { p: 1.5, display: "flex", flexDirection: "column", gap: 1.5 } }, configError && /* @__PURE__ */ import_react17.default.createElement(import_material16.Typography, { variant: "caption", color: "error" }, "Couldn't load chat defaults: ", configError), /* @__PURE__ */ import_react17.default.createElement(
-          PersonaPicker,
-          {
-            value: personaId,
-            personas,
-            loading: personasLoading,
-            error: personasError,
-            onChange: handlePersonaChange
-          }
-        ), /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { display: "flex", gap: 1.5, flexWrap: "wrap" } }, /* @__PURE__ */ import_react17.default.createElement(
-          OptionPicker,
-          {
-            label: "Tone",
-            value: toneId,
-            options: traits.tones,
-            onChange: setToneId,
-            loading: traitsLoading
-          }
-        ), /* @__PURE__ */ import_react17.default.createElement(
-          OptionPicker,
-          {
-            label: "Focus",
-            value: focusId,
-            options: traits.focuses,
-            onChange: setFocusId,
-            loading: traitsLoading
-          }
-        )), /* @__PURE__ */ import_react17.default.createElement(
-          import_material16.TextField,
-          {
-            label: "Custom system prompt",
-            placeholder: personaId ? "Appended after the persona system prompt\u2026" : "Used as the system prompt (no persona selected)\u2026",
-            value: customSystemPrompt,
-            onChange: (e) => setCustomSystemPrompt(e.target.value),
-            multiline: true,
-            minRows: 2,
-            maxRows: 6,
-            size: "small",
-            fullWidth: true
-          }
-        ), /* @__PURE__ */ import_react17.default.createElement(
-          KeyPicker,
-          {
-            value: keyVal,
-            onChange: setKeyVal,
-            onDelete: () => {
-              if (chat.activeThread?.keyToken) {
-                chatApi.deleteChatKey(chat.activeThread.keyToken).catch(() => {
-                });
-              }
-            }
-          }
-        ), /* @__PURE__ */ import_react17.default.createElement(
-          import_material16.FormControlLabel,
-          {
-            control: /* @__PURE__ */ import_react17.default.createElement(
-              import_material16.Switch,
-              {
-                size: "small",
-                checked: compareMode,
-                onChange: (e) => setCompareModeUi(e.target.checked)
-              }
-            ),
-            label: /* @__PURE__ */ import_react17.default.createElement(import_material16.Typography, { variant: "body2" }, "Compare models side-by-side")
-          }
-        ), compareMode ? /* @__PURE__ */ import_react17.default.createElement(CompareModelPicker, { value: compareModelsSel, onChange: setCompareModelsSel }) : /* @__PURE__ */ import_react17.default.createElement(ModelPicker, { value: model, onChange: setModel, defaultModel: config.defaultModel }), /* @__PURE__ */ import_react17.default.createElement(
-          import_material16.Accordion,
-          {
-            disableGutters: true,
-            variant: "outlined",
-            sx: { "&:before": { display: "none" } }
-          },
-          /* @__PURE__ */ import_react17.default.createElement(import_material16.AccordionSummary, { expandIcon: /* @__PURE__ */ import_react17.default.createElement(import_ExpandMore.default, { fontSize: "small" }) }, /* @__PURE__ */ import_react17.default.createElement(import_material16.Typography, { variant: "body2", sx: { fontWeight: 500 } }, "Advanced")),
-          /* @__PURE__ */ import_react17.default.createElement(import_material16.AccordionDetails, { sx: { display: "flex", flexDirection: "column", gap: 1.5 } }, /* @__PURE__ */ import_react17.default.createElement(
-            VectorStorePicker,
-            {
-              value: vectorStoreIds,
-              onChange: setVectorStoreIds,
-              defaultVectorStoreIds: config.defaultVectorStoreIds
-            }
-          ), /* @__PURE__ */ import_react17.default.createElement(
-            import_material16.FormControlLabel,
-            {
-              control: /* @__PURE__ */ import_react17.default.createElement(
-                import_material16.Switch,
-                {
-                  size: "small",
-                  checked: webSearch,
-                  onChange: (e) => setWebSearch(e.target.checked)
-                }
-              ),
-              label: /* @__PURE__ */ import_react17.default.createElement(import_material16.Typography, { variant: "body2" }, "Include web search")
-            }
-          ), /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { display: "flex", gap: 1.5, flexWrap: "wrap" } }, /* @__PURE__ */ import_react17.default.createElement(
+          ), /* @__PURE__ */ import_react18.default.createElement(import_material17.Box, { sx: { display: "flex", gap: 1.5, flexWrap: "wrap" } }, /* @__PURE__ */ import_react18.default.createElement(
             OptionPicker,
             {
-              label: "Verbosity",
-              value: verbosityId,
-              options: traits.verbosities,
-              onChange: setVerbosityId,
+              label: "Tone",
+              value: toneId,
+              options: traits.tones,
+              onChange: setToneId,
               loading: traitsLoading
             }
-          ), /* @__PURE__ */ import_react17.default.createElement(
+          ), /* @__PURE__ */ import_react18.default.createElement(
             OptionPicker,
             {
-              label: "Reasoning effort",
-              value: reasoningEffort,
-              options: REASONING_EFFORT_OPTIONS,
-              onChange: (id) => setReasoningEffort(id),
-              noneLabel: "Model default"
+              label: "Focus",
+              value: focusId,
+              options: traits.focuses,
+              onChange: setFocusId,
+              loading: traitsLoading
             }
-          )))
-        )))), /* @__PURE__ */ import_react17.default.createElement(import_material16.Divider, null), /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { p: 1.5, display: "flex", gap: 1 } }, /* @__PURE__ */ import_react17.default.createElement(
-          import_material16.Button,
-          {
-            fullWidth: true,
-            variant: "outlined",
-            startIcon: /* @__PURE__ */ import_react17.default.createElement(import_Add.default, null),
-            onClick: chat.newThread,
-            size: "small"
-          },
-          "New chat"
-        ), /* @__PURE__ */ import_react17.default.createElement(import_material16.Tooltip, { title: "Import thread" }, /* @__PURE__ */ import_react17.default.createElement(import_material16.IconButton, { size: "small", onClick: () => importInputRef.current?.click() }, /* @__PURE__ */ import_react17.default.createElement(import_FileUpload.default, { fontSize: "small" }))), /* @__PURE__ */ import_react17.default.createElement(
-          "input",
-          {
-            ref: importInputRef,
-            type: "file",
-            accept: "application/json",
-            hidden: true,
-            onChange: handleImportFile
-          }
-        )), importError && /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { px: 1.5, pb: 1 } }, /* @__PURE__ */ import_react17.default.createElement(import_material16.Typography, { variant: "caption", color: "error" }, importError)), /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { px: 1.5, pb: 1 } }, /* @__PURE__ */ import_react17.default.createElement(import_material16.Tooltip, { title: persistenceTooltip }, /* @__PURE__ */ import_react17.default.createElement(import_material16.Typography, { variant: "caption", color: "text.secondary" }, config.persistence.enabled ? `History saved to your account${config.persistence.ttlDays > 0 ? ` \xB7 ${config.persistence.ttlDays}d retention` : ""}` : "History stored only in this browser"))), /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { px: 1.5, pb: 1 } }, /* @__PURE__ */ import_react17.default.createElement(
-          import_material16.InputBase,
-          {
-            fullWidth: true,
-            placeholder: "Search threads\u2026",
-            value: searchQuery,
-            onChange: (e) => setSearchQuery(e.target.value),
-            startAdornment: /* @__PURE__ */ import_react17.default.createElement(import_Search.default, { fontSize: "small", sx: { mr: 0.75, color: "text.secondary" } }),
-            sx: {
-              border: 1,
-              borderColor: "divider",
-              borderRadius: 2,
-              px: 1,
-              py: 0.5,
-              fontSize: "0.85rem"
-            }
-          }
-        )), /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { flex: 1, overflowY: "auto", minHeight: 0 } }, /* @__PURE__ */ import_react17.default.createElement(import_material16.List, { dense: true }, visibleThreads.map((t) => /* @__PURE__ */ import_react17.default.createElement(
-          import_material16.ListItem,
-          {
-            key: t.id,
-            disablePadding: true,
-            secondaryAction: /* @__PURE__ */ import_react17.default.createElement(import_material16.IconButton, { edge: "end", size: "small", onClick: (e) => openThreadMenu(e, t.id) }, /* @__PURE__ */ import_react17.default.createElement(import_MoreVert.default, { fontSize: "small" }))
-          },
-          /* @__PURE__ */ import_react17.default.createElement(
-            import_material16.ListItemButton,
+          )), /* @__PURE__ */ import_react18.default.createElement(
+            import_material17.TextField,
             {
-              selected: chat.activeThread?.id === t.id,
-              onClick: () => chat.selectThread(t.id),
-              sx: { pr: 6 }
-            },
-            t.pinned && /* @__PURE__ */ import_react17.default.createElement(import_PushPin.default, { fontSize: "small", sx: { mr: 0.75, color: "text.secondary" } }),
-            /* @__PURE__ */ import_react17.default.createElement(
-              import_material16.ListItemText,
-              {
-                primary: t.title,
-                primaryTypographyProps: { noWrap: true, variant: "body2" },
-                secondaryTypographyProps: { noWrap: true, variant: "caption" }
+              label: "Custom system prompt",
+              placeholder: personaId ? "Appended after the persona system prompt\u2026" : "Used as the system prompt (no persona selected)\u2026",
+              value: customSystemPrompt,
+              onChange: (e) => setCustomSystemPrompt(e.target.value),
+              multiline: true,
+              minRows: 2,
+              maxRows: 6,
+              size: "small",
+              fullWidth: true
+            }
+          ), /* @__PURE__ */ import_react18.default.createElement(
+            KeyPicker,
+            {
+              value: keyVal,
+              onChange: setKeyVal,
+              onDelete: () => {
+                if (chat.activeThread?.keyToken) {
+                  chatApi.deleteChatKey(chat.activeThread.keyToken).catch(() => {
+                  });
+                }
               }
-            )
-          )
-        )), visibleThreads.length === 0 && /* @__PURE__ */ import_react17.default.createElement(import_material16.Typography, { variant: "caption", color: "text.secondary", sx: { px: 2, py: 1, display: "block" } }, searchQuery ? "No threads match your search." : "No threads yet."))), /* @__PURE__ */ import_react17.default.createElement(import_material16.Menu, { anchorEl: threadMenuAnchor, open: !!threadMenuAnchor, onClose: closeThreadMenu }, /* @__PURE__ */ import_react17.default.createElement(
-          import_material16.MenuItem,
-          {
-            onClick: () => {
-              if (threadMenuTarget) chat.togglePin(threadMenuTarget);
-              closeThreadMenu();
             }
-          },
-          /* @__PURE__ */ import_react17.default.createElement(import_material16.ListItemIcon, null, menuTargetThread?.pinned ? /* @__PURE__ */ import_react17.default.createElement(import_PushPin.default, { fontSize: "small" }) : /* @__PURE__ */ import_react17.default.createElement(import_PushPinOutlined.default, { fontSize: "small" })),
-          menuTargetThread?.pinned ? "Unpin" : "Pin"
-        ), /* @__PURE__ */ import_react17.default.createElement(
-          import_material16.MenuItem,
-          {
-            onClick: () => {
-              if (threadMenuTarget) chat.exportThread(threadMenuTarget);
-              closeThreadMenu();
+          ), /* @__PURE__ */ import_react18.default.createElement(
+            import_material17.FormControlLabel,
+            {
+              control: /* @__PURE__ */ import_react18.default.createElement(
+                import_material17.Switch,
+                {
+                  size: "small",
+                  checked: compareMode,
+                  onChange: (e) => setCompareModeUi(e.target.checked)
+                }
+              ),
+              label: /* @__PURE__ */ import_react18.default.createElement(import_material17.Typography, { variant: "body2" }, "Compare models side-by-side")
             }
-          },
-          /* @__PURE__ */ import_react17.default.createElement(import_material16.ListItemIcon, null, /* @__PURE__ */ import_react17.default.createElement(import_FileDownload.default, { fontSize: "small" })),
-          "Export"
-        ), /* @__PURE__ */ import_react17.default.createElement(
-          import_material16.MenuItem,
-          {
-            onClick: () => {
-              if (threadMenuTarget) chat.deleteThread(threadMenuTarget);
-              closeThreadMenu();
-            }
-          },
-          /* @__PURE__ */ import_react17.default.createElement(import_material16.ListItemIcon, null, /* @__PURE__ */ import_react17.default.createElement(import_Delete2.default, { fontSize: "small" })),
-          "Delete"
-        )))
-      ), /* @__PURE__ */ import_react17.default.createElement(
-        import_material16.Box,
+          ), compareMode ? /* @__PURE__ */ import_react18.default.createElement(CompareModelPicker, { value: compareModelsSel, onChange: setCompareModelsSel }) : /* @__PURE__ */ import_react18.default.createElement(ModelPicker, { value: model, onChange: setModel, defaultModel: config.defaultModel }), /* @__PURE__ */ import_react18.default.createElement(
+            import_material17.Accordion,
+            {
+              disableGutters: true,
+              variant: "outlined",
+              sx: { "&:before": { display: "none" } }
+            },
+            /* @__PURE__ */ import_react18.default.createElement(import_material17.AccordionSummary, { expandIcon: /* @__PURE__ */ import_react18.default.createElement(import_ExpandMore2.default, { fontSize: "small" }) }, /* @__PURE__ */ import_react18.default.createElement(import_material17.Typography, { variant: "body2", sx: { fontWeight: 500 } }, "Advanced")),
+            /* @__PURE__ */ import_react18.default.createElement(import_material17.AccordionDetails, { sx: { display: "flex", flexDirection: "column", gap: 1.5 } }, /* @__PURE__ */ import_react18.default.createElement(
+              VectorStorePicker,
+              {
+                value: vectorStoreIds,
+                onChange: setVectorStoreIds,
+                defaultVectorStoreIds: config.defaultVectorStoreIds
+              }
+            ), /* @__PURE__ */ import_react18.default.createElement(
+              import_material17.FormControlLabel,
+              {
+                control: /* @__PURE__ */ import_react18.default.createElement(
+                  import_material17.Switch,
+                  {
+                    size: "small",
+                    checked: webSearch,
+                    onChange: (e) => setWebSearch(e.target.checked)
+                  }
+                ),
+                label: /* @__PURE__ */ import_react18.default.createElement(import_material17.Typography, { variant: "body2" }, "Include web search")
+              }
+            ), /* @__PURE__ */ import_react18.default.createElement(import_material17.Box, { sx: { display: "flex", gap: 1.5, flexWrap: "wrap" } }, /* @__PURE__ */ import_react18.default.createElement(
+              OptionPicker,
+              {
+                label: "Verbosity",
+                value: verbosityId,
+                options: traits.verbosities,
+                onChange: setVerbosityId,
+                loading: traitsLoading
+              }
+            ), /* @__PURE__ */ import_react18.default.createElement(
+              OptionPicker,
+              {
+                label: "Reasoning effort",
+                value: reasoningEffort,
+                options: REASONING_EFFORT_OPTIONS,
+                onChange: (id) => setReasoningEffort(id),
+                noneLabel: "Model default"
+              }
+            )))
+          )),
+          onNewThread: chat.newThread,
+          importInputRef,
+          onImportFile: handleImportFile,
+          importError,
+          persistenceTooltip,
+          persistenceText: config.persistence.enabled ? `History saved to your account${config.persistence.ttlDays > 0 ? ` \xB7 ${config.persistence.ttlDays}d retention` : ""}` : "History stored only in this browser",
+          searchQuery,
+          onSearchQueryChange: (v) => setSearchQuery(v),
+          visibleThreads,
+          activeThreadId,
+          onSelectThread: (id) => chat.selectThread(id),
+          threads: chat.threads,
+          menuAnchor: threadMenuAnchor,
+          menuTarget: threadMenuTarget,
+          onOpenMenu: openThreadMenu,
+          onCloseMenu: closeThreadMenu,
+          onTogglePin: (id) => chat.togglePin(id),
+          onExport: (id) => chat.exportThread(id),
+          onDelete: (id) => chat.deleteThread(id)
+        }
+      ), /* @__PURE__ */ import_react18.default.createElement(
+        import_material17.Box,
         {
           sx: {
             flex: 3,
@@ -2476,8 +2546,8 @@ var init_ChatPage = __esm({
             overflow: "hidden"
           }
         },
-        /* @__PURE__ */ import_react17.default.createElement(
-          import_material16.Box,
+        /* @__PURE__ */ import_react18.default.createElement(
+          import_material17.Box,
           {
             sx: {
               width: "100%",
@@ -2487,8 +2557,8 @@ var init_ChatPage = __esm({
               overflow: "hidden"
             }
           },
-          /* @__PURE__ */ import_react17.default.createElement(
-            import_material16.Box,
+          /* @__PURE__ */ import_react18.default.createElement(
+            import_material17.Box,
             {
               sx: {
                 flexShrink: 0,
@@ -2501,13 +2571,13 @@ var init_ChatPage = __esm({
                 gap: 1
               }
             },
-            /* @__PURE__ */ import_react17.default.createElement(import_Chat.default, { fontSize: "small", color: "action" }),
-            /* @__PURE__ */ import_react17.default.createElement(import_material16.Typography, { variant: "subtitle2", noWrap: true, sx: { flex: 1 } }, chat.activeThread?.title ?? "AI Chat"),
-            /* @__PURE__ */ import_react17.default.createElement(import_material16.Tooltip, { title: rightPanelCollapsed ? "Show context panel" : "Hide context panel" }, /* @__PURE__ */ import_react17.default.createElement(import_material16.IconButton, { size: "small", onClick: () => setRightPanelCollapsed((v) => !v) }, rightPanelCollapsed ? /* @__PURE__ */ import_react17.default.createElement(import_ChevronLeft.default, { fontSize: "small" }) : /* @__PURE__ */ import_react17.default.createElement(import_ChevronRight.default, { fontSize: "small" })))
+            /* @__PURE__ */ import_react18.default.createElement(import_Chat.default, { fontSize: "small", color: "action" }),
+            /* @__PURE__ */ import_react18.default.createElement(import_material17.Typography, { variant: "subtitle2", noWrap: true, sx: { flex: 1 } }, chat.activeThread?.title ?? "AI Chat"),
+            /* @__PURE__ */ import_react18.default.createElement(import_material17.Tooltip, { title: rightPanelCollapsed ? "Show context panel" : "Hide context panel" }, /* @__PURE__ */ import_react18.default.createElement(import_material17.IconButton, { size: "small", onClick: () => setRightPanelCollapsed((v) => !v) }, rightPanelCollapsed ? /* @__PURE__ */ import_react18.default.createElement(import_ChevronLeft2.default, { fontSize: "small" }) : /* @__PURE__ */ import_react18.default.createElement(import_ChevronRight2.default, { fontSize: "small" })))
           ),
-          chat.error && /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { px: 2, pt: 1 } }, /* @__PURE__ */ import_react17.default.createElement(ErrorBanner, { error: chat.error, onDismiss: chat.clearError })),
-          /* @__PURE__ */ import_react17.default.createElement(
-            import_material16.Box,
+          chat.error && /* @__PURE__ */ import_react18.default.createElement(import_material17.Box, { sx: { px: 2, pt: 1 } }, /* @__PURE__ */ import_react18.default.createElement(ErrorBanner, { error: chat.error, onDismiss: chat.clearError })),
+          /* @__PURE__ */ import_react18.default.createElement(
+            import_material17.Box,
             {
               ref: messagesContainerRef,
               sx: {
@@ -2516,7 +2586,7 @@ var init_ChatPage = __esm({
                 minHeight: 0
               }
             },
-            messages.length === 0 ? /* @__PURE__ */ import_react17.default.createElement(
+            messages.length === 0 ? /* @__PURE__ */ import_react18.default.createElement(
               PersonaHomepage,
               {
                 personas,
@@ -2525,7 +2595,7 @@ var init_ChatPage = __esm({
                 selectedId: personaId,
                 onSelect: handlePersonaChange
               }
-            ) : /* @__PURE__ */ import_react17.default.createElement(
+            ) : /* @__PURE__ */ import_react18.default.createElement(
               MessageList,
               {
                 messages,
@@ -2535,11 +2605,11 @@ var init_ChatPage = __esm({
                 onEditAndResend: chat.editAndResend
               }
             ),
-            /* @__PURE__ */ import_react17.default.createElement("div", { ref: messagesEndRef })
+            /* @__PURE__ */ import_react18.default.createElement("div", { ref: messagesEndRef })
           ),
-          (urlPreviewLoading || urlPreview || urlPreviewError) && /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { px: 2, pt: 1 } }, urlPreviewChip),
-          /* @__PURE__ */ import_react17.default.createElement(
-            import_material16.Box,
+          (urlPreviewLoading || urlPreview || urlPreviewError) && /* @__PURE__ */ import_react18.default.createElement(import_material17.Box, { sx: { px: 2, pt: 1 } }, urlPreviewChip),
+          /* @__PURE__ */ import_react18.default.createElement(
+            import_material17.Box,
             {
               sx: {
                 flexShrink: 0,
@@ -2552,8 +2622,8 @@ var init_ChatPage = __esm({
                 alignItems: "flex-end"
               }
             },
-            /* @__PURE__ */ import_react17.default.createElement(
-              import_material16.InputBase,
+            /* @__PURE__ */ import_react18.default.createElement(
+              import_material17.InputBase,
               {
                 multiline: true,
                 minRows: 1,
@@ -2574,20 +2644,20 @@ var init_ChatPage = __esm({
                 }
               }
             ),
-            isStreaming ? /* @__PURE__ */ import_react17.default.createElement(import_material16.Tooltip, { title: "Stop" }, /* @__PURE__ */ import_react17.default.createElement(import_material16.IconButton, { color: "error", onClick: chat.stopGeneration }, /* @__PURE__ */ import_react17.default.createElement(import_Stop.default, null))) : /* @__PURE__ */ import_react17.default.createElement(import_material16.Tooltip, { title: "Send" }, /* @__PURE__ */ import_react17.default.createElement(
-              import_material16.IconButton,
+            isStreaming ? /* @__PURE__ */ import_react18.default.createElement(import_material17.Tooltip, { title: "Stop" }, /* @__PURE__ */ import_react18.default.createElement(import_material17.IconButton, { color: "error", onClick: chat.stopGeneration }, /* @__PURE__ */ import_react18.default.createElement(import_Stop.default, null))) : /* @__PURE__ */ import_react18.default.createElement(import_material17.Tooltip, { title: "Send" }, /* @__PURE__ */ import_react18.default.createElement(
+              import_material17.IconButton,
               {
                 color: "primary",
                 onClick: handleSend,
                 disabled: !input.trim() || !keyVal.token || compareMode && compareModelsSel.length === 0
               },
-              /* @__PURE__ */ import_react17.default.createElement(import_Send.default, null)
+              /* @__PURE__ */ import_react18.default.createElement(import_Send.default, null)
             ))
           ),
-          statusParts.length > 0 && /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { px: 2, pb: 1 } }, /* @__PURE__ */ import_react17.default.createElement(import_material16.Typography, { variant: "caption", color: "text.secondary" }, statusParts.join(" \xB7 ")))
+          statusParts.length > 0 && /* @__PURE__ */ import_react18.default.createElement(import_material17.Box, { sx: { px: 2, pb: 1 } }, /* @__PURE__ */ import_react18.default.createElement(import_material17.Typography, { variant: "caption", color: "text.secondary" }, statusParts.join(" \xB7 ")))
         )
-      ), !rightPanelCollapsed && /* @__PURE__ */ import_react17.default.createElement(
-        import_material16.Box,
+      ), !rightPanelCollapsed && /* @__PURE__ */ import_react18.default.createElement(
+        import_material17.Box,
         {
           sx: {
             width: RIGHT_RAIL_WIDTH,
@@ -2599,9 +2669,9 @@ var init_ChatPage = __esm({
             overflowY: "auto"
           }
         },
-        /* @__PURE__ */ import_react17.default.createElement(SourcesPanel, { citations: chat.citations }),
-        /* @__PURE__ */ import_react17.default.createElement(import_material16.Divider, null),
-        /* @__PURE__ */ import_react17.default.createElement(
+        /* @__PURE__ */ import_react18.default.createElement(SourcesPanel, { citations: chat.citations }),
+        /* @__PURE__ */ import_react18.default.createElement(import_material17.Divider, null),
+        /* @__PURE__ */ import_react18.default.createElement(
           UsagePanel,
           {
             lastTurnUsage,
@@ -2615,19 +2685,19 @@ var init_ChatPage = __esm({
 });
 
 // src/components/BarList.tsx
-var import_react18, import_material17, BarList;
+var import_react19, import_material18, BarList;
 var init_BarList = __esm({
   "src/components/BarList.tsx"() {
     "use strict";
-    import_react18 = __toESM(require("react"));
-    import_material17 = require("@mui/material");
+    import_react19 = __toESM(require("react"));
+    import_material18 = require("@mui/material");
     BarList = ({ rows, emptyLabel = "No data yet." }) => {
       if (rows.length === 0) {
-        return /* @__PURE__ */ import_react18.default.createElement(import_material17.Typography, { variant: "body2", color: "text.secondary" }, emptyLabel);
+        return /* @__PURE__ */ import_react19.default.createElement(import_material18.Typography, { variant: "body2", color: "text.secondary" }, emptyLabel);
       }
       const max = Math.max(...rows.map((r) => r.count), 1);
-      return /* @__PURE__ */ import_react18.default.createElement(import_material17.Box, { sx: { display: "flex", flexDirection: "column", gap: 1 } }, rows.map((row) => /* @__PURE__ */ import_react18.default.createElement(import_material17.Box, { key: row.key, sx: { display: "flex", alignItems: "center", gap: 1 } }, /* @__PURE__ */ import_react18.default.createElement(import_material17.Typography, { variant: "body2", sx: { width: 180, flexShrink: 0 }, noWrap: true, title: row.key }, row.key), /* @__PURE__ */ import_react18.default.createElement(import_material17.Box, { sx: { flex: 1, bgcolor: "action.hover", borderRadius: 1, overflow: "hidden", height: 18 } }, /* @__PURE__ */ import_react18.default.createElement(
-        import_material17.Box,
+      return /* @__PURE__ */ import_react19.default.createElement(import_material18.Box, { sx: { display: "flex", flexDirection: "column", gap: 1 } }, rows.map((row) => /* @__PURE__ */ import_react19.default.createElement(import_material18.Box, { key: row.key, sx: { display: "flex", alignItems: "center", gap: 1 } }, /* @__PURE__ */ import_react19.default.createElement(import_material18.Typography, { variant: "body2", sx: { width: 180, flexShrink: 0 }, noWrap: true, title: row.key }, row.key), /* @__PURE__ */ import_react19.default.createElement(import_material18.Box, { sx: { flex: 1, bgcolor: "action.hover", borderRadius: 1, overflow: "hidden", height: 18 } }, /* @__PURE__ */ import_react19.default.createElement(
+        import_material18.Box,
         {
           sx: {
             width: `${row.count / max * 100}%`,
@@ -2636,7 +2706,7 @@ var init_BarList = __esm({
             borderRadius: 1
           }
         }
-      )), /* @__PURE__ */ import_react18.default.createElement(import_material17.Typography, { variant: "body2", sx: { width: 40, textAlign: "right", flexShrink: 0 } }, row.count))));
+      )), /* @__PURE__ */ import_react19.default.createElement(import_material18.Typography, { variant: "body2", sx: { width: 40, textAlign: "right", flexShrink: 0 } }, row.count))));
     };
   }
 });
@@ -2646,12 +2716,12 @@ var AnalyticsPage_exports = {};
 __export(AnalyticsPage_exports, {
   AnalyticsPage: () => AnalyticsPage
 });
-var import_react19, import_material18, import_core_plugin_api8, RANGES, AnalyticsPage;
+var import_react20, import_material19, import_core_plugin_api8, RANGES, AnalyticsPage;
 var init_AnalyticsPage = __esm({
   "src/components/AnalyticsPage.tsx"() {
     "use strict";
-    import_react19 = __toESM(require("react"));
-    import_material18 = require("@mui/material");
+    import_react20 = __toESM(require("react"));
+    import_material19 = require("@mui/material");
     import_core_plugin_api8 = require("@backstage/core-plugin-api");
     init_api();
     init_BarList();
@@ -2663,13 +2733,13 @@ var init_AnalyticsPage = __esm({
     ];
     AnalyticsPage = () => {
       const chatApi = (0, import_core_plugin_api8.useApi)(liteLlmChatApiRef);
-      const [range, setRange] = (0, import_react19.useState)("30d");
-      const [byPersona, setByPersona] = (0, import_react19.useState)([]);
-      const [byModel, setByModel] = (0, import_react19.useState)([]);
-      const [feedback, setFeedback] = (0, import_react19.useState)(null);
-      const [error, setError] = (0, import_react19.useState)(null);
-      const [loading, setLoading] = (0, import_react19.useState)(true);
-      (0, import_react19.useEffect)(() => {
+      const [range, setRange] = (0, import_react20.useState)("30d");
+      const [byPersona, setByPersona] = (0, import_react20.useState)([]);
+      const [byModel, setByModel] = (0, import_react20.useState)([]);
+      const [feedback, setFeedback] = (0, import_react20.useState)(null);
+      const [error, setError] = (0, import_react20.useState)(null);
+      const [loading, setLoading] = (0, import_react20.useState)(true);
+      (0, import_react20.useEffect)(() => {
         let alive = true;
         setLoading(true);
         setError(null);
@@ -2690,7 +2760,7 @@ var init_AnalyticsPage = __esm({
         };
       }, [chatApi, range]);
       const feedbackRows = feedback ? [{ key: "\u{1F44D} up", count: feedback.up }, { key: "\u{1F44E} down", count: feedback.down }] : [];
-      return /* @__PURE__ */ import_react19.default.createElement(import_material18.Box, { sx: { p: 3, maxWidth: 900, mx: "auto" } }, /* @__PURE__ */ import_react19.default.createElement(import_material18.Box, { sx: { display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 } }, /* @__PURE__ */ import_react19.default.createElement(import_material18.Typography, { variant: "h5" }, "AI Chat analytics"), /* @__PURE__ */ import_react19.default.createElement(import_material18.Select, { size: "small", value: range, onChange: (e) => setRange(e.target.value) }, RANGES.map((r) => /* @__PURE__ */ import_react19.default.createElement(import_material18.MenuItem, { key: r.value, value: r.value }, r.label)))), error && /* @__PURE__ */ import_react19.default.createElement(import_material18.Alert, { severity: "error", sx: { mb: 2 } }, error), /* @__PURE__ */ import_react19.default.createElement(import_material18.Box, { sx: { display: "flex", flexDirection: "column", gap: 2 } }, /* @__PURE__ */ import_react19.default.createElement(import_material18.Paper, { variant: "outlined", sx: { p: 2 } }, /* @__PURE__ */ import_react19.default.createElement(import_material18.Typography, { variant: "subtitle1", sx: { mb: 1.5 } }, "Turns by persona"), /* @__PURE__ */ import_react19.default.createElement(BarList, { rows: byPersona, emptyLabel: loading ? "Loading\u2026" : "No chat turns in this range." })), /* @__PURE__ */ import_react19.default.createElement(import_material18.Paper, { variant: "outlined", sx: { p: 2 } }, /* @__PURE__ */ import_react19.default.createElement(import_material18.Typography, { variant: "subtitle1", sx: { mb: 1.5 } }, "Turns by model"), /* @__PURE__ */ import_react19.default.createElement(BarList, { rows: byModel, emptyLabel: loading ? "Loading\u2026" : "No chat turns in this range." })), /* @__PURE__ */ import_react19.default.createElement(import_material18.Paper, { variant: "outlined", sx: { p: 2 } }, /* @__PURE__ */ import_react19.default.createElement(import_material18.Typography, { variant: "subtitle1", sx: { mb: 1.5 } }, "Feedback (all time)"), /* @__PURE__ */ import_react19.default.createElement(BarList, { rows: feedbackRows, emptyLabel: loading ? "Loading\u2026" : "No feedback recorded yet." }))));
+      return /* @__PURE__ */ import_react20.default.createElement(import_material19.Box, { sx: { p: 3, maxWidth: 900, mx: "auto" } }, /* @__PURE__ */ import_react20.default.createElement(import_material19.Box, { sx: { display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 } }, /* @__PURE__ */ import_react20.default.createElement(import_material19.Typography, { variant: "h5" }, "AI Chat analytics"), /* @__PURE__ */ import_react20.default.createElement(import_material19.Select, { size: "small", value: range, onChange: (e) => setRange(e.target.value) }, RANGES.map((r) => /* @__PURE__ */ import_react20.default.createElement(import_material19.MenuItem, { key: r.value, value: r.value }, r.label)))), error && /* @__PURE__ */ import_react20.default.createElement(import_material19.Alert, { severity: "error", sx: { mb: 2 } }, error), /* @__PURE__ */ import_react20.default.createElement(import_material19.Box, { sx: { display: "flex", flexDirection: "column", gap: 2 } }, /* @__PURE__ */ import_react20.default.createElement(import_material19.Paper, { variant: "outlined", sx: { p: 2 } }, /* @__PURE__ */ import_react20.default.createElement(import_material19.Typography, { variant: "subtitle1", sx: { mb: 1.5 } }, "Turns by persona"), /* @__PURE__ */ import_react20.default.createElement(BarList, { rows: byPersona, emptyLabel: loading ? "Loading\u2026" : "No chat turns in this range." })), /* @__PURE__ */ import_react20.default.createElement(import_material19.Paper, { variant: "outlined", sx: { p: 2 } }, /* @__PURE__ */ import_react20.default.createElement(import_material19.Typography, { variant: "subtitle1", sx: { mb: 1.5 } }, "Turns by model"), /* @__PURE__ */ import_react20.default.createElement(BarList, { rows: byModel, emptyLabel: loading ? "Loading\u2026" : "No chat turns in this range." })), /* @__PURE__ */ import_react20.default.createElement(import_material19.Paper, { variant: "outlined", sx: { p: 2 } }, /* @__PURE__ */ import_react20.default.createElement(import_material19.Typography, { variant: "subtitle1", sx: { mb: 1.5 } }, "Feedback (all time)"), /* @__PURE__ */ import_react20.default.createElement(BarList, { rows: feedbackRows, emptyLabel: loading ? "Loading\u2026" : "No feedback recorded yet." }))));
     };
   }
 });
@@ -2707,7 +2777,7 @@ __export(index_exports, {
 module.exports = __toCommonJS(index_exports);
 
 // src/plugin.tsx
-var import_react20 = __toESM(require("react"));
+var import_react21 = __toESM(require("react"));
 var import_icons_material = require("@mui/icons-material");
 var import_frontend_plugin_api = require("@backstage/frontend-plugin-api");
 init_api();
@@ -2722,10 +2792,10 @@ var chatPage = import_frontend_plugin_api.PageBlueprint.make({
   params: {
     path: "/ai-chat",
     title: "AI Chat",
-    icon: /* @__PURE__ */ import_react20.default.createElement(import_icons_material.Chat, null),
+    icon: /* @__PURE__ */ import_react21.default.createElement(import_icons_material.Chat, null),
     loader: async () => {
       const { ChatPage: ChatPage2 } = await Promise.resolve().then(() => (init_ChatPage(), ChatPage_exports));
-      return /* @__PURE__ */ import_react20.default.createElement(ChatPage2, null);
+      return /* @__PURE__ */ import_react21.default.createElement(ChatPage2, null);
     }
   }
 });
@@ -2734,10 +2804,10 @@ var analyticsPage = import_frontend_plugin_api.PageBlueprint.make({
   params: {
     path: "/ai-chat/analytics",
     title: "AI Chat Analytics",
-    icon: /* @__PURE__ */ import_react20.default.createElement(import_icons_material.BarChart, null),
+    icon: /* @__PURE__ */ import_react21.default.createElement(import_icons_material.BarChart, null),
     loader: async () => {
       const { AnalyticsPage: AnalyticsPage2 } = await Promise.resolve().then(() => (init_AnalyticsPage(), AnalyticsPage_exports));
-      return /* @__PURE__ */ import_react20.default.createElement(AnalyticsPage2, null);
+      return /* @__PURE__ */ import_react21.default.createElement(AnalyticsPage2, null);
     }
   }
 });
