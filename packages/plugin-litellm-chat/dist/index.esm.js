@@ -882,6 +882,7 @@ function useChat(opts) {
     },
     [activeThread, api]
   );
+  const clearError = useCallback(() => setError(null), []);
   return {
     threads,
     activeThread,
@@ -900,6 +901,7 @@ function useChat(opts) {
     isStreaming,
     streamingMessageIds: streamingIds,
     error,
+    clearError,
     citations,
     keySpend
   };
@@ -2481,8 +2483,7 @@ var init_ChatPage = __esm({
             /* @__PURE__ */ React16.createElement(Typography10, { variant: "subtitle2", noWrap: true, sx: { flex: 1 } }, chat.activeThread?.title ?? "AI Chat"),
             /* @__PURE__ */ React16.createElement(Tooltip5, { title: rightPanelCollapsed ? "Show context panel" : "Hide context panel" }, /* @__PURE__ */ React16.createElement(IconButton5, { size: "small", onClick: () => setRightPanelCollapsed((v) => !v) }, rightPanelCollapsed ? /* @__PURE__ */ React16.createElement(ChevronLeftIcon, { fontSize: "small" }) : /* @__PURE__ */ React16.createElement(ChevronRightIcon, { fontSize: "small" })))
           ),
-          chat.error && /* @__PURE__ */ React16.createElement(Box12, { sx: { px: 2, pt: 1 } }, /* @__PURE__ */ React16.createElement(ErrorBanner, { error: chat.error, onDismiss: () => {
-          } })),
+          chat.error && /* @__PURE__ */ React16.createElement(Box12, { sx: { px: 2, pt: 1 } }, /* @__PURE__ */ React16.createElement(ErrorBanner, { error: chat.error, onDismiss: chat.clearError })),
           /* @__PURE__ */ React16.createElement(
             Box12,
             {

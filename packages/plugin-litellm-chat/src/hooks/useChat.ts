@@ -92,6 +92,7 @@ export interface UseChatResult {
    * mode several are streaming at once, one per model column. */
   streamingMessageIds: Set<string>;
   error: string | null;
+  clearError: () => void;
   citations: Citation[];
   keySpend: KeySpend | null;
 }
@@ -779,6 +780,8 @@ export function useChat(opts: UseChatOptions): UseChatResult {
     [activeThread, api],
   );
 
+  const clearError = useCallback(() => setError(null), []);
+
   return {
     threads,
     activeThread,
@@ -797,6 +800,7 @@ export function useChat(opts: UseChatOptions): UseChatResult {
     isStreaming,
     streamingMessageIds: streamingIds,
     error,
+    clearError,
     citations,
     keySpend,
   };

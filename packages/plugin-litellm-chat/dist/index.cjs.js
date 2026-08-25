@@ -902,6 +902,7 @@ function useChat(opts) {
     },
     [activeThread, api]
   );
+  const clearError = (0, import_react.useCallback)(() => setError(null), []);
   return {
     threads,
     activeThread,
@@ -920,6 +921,7 @@ function useChat(opts) {
     isStreaming,
     streamingMessageIds: streamingIds,
     error,
+    clearError,
     citations,
     keySpend
   };
@@ -2480,8 +2482,7 @@ var init_ChatPage = __esm({
             /* @__PURE__ */ import_react17.default.createElement(import_material16.Typography, { variant: "subtitle2", noWrap: true, sx: { flex: 1 } }, chat.activeThread?.title ?? "AI Chat"),
             /* @__PURE__ */ import_react17.default.createElement(import_material16.Tooltip, { title: rightPanelCollapsed ? "Show context panel" : "Hide context panel" }, /* @__PURE__ */ import_react17.default.createElement(import_material16.IconButton, { size: "small", onClick: () => setRightPanelCollapsed((v) => !v) }, rightPanelCollapsed ? /* @__PURE__ */ import_react17.default.createElement(import_ChevronLeft.default, { fontSize: "small" }) : /* @__PURE__ */ import_react17.default.createElement(import_ChevronRight.default, { fontSize: "small" })))
           ),
-          chat.error && /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { px: 2, pt: 1 } }, /* @__PURE__ */ import_react17.default.createElement(ErrorBanner, { error: chat.error, onDismiss: () => {
-          } })),
+          chat.error && /* @__PURE__ */ import_react17.default.createElement(import_material16.Box, { sx: { px: 2, pt: 1 } }, /* @__PURE__ */ import_react17.default.createElement(ErrorBanner, { error: chat.error, onDismiss: chat.clearError })),
           /* @__PURE__ */ import_react17.default.createElement(
             import_material16.Box,
             {

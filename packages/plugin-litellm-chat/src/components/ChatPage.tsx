@@ -745,7 +745,7 @@ export const ChatPage: React.FC = () => {
           {/* Error banner */}
           {chat.error && (
             <Box sx={{ px: 2, pt: 1 }}>
-              <ErrorBanner error={chat.error} onDismiss={() => {}} />
+              <ErrorBanner error={chat.error} onDismiss={chat.clearError} />
             </Box>
           )}
 

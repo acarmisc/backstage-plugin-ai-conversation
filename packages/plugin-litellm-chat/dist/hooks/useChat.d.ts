@@ -43,6 +43,7 @@ export interface UseChatResult {
      * mode several are streaming at once, one per model column. */
     streamingMessageIds: Set<string>;
     error: string | null;
+    clearError: () => void;
     citations: Citation[];
     keySpend: KeySpend | null;
 }
