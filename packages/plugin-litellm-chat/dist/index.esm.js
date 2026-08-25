@@ -1871,7 +1871,7 @@ var init_KeyPicker = __esm({
 
 // src/components/OptionPicker.tsx
 import React13 from "react";
-import { Select as Select2, MenuItem as MenuItem3, FormControl as FormControl2, InputLabel as InputLabel2 } from "@mui/material";
+import { Select as Select2, MenuItem as MenuItem3, FormControl as FormControl2, InputLabel as InputLabel2, Tooltip as Tooltip6 } from "@mui/material";
 var OptionPicker;
 var init_OptionPicker = __esm({
   "src/components/OptionPicker.tsx"() {
@@ -1882,9 +1882,10 @@ var init_OptionPicker = __esm({
       options,
       onChange,
       loading,
-      noneLabel = "Default"
+      noneLabel = "Default",
+      description
     }) => {
-      return /* @__PURE__ */ React13.createElement(FormControl2, { size: "small", sx: { minWidth: 160 } }, /* @__PURE__ */ React13.createElement(InputLabel2, { shrink: true }, label), /* @__PURE__ */ React13.createElement(
+      const control = /* @__PURE__ */ React13.createElement(FormControl2, { size: "small", sx: { minWidth: 160 } }, /* @__PURE__ */ React13.createElement(InputLabel2, { shrink: true }, label), /* @__PURE__ */ React13.createElement(
         Select2,
         {
           value,
@@ -1896,6 +1897,10 @@ var init_OptionPicker = __esm({
         /* @__PURE__ */ React13.createElement(MenuItem3, { value: "" }, /* @__PURE__ */ React13.createElement("em", null, noneLabel)),
         options.map((o) => /* @__PURE__ */ React13.createElement(MenuItem3, { key: o.id, value: o.id }, o.label))
       ));
+      if (description) {
+        return /* @__PURE__ */ React13.createElement(Tooltip6, { title: description }, control);
+      }
+      return control;
     };
   }
 });
@@ -2180,7 +2185,8 @@ var init_SettingsPanel = __esm({
           value: toneId,
           options: traits.tones,
           onChange: onToneChange,
-          loading: traitsLoading
+          loading: traitsLoading,
+          description: "How formal or casual the assistant's replies sound"
         }
       ), /* @__PURE__ */ React17.createElement(
         OptionPicker,
@@ -2189,7 +2195,8 @@ var init_SettingsPanel = __esm({
           value: focusId,
           options: traits.focuses,
           onChange: onFocusChange,
-          loading: traitsLoading
+          loading: traitsLoading,
+          description: "What the assistant should prioritize or emphasize in answers"
         }
       )), /* @__PURE__ */ React17.createElement(
         TextField4,
@@ -2259,7 +2266,8 @@ var init_SettingsPanel = __esm({
             value: verbosityId,
             options: traits.verbosities,
             onChange: onVerbosityChange,
-            loading: traitsLoading
+            loading: traitsLoading,
+            description: "How long and detailed the assistant's replies are"
           }
         ), /* @__PURE__ */ React17.createElement(
           OptionPicker,
@@ -2282,7 +2290,7 @@ import {
   Box as Box14,
   IconButton as IconButton6,
   Typography as Typography12,
-  Tooltip as Tooltip6,
+  Tooltip as Tooltip7,
   InputBase as InputBase2,
   Chip as Chip6
 } from "@mui/material";
@@ -2354,7 +2362,7 @@ var init_ChatComposer = __esm({
             }
           }
         ),
-        isStreaming ? /* @__PURE__ */ React18.createElement(Tooltip6, { title: "Stop" }, /* @__PURE__ */ React18.createElement(IconButton6, { color: "error", onClick: onStop }, /* @__PURE__ */ React18.createElement(StopIcon, null))) : /* @__PURE__ */ React18.createElement(Tooltip6, { title: sendTooltipLabel }, /* @__PURE__ */ React18.createElement(
+        isStreaming ? /* @__PURE__ */ React18.createElement(Tooltip7, { title: "Stop" }, /* @__PURE__ */ React18.createElement(IconButton6, { color: "error", onClick: onStop }, /* @__PURE__ */ React18.createElement(StopIcon, null))) : /* @__PURE__ */ React18.createElement(Tooltip7, { title: sendTooltipLabel }, /* @__PURE__ */ React18.createElement(
           IconButton6,
           {
             color: "primary",
@@ -2379,7 +2387,7 @@ import {
   IconButton as IconButton7,
   Divider as Divider3,
   Typography as Typography13,
-  Tooltip as Tooltip7,
+  Tooltip as Tooltip8,
   Chip as Chip7
 } from "@mui/material";
 import ChatIcon from "@mui/icons-material/Chat";
@@ -2639,7 +2647,7 @@ var init_ChatPage = __esm({
           }
         );
       } else if (urlPreview) {
-        urlPreviewChip = /* @__PURE__ */ React19.createElement(Tooltip7, { title: urlPreview.url }, /* @__PURE__ */ React19.createElement(
+        urlPreviewChip = /* @__PURE__ */ React19.createElement(Tooltip8, { title: urlPreview.url }, /* @__PURE__ */ React19.createElement(
           Chip7,
           {
             size: "small",
@@ -2757,7 +2765,7 @@ var init_ChatPage = __esm({
             },
             /* @__PURE__ */ React19.createElement(ChatIcon, { fontSize: "small", color: "action" }),
             /* @__PURE__ */ React19.createElement(Typography13, { variant: "subtitle2", noWrap: true, sx: { flex: 1 } }, chat.activeThread?.title ?? "AI Chat"),
-            /* @__PURE__ */ React19.createElement(Tooltip7, { title: rightPanelCollapsed ? "Show context panel" : "Hide context panel" }, /* @__PURE__ */ React19.createElement(IconButton7, { size: "small", onClick: () => setRightPanelCollapsed((v) => !v) }, rightPanelCollapsed ? /* @__PURE__ */ React19.createElement(ChevronLeftIcon2, { fontSize: "small" }) : /* @__PURE__ */ React19.createElement(ChevronRightIcon2, { fontSize: "small" })))
+            /* @__PURE__ */ React19.createElement(Tooltip8, { title: rightPanelCollapsed ? "Show context panel" : "Hide context panel" }, /* @__PURE__ */ React19.createElement(IconButton7, { size: "small", onClick: () => setRightPanelCollapsed((v) => !v) }, rightPanelCollapsed ? /* @__PURE__ */ React19.createElement(ChevronLeftIcon2, { fontSize: "small" }) : /* @__PURE__ */ React19.createElement(ChevronRightIcon2, { fontSize: "small" })))
           ),
           chat.error && /* @__PURE__ */ React19.createElement(Box15, { sx: { px: 2, pt: 1 } }, /* @__PURE__ */ React19.createElement(ErrorBanner, { error: chat.error, onDismiss: chat.clearError })),
           /* @__PURE__ */ React19.createElement(

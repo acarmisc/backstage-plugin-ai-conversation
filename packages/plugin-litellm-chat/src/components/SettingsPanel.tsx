@@ -114,6 +114,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
           options={traits.tones}
           onChange={onToneChange}
           loading={traitsLoading}
+          description="How formal or casual the assistant's replies sound"
         />
         <OptionPicker
           label="Focus"
@@ -121,6 +122,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
           options={traits.focuses}
           onChange={onFocusChange}
           loading={traitsLoading}
+          description="What the assistant should prioritize or emphasize in answers"
         />
       </Box>
       <TextField
@@ -193,6 +195,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               options={traits.verbosities}
               onChange={onVerbosityChange}
               loading={traitsLoading}
+              description="How long and detailed the assistant's replies are"
             />
             <OptionPicker
               label="Reasoning effort"

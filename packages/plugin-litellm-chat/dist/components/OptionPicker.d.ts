@@ -11,6 +11,8 @@ export interface OptionPickerProps {
     loading?: boolean;
     /** Label for the empty/unset choice. Defaults to "Default". */
     noneLabel?: string;
+    /** Optional description shown in a tooltip on hover. */
+    description?: string;
 }
 /**
  * Generic small Select for a single trait pick (tone/focus/verbosity/

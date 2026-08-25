@@ -1,5 +1,5 @@
 import React from 'react';
-import { Select, MenuItem, FormControl, InputLabel } from '@mui/material';
+import { Select, MenuItem, FormControl, InputLabel, Tooltip } from '@mui/material';
 
 export interface OptionPickerOption {
   id: string;
@@ -14,6 +14,8 @@ export interface OptionPickerProps {
   loading?: boolean;
   /** Label for the empty/unset choice. Defaults to "Default". */
   noneLabel?: string;
+  /** Optional description shown in a tooltip on hover. */
+  description?: string;
 }
 
 /**
@@ -29,8 +31,9 @@ export const OptionPicker: React.FC<OptionPickerProps> = ({
   onChange,
   loading,
   noneLabel = 'Default',
+  description,
 }) => {
-  return (
+  const control = (
     <FormControl size="small" sx={{ minWidth: 160 }}>
       <InputLabel shrink>{label}</InputLabel>
       <Select
@@ -51,4 +54,10 @@ export const OptionPicker: React.FC<OptionPickerProps> = ({
       </Select>
     </FormControl>
   );
+
+  if (description) {
+    return <Tooltip title={description}>{control}</Tooltip>;
+  }
+
+  return control;
 };

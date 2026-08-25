@@ -1888,9 +1888,10 @@ var init_OptionPicker = __esm({
       options,
       onChange,
       loading,
-      noneLabel = "Default"
+      noneLabel = "Default",
+      description
     }) => {
-      return /* @__PURE__ */ import_react14.default.createElement(import_material13.FormControl, { size: "small", sx: { minWidth: 160 } }, /* @__PURE__ */ import_react14.default.createElement(import_material13.InputLabel, { shrink: true }, label), /* @__PURE__ */ import_react14.default.createElement(
+      const control = /* @__PURE__ */ import_react14.default.createElement(import_material13.FormControl, { size: "small", sx: { minWidth: 160 } }, /* @__PURE__ */ import_react14.default.createElement(import_material13.InputLabel, { shrink: true }, label), /* @__PURE__ */ import_react14.default.createElement(
         import_material13.Select,
         {
           value,
@@ -1902,6 +1903,10 @@ var init_OptionPicker = __esm({
         /* @__PURE__ */ import_react14.default.createElement(import_material13.MenuItem, { value: "" }, /* @__PURE__ */ import_react14.default.createElement("em", null, noneLabel)),
         options.map((o) => /* @__PURE__ */ import_react14.default.createElement(import_material13.MenuItem, { key: o.id, value: o.id }, o.label))
       ));
+      if (description) {
+        return /* @__PURE__ */ import_react14.default.createElement(import_material13.Tooltip, { title: description }, control);
+      }
+      return control;
     };
   }
 });
@@ -2177,7 +2182,8 @@ var init_SettingsPanel = __esm({
           value: toneId,
           options: traits.tones,
           onChange: onToneChange,
-          loading: traitsLoading
+          loading: traitsLoading,
+          description: "How formal or casual the assistant's replies sound"
         }
       ), /* @__PURE__ */ import_react18.default.createElement(
         OptionPicker,
@@ -2186,7 +2192,8 @@ var init_SettingsPanel = __esm({
           value: focusId,
           options: traits.focuses,
           onChange: onFocusChange,
-          loading: traitsLoading
+          loading: traitsLoading,
+          description: "What the assistant should prioritize or emphasize in answers"
         }
       )), /* @__PURE__ */ import_react18.default.createElement(
         import_material17.TextField,
@@ -2256,7 +2263,8 @@ var init_SettingsPanel = __esm({
             value: verbosityId,
             options: traits.verbosities,
             onChange: onVerbosityChange,
-            loading: traitsLoading
+            loading: traitsLoading,
+            description: "How long and detailed the assistant's replies are"
           }
         ), /* @__PURE__ */ import_react18.default.createElement(
           OptionPicker,
