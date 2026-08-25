@@ -86,7 +86,6 @@ export interface UseChatResult {
   togglePin: (id: string) => void;
   exportThread: (id: string) => void;
   importThread: (file: File) => Promise<void>;
-  setCompareMode: (enabled: boolean, models?: string[]) => void;
   isStreaming: boolean;
   /** IDs of assistant messages currently receiving tokens — in compare
    * mode several are streaming at once, one per model column. */
@@ -555,6 +554,7 @@ export function useChat(opts: UseChatOptions): UseChatResult {
                 ...t,
                 messages: updatedMessages,
                 title: t.messages.length === 0 ? text.slice(0, 40) : t.title,
+                model,
                 vectorStoreIds,
                 personaId,
                 customSystemPrompt,
@@ -585,6 +585,7 @@ export function useChat(opts: UseChatOptions): UseChatResult {
       activeThread,
       api,
       keyToken,
+      model,
       vectorStoreIds,
       personaId,
       customSystemPrompt,
@@ -658,25 +659,6 @@ export function useChat(opts: UseChatOptions): UseChatResult {
       }
     },
     [activeThread, runSend, runCompareSend],
-  );
-
-  const setCompareMode = useCallback(
-    (enabled: boolean, models?: string[]) => {
-      if (!activeThread) return;
-      const threadId = activeThread.id;
-      setThreads(prev =>
-        prev.map(t =>
-          t.id === threadId
-            ? {
-                ...t,
-                mode: enabled ? 'compare' : 'single',
-                compareModels: enabled ? models ?? t.compareModels ?? [] : t.compareModels,
-              }
-            : t,
-        ),
-      );
-    },
-    [activeThread],
   );
 
   const togglePin = useCallback(
@@ -817,7 +799,6 @@ export function useChat(opts: UseChatOptions): UseChatResult {
     togglePin,
     exportThread,
     importThread,
-    setCompareMode,
     isStreaming,
     streamingMessageIds: streamingIds,
     error,

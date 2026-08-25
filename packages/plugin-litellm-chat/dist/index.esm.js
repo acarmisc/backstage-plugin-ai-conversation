@@ -708,6 +708,7 @@ function useChat(opts) {
             ...t,
             messages: updatedMessages,
             title: t.messages.length === 0 ? text.slice(0, 40) : t.title,
+            model,
             vectorStoreIds,
             personaId,
             customSystemPrompt,
@@ -737,6 +738,7 @@ function useChat(opts) {
       activeThread,
       api,
       keyToken,
+      model,
       vectorStoreIds,
       personaId,
       customSystemPrompt,
@@ -789,22 +791,6 @@ function useChat(opts) {
       }
     },
     [activeThread, runSend, runCompareSend]
-  );
-  const setCompareMode = useCallback(
-    (enabled, models) => {
-      if (!activeThread) return;
-      const threadId = activeThread.id;
-      setThreads(
-        (prev) => prev.map(
-          (t) => t.id === threadId ? {
-            ...t,
-            mode: enabled ? "compare" : "single",
-            compareModels: enabled ? models ?? t.compareModels ?? [] : t.compareModels
-          } : t
-        )
-      );
-    },
-    [activeThread]
   );
   const togglePin = useCallback(
     (id) => {
@@ -916,7 +902,6 @@ function useChat(opts) {
     togglePin,
     exportThread,
     importThread,
-    setCompareMode,
     isStreaming,
     streamingMessageIds: streamingIds,
     error,

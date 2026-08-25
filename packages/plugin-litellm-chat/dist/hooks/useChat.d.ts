@@ -37,7 +37,6 @@ export interface UseChatResult {
     togglePin: (id: string) => void;
     exportThread: (id: string) => void;
     importThread: (file: File) => Promise<void>;
-    setCompareMode: (enabled: boolean, models?: string[]) => void;
     isStreaming: boolean;
     /** IDs of assistant messages currently receiving tokens — in compare
      * mode several are streaming at once, one per model column. */
