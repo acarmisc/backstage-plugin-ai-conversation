@@ -6,15 +6,8 @@ import {
   Typography,
   Tooltip,
   InputBase,
-  TextField,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
   Chip,
-  Switch,
-  FormControlLabel,
 } from '@mui/material';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ChatIcon from '@mui/icons-material/Chat';
 import SendIcon from '@mui/icons-material/Send';
 import StopIcon from '@mui/icons-material/Stop';
@@ -26,33 +19,19 @@ import { useApi, identityApiRef } from '@backstage/core-plugin-api';
 import { liteLlmChatApiRef } from '../api';
 import { useChat } from '../hooks/useChat';
 import { injectDesignSystemAssets } from '../theme';
-import { ModelPicker } from './ModelPicker';
-import { CompareModelPicker } from './CompareModelPicker';
-import { VectorStorePicker } from './VectorStorePicker';
-import { PersonaPicker } from './PersonaPicker';
 import { PersonaHomepage } from './PersonaHomepage';
-import { KeyPicker } from './KeyPicker';
-import { OptionPicker } from './OptionPicker';
 import { MessageList } from './MessageList';
 import { ErrorBanner } from './ErrorBanner';
 import { SourcesPanel } from './SourcesPanel';
 import { UsagePanel } from './UsagePanel';
 import { ThreadSidebar } from './ThreadSidebar';
+import { SettingsPanel } from './SettingsPanel';
 import type { ChatConfig, ChatTraits, Persona, ReasoningEffort, Thread, UrlContextPreview } from '../types';
 
 const RIGHT_RAIL_WIDTH = 300;
 const CHAT_MAX_WIDTH = 900;
 const URL_TOKEN_RE = /#(https:\/\/\S+)/;
 const URL_PREVIEW_DEBOUNCE_MS = 500;
-
-// Fixed, provider-agnostic enum — no prompt text attached (see
-// ReasoningEffort in types.ts), so unlike tone/focus/verbosity it doesn't
-// need a backend round-trip.
-const REASONING_EFFORT_OPTIONS: { id: ReasoningEffort; label: string }[] = [
-  { id: 'low', label: 'Low' },
-  { id: 'medium', label: 'Medium' },
-  { id: 'high', label: 'High' },
-];
 
 function threadMatchesQuery(thread: Thread, query: string): boolean {
   const q = query.trim().toLowerCase();
@@ -370,121 +349,44 @@ export const ChatPage: React.FC = () => {
         showSettings={showSettings}
         onToggleShowSettings={() => setShowSettings(v => !v)}
         settingsSlot={
-          <>
-            {configError && (
-              <Typography variant="caption" color="error">
-                Couldn't load chat defaults: {configError}
-              </Typography>
-            )}
-            <PersonaPicker
-              value={personaId}
-              personas={personas}
-              loading={personasLoading}
-              error={personasError}
-              onChange={handlePersonaChange}
-            />
-            <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-              <OptionPicker
-                label="Tone"
-                value={toneId}
-                options={traits.tones}
-                onChange={setToneId}
-                loading={traitsLoading}
-              />
-              <OptionPicker
-                label="Focus"
-                value={focusId}
-                options={traits.focuses}
-                onChange={setFocusId}
-                loading={traitsLoading}
-              />
-            </Box>
-            <TextField
-              label="Custom system prompt"
-              placeholder={
-                personaId
-                  ? 'Appended after the persona system prompt…'
-                  : 'Used as the system prompt (no persona selected)…'
+          <SettingsPanel
+            configError={configError}
+            personaId={personaId}
+            personas={personas}
+            personasLoading={personasLoading}
+            personasError={personasError}
+            onPersonaChange={handlePersonaChange}
+            toneId={toneId}
+            onToneChange={setToneId}
+            traits={traits}
+            traitsLoading={traitsLoading}
+            focusId={focusId}
+            onFocusChange={setFocusId}
+            customSystemPrompt={customSystemPrompt}
+            onCustomSystemPromptChange={setCustomSystemPrompt}
+            keyVal={keyVal}
+            onKeyChange={setKeyVal}
+            onDeleteKey={() => {
+              if (chat.activeThread?.keyToken) {
+                chatApi.deleteChatKey(chat.activeThread.keyToken).catch(() => {});
               }
-              value={customSystemPrompt}
-              onChange={e => setCustomSystemPrompt(e.target.value)}
-              multiline
-              minRows={2}
-              maxRows={6}
-              size="small"
-              fullWidth
-            />
-            <KeyPicker
-              value={keyVal}
-              onChange={setKeyVal}
-              onDelete={() => {
-                if (chat.activeThread?.keyToken) {
-                  chatApi.deleteChatKey(chat.activeThread.keyToken).catch(() => {});
-                }
-              }}
-            />
-            <FormControlLabel
-              control={
-                <Switch
-                  size="small"
-                  checked={compareMode}
-                  onChange={e => setCompareModeUi(e.target.checked)}
-                />
-              }
-              label={
-                <Typography variant="body2">Compare models side-by-side</Typography>
-              }
-            />
-            {compareMode ? (
-              <CompareModelPicker value={compareModelsSel} onChange={setCompareModelsSel} />
-            ) : (
-              <ModelPicker value={model} onChange={setModel} defaultModel={config.defaultModel} />
-            )}
-            <Accordion
-              disableGutters
-              variant="outlined"
-              sx={{ '&:before': { display: 'none' } }}
-            >
-              <AccordionSummary expandIcon={<ExpandMoreIcon fontSize="small" />}>
-                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                  Advanced
-                </Typography>
-              </AccordionSummary>
-              <AccordionDetails sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                <VectorStorePicker
-                  value={vectorStoreIds}
-                  onChange={setVectorStoreIds}
-                  defaultVectorStoreIds={config.defaultVectorStoreIds}
-                />
-                <FormControlLabel
-                  control={
-                    <Switch
-                      size="small"
-                      checked={webSearch}
-                      onChange={e => setWebSearch(e.target.checked)}
-                    />
-                  }
-                  label={<Typography variant="body2">Include web search</Typography>}
-                />
-                <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-                  <OptionPicker
-                    label="Verbosity"
-                    value={verbosityId}
-                    options={traits.verbosities}
-                    onChange={setVerbosityId}
-                    loading={traitsLoading}
-                  />
-                  <OptionPicker
-                    label="Reasoning effort"
-                    value={reasoningEffort}
-                    options={REASONING_EFFORT_OPTIONS}
-                    onChange={id => setReasoningEffort(id as ReasoningEffort | '')}
-                    noneLabel="Model default"
-                  />
-                </Box>
-              </AccordionDetails>
-            </Accordion>
-          </>
+            }}
+            compareMode={compareMode}
+            onCompareModeChange={setCompareModeUi}
+            compareModelsSel={compareModelsSel}
+            onCompareModelsChange={setCompareModelsSel}
+            model={model}
+            onModelChange={setModel}
+            config={config}
+            vectorStoreIds={vectorStoreIds}
+            onVectorStoreIdsChange={setVectorStoreIds}
+            webSearch={webSearch}
+            onWebSearchChange={setWebSearch}
+            verbosityId={verbosityId}
+            onVerbosityChange={setVerbosityId}
+            reasoningEffort={reasoningEffort}
+            onReasoningEffortChange={setReasoningEffort}
+          />
         }
         onNewThread={chat.newThread}
         importInputRef={importInputRef}

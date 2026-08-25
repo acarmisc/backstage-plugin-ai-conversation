@@ -965,244 +965,9 @@ var init_theme = __esm({
   }
 });
 
-// src/components/ModelPicker.tsx
-import React, { useEffect as useEffect2, useState as useState2 } from "react";
-import { Select, MenuItem, FormControl, InputLabel, Typography } from "@mui/material";
-import { useApi as useApi2 } from "@backstage/core-plugin-api";
-import { liteLlmApiRef } from "@acarmisc/backstage-plugin-litellm";
-var ModelPicker;
-var init_ModelPicker = __esm({
-  "src/components/ModelPicker.tsx"() {
-    "use strict";
-    ModelPicker = ({
-      value,
-      onChange,
-      defaultModel
-    }) => {
-      const liteLlmApi = useApi2(liteLlmApiRef);
-      const [models, setModels] = useState2([]);
-      const [loading, setLoading] = useState2(true);
-      const [error, setError] = useState2(null);
-      useEffect2(() => {
-        let alive = true;
-        liteLlmApi.listModels().then((all) => {
-          if (!alive) return;
-          const m = all.filter((x) => !x.model_name.startsWith("claude"));
-          setModels(m);
-          if (!value && m.length) {
-            const def = defaultModel && m.find((x) => x.model_name === defaultModel)?.model_name || m[0].model_name;
-            onChange(def);
-          }
-        }).catch((err) => {
-          if (alive) setError(err.message ?? "Failed to load models");
-        }).finally(() => alive && setLoading(false));
-        return () => {
-          alive = false;
-        };
-      }, []);
-      return /* @__PURE__ */ React.createElement(FormControl, { size: "small", error: !!error, sx: { minWidth: 200 } }, /* @__PURE__ */ React.createElement(InputLabel, null, "Model"), /* @__PURE__ */ React.createElement(
-        Select,
-        {
-          value,
-          label: "Model",
-          onChange: (e) => onChange(e.target.value),
-          disabled: loading
-        },
-        models.map((m) => /* @__PURE__ */ React.createElement(MenuItem, { key: m.model_name, value: m.model_name }, m.model_name))
-      ), error && /* @__PURE__ */ React.createElement(Typography, { variant: "caption", color: "error", sx: { mt: 0.5 } }, error));
-    };
-  }
-});
-
-// src/components/CompareModelPicker.tsx
-import React2, { useEffect as useEffect3, useState as useState3 } from "react";
-import { Autocomplete, Box, Checkbox, Chip, TextField, Typography as Typography2 } from "@mui/material";
-import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
-import CheckBoxIcon from "@mui/icons-material/CheckBox";
-import { useApi as useApi3 } from "@backstage/core-plugin-api";
-import { liteLlmApiRef as liteLlmApiRef2 } from "@acarmisc/backstage-plugin-litellm";
-var CompareModelPicker;
-var init_CompareModelPicker = __esm({
-  "src/components/CompareModelPicker.tsx"() {
-    "use strict";
-    CompareModelPicker = ({ value, onChange }) => {
-      const liteLlmApi = useApi3(liteLlmApiRef2);
-      const [models, setModels] = useState3([]);
-      const [loading, setLoading] = useState3(true);
-      const [error, setError] = useState3(null);
-      useEffect3(() => {
-        let alive = true;
-        liteLlmApi.listModels().then((all) => {
-          if (!alive) return;
-          setModels(all.filter((x) => !x.model_name.startsWith("claude")));
-        }).catch((err) => {
-          if (alive) setError(err.message ?? "Failed to load models");
-        }).finally(() => alive && setLoading(false));
-        return () => {
-          alive = false;
-        };
-      }, [liteLlmApi]);
-      return /* @__PURE__ */ React2.createElement(Box, null, /* @__PURE__ */ React2.createElement(
-        Autocomplete,
-        {
-          multiple: true,
-          size: "small",
-          options: models,
-          value: models.filter((m) => value.includes(m.model_name)),
-          loading,
-          disableCloseOnSelect: true,
-          getOptionLabel: (m) => m.model_name,
-          isOptionEqualToValue: (a, b) => a.model_name === b.model_name,
-          onChange: (_e, newValue) => onChange(newValue.map((m) => m.model_name)),
-          renderOption: (props, option, { selected: isSelected }) => /* @__PURE__ */ React2.createElement("li", { ...props, key: option.model_name }, /* @__PURE__ */ React2.createElement(
-            Checkbox,
-            {
-              icon: /* @__PURE__ */ React2.createElement(CheckBoxOutlineBlankIcon, { fontSize: "small" }),
-              checkedIcon: /* @__PURE__ */ React2.createElement(CheckBoxIcon, { fontSize: "small" }),
-              checked: isSelected,
-              size: "small",
-              sx: { mr: 1, p: 0 }
-            }
-          ), option.model_name),
-          renderTags: (tagValue, getTagProps) => tagValue.map((option, index) => /* @__PURE__ */ React2.createElement(Chip, { ...getTagProps({ index }), key: option.model_name, size: "small", label: option.model_name })),
-          renderInput: (params) => /* @__PURE__ */ React2.createElement(
-            TextField,
-            {
-              ...params,
-              label: "Compare models",
-              placeholder: value.length ? void 0 : "Pick 2+ models\u2026",
-              error: !!error
-            }
-          ),
-          sx: { minWidth: 200 }
-        }
-      ), error && /* @__PURE__ */ React2.createElement(Typography2, { variant: "caption", color: "error", sx: { display: "block", mt: 0.5 } }, error));
-    };
-  }
-});
-
-// src/components/VectorStorePicker.tsx
-import React3, { useEffect as useEffect4, useState as useState4 } from "react";
-import { Autocomplete as Autocomplete2, Box as Box2, Checkbox as Checkbox2, Chip as Chip2, TextField as TextField2, Typography as Typography3 } from "@mui/material";
-import CheckBoxOutlineBlankIcon2 from "@mui/icons-material/CheckBoxOutlineBlank";
-import CheckBoxIcon2 from "@mui/icons-material/CheckBox";
-import { useApi as useApi4 } from "@backstage/core-plugin-api";
-var VectorStorePicker;
-var init_VectorStorePicker = __esm({
-  "src/components/VectorStorePicker.tsx"() {
-    "use strict";
-    init_api();
-    VectorStorePicker = ({
-      value,
-      onChange,
-      defaultVectorStoreIds
-    }) => {
-      const chatApi = useApi4(liteLlmChatApiRef);
-      const [stores, setStores] = useState4([]);
-      const [loading, setLoading] = useState4(true);
-      const [error, setError] = useState4(null);
-      useEffect4(() => {
-        let alive = true;
-        chatApi.listVectorStores().then((s) => {
-          if (!alive) return;
-          setStores(s);
-          if (value.length === 0 && s.length && defaultVectorStoreIds?.length) {
-            const defaults = defaultVectorStoreIds.filter(
-              (id) => s.some((x) => x.id === id)
-            );
-            if (defaults.length) onChange(defaults);
-          }
-        }).catch((err) => {
-          if (alive) setError(err.message ?? "Failed to load knowledge bases");
-        }).finally(() => alive && setLoading(false));
-        return () => {
-          alive = false;
-        };
-      }, []);
-      const selected = stores.filter((s) => value.includes(s.id));
-      return /* @__PURE__ */ React3.createElement(Box2, null, /* @__PURE__ */ React3.createElement(
-        Autocomplete2,
-        {
-          multiple: true,
-          size: "small",
-          options: stores,
-          value: selected,
-          loading,
-          disableCloseOnSelect: true,
-          getOptionLabel: (s) => s.name,
-          isOptionEqualToValue: (a, b) => a.id === b.id,
-          onChange: (_e, newValue) => onChange(newValue.map((s) => s.id)),
-          renderOption: (props, option, { selected: isSelected }) => /* @__PURE__ */ React3.createElement("li", { ...props, key: option.id }, /* @__PURE__ */ React3.createElement(
-            Checkbox2,
-            {
-              icon: /* @__PURE__ */ React3.createElement(CheckBoxOutlineBlankIcon2, { fontSize: "small" }),
-              checkedIcon: /* @__PURE__ */ React3.createElement(CheckBoxIcon2, { fontSize: "small" }),
-              checked: isSelected,
-              size: "small",
-              sx: { mr: 1, p: 0 }
-            }
-          ), option.name, " ", option.file_count != null ? `(${option.file_count})` : ""),
-          renderTags: (tagValue, getTagProps) => tagValue.map((option, index) => /* @__PURE__ */ React3.createElement(
-            Chip2,
-            {
-              ...getTagProps({ index }),
-              key: option.id,
-              size: "small",
-              label: option.name
-            }
-          )),
-          renderInput: (params) => /* @__PURE__ */ React3.createElement(
-            TextField2,
-            {
-              ...params,
-              label: "Knowledge bases",
-              placeholder: value.length ? void 0 : "None (no grounding)",
-              error: !!error
-            }
-          ),
-          sx: { minWidth: 200 }
-        }
-      ), error && /* @__PURE__ */ React3.createElement(Typography3, { variant: "caption", color: "error", sx: { display: "block", mt: 0.5 } }, error));
-    };
-  }
-});
-
-// src/components/PersonaPicker.tsx
-import React4 from "react";
-import { Select as Select2, MenuItem as MenuItem2, FormControl as FormControl2, InputLabel as InputLabel2, Typography as Typography4 } from "@mui/material";
-var PersonaPicker;
-var init_PersonaPicker = __esm({
-  "src/components/PersonaPicker.tsx"() {
-    "use strict";
-    PersonaPicker = ({
-      value,
-      personas,
-      loading,
-      error,
-      onChange
-    }) => {
-      return /* @__PURE__ */ React4.createElement(FormControl2, { size: "small", error: !!error, sx: { minWidth: 200 } }, /* @__PURE__ */ React4.createElement(InputLabel2, { shrink: true }, "Persona"), /* @__PURE__ */ React4.createElement(
-        Select2,
-        {
-          value,
-          label: "Persona",
-          displayEmpty: true,
-          onChange: (e) => {
-            const id = e.target.value;
-            onChange(id, personas.find((p) => p.id === id));
-          },
-          disabled: loading
-        },
-        /* @__PURE__ */ React4.createElement(MenuItem2, { value: "" }, /* @__PURE__ */ React4.createElement("em", null, "None")),
-        personas.map((p) => /* @__PURE__ */ React4.createElement(MenuItem2, { key: p.id, value: p.id }, p.title))
-      ), error && /* @__PURE__ */ React4.createElement(Typography4, { variant: "caption", color: "error", sx: { mt: 0.5 } }, error));
-    };
-  }
-});
-
 // src/components/PersonaHomepage.tsx
-import React5 from "react";
-import { Box as Box3, Typography as Typography5, Chip as Chip3, CircularProgress } from "@mui/material";
+import React from "react";
+import { Box, Typography, Chip, CircularProgress } from "@mui/material";
 import PersonIcon from "@mui/icons-material/Person";
 var PersonaHomepage;
 var init_PersonaHomepage = __esm({
@@ -1216,13 +981,13 @@ var init_PersonaHomepage = __esm({
       onSelect
     }) => {
       if (loading) {
-        return /* @__PURE__ */ React5.createElement(Box3, { sx: { height: "100%", display: "flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React5.createElement(CircularProgress, { size: 24 }));
+        return /* @__PURE__ */ React.createElement(Box, { sx: { height: "100%", display: "flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React.createElement(CircularProgress, { size: 24 }));
       }
       if (error || personas.length === 0) {
-        return /* @__PURE__ */ React5.createElement(Box3, { sx: { height: "100%", display: "flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React5.createElement(Typography5, { color: "text.secondary" }, error ? `Couldn't load personas: ${error}` : "Start a conversation\u2026"));
+        return /* @__PURE__ */ React.createElement(Box, { sx: { height: "100%", display: "flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React.createElement(Typography, { color: "text.secondary" }, error ? `Couldn't load personas: ${error}` : "Start a conversation\u2026"));
       }
-      return /* @__PURE__ */ React5.createElement(
-        Box3,
+      return /* @__PURE__ */ React.createElement(
+        Box,
         {
           sx: {
             height: "100%",
@@ -1234,9 +999,9 @@ var init_PersonaHomepage = __esm({
             py: 4
           }
         },
-        /* @__PURE__ */ React5.createElement(Typography5, { variant: "subtitle1", align: "center", color: "text.secondary" }, "Pick a persona to get started, or just start typing"),
-        /* @__PURE__ */ React5.createElement(
-          Box3,
+        /* @__PURE__ */ React.createElement(Typography, { variant: "subtitle1", align: "center", color: "text.secondary" }, "Pick a persona to get started, or just start typing"),
+        /* @__PURE__ */ React.createElement(
+          Box,
           {
             sx: {
               display: "grid",
@@ -1246,8 +1011,8 @@ var init_PersonaHomepage = __esm({
           },
           personas.map((p) => {
             const selected = p.id === selectedId;
-            return /* @__PURE__ */ React5.createElement(
-              Box3,
+            return /* @__PURE__ */ React.createElement(
+              Box,
               {
                 key: p.id,
                 role: "button",
@@ -1276,9 +1041,9 @@ var init_PersonaHomepage = __esm({
                   }
                 }
               },
-              /* @__PURE__ */ React5.createElement(Box3, { sx: { display: "flex", alignItems: "center", gap: 0.75 } }, /* @__PURE__ */ React5.createElement(PersonIcon, { fontSize: "small", color: selected ? "primary" : "action" }), /* @__PURE__ */ React5.createElement(Typography5, { variant: "body2", sx: { fontWeight: 600 }, noWrap: true }, p.title)),
-              p.description && /* @__PURE__ */ React5.createElement(
-                Typography5,
+              /* @__PURE__ */ React.createElement(Box, { sx: { display: "flex", alignItems: "center", gap: 0.75 } }, /* @__PURE__ */ React.createElement(PersonIcon, { fontSize: "small", color: selected ? "primary" : "action" }), /* @__PURE__ */ React.createElement(Typography, { variant: "body2", sx: { fontWeight: 600 }, noWrap: true }, p.title)),
+              p.description && /* @__PURE__ */ React.createElement(
+                Typography,
                 {
                   variant: "caption",
                   color: "text.secondary",
@@ -1291,7 +1056,7 @@ var init_PersonaHomepage = __esm({
                 },
                 p.description
               ),
-              p.tags && p.tags.length > 0 && /* @__PURE__ */ React5.createElement(Box3, { sx: { display: "flex", flexWrap: "wrap", gap: 0.5, mt: 0.5 } }, p.tags.map((tag) => /* @__PURE__ */ React5.createElement(Chip3, { key: tag, label: tag, size: "small", variant: "outlined" })))
+              p.tags && p.tags.length > 0 && /* @__PURE__ */ React.createElement(Box, { sx: { display: "flex", flexWrap: "wrap", gap: 0.5, mt: 0.5 } }, p.tags.map((tag) => /* @__PURE__ */ React.createElement(Chip, { key: tag, label: tag, size: "small", variant: "outlined" })))
             );
           })
         )
@@ -1300,94 +1065,9 @@ var init_PersonaHomepage = __esm({
   }
 });
 
-// src/components/KeyPicker.tsx
-import React6, { useState as useState5 } from "react";
-import { Button, Box as Box4, Typography as Typography6, CircularProgress as CircularProgress2, Tooltip, IconButton } from "@mui/material";
-import KeyIcon from "@mui/icons-material/VpnKey";
-import DeleteIcon from "@mui/icons-material/Delete";
-import { useApi as useApi5 } from "@backstage/core-plugin-api";
-var KeyPicker;
-var init_KeyPicker = __esm({
-  "src/components/KeyPicker.tsx"() {
-    "use strict";
-    init_api();
-    KeyPicker = ({ value, onChange, onDelete }) => {
-      const chatApi = useApi5(liteLlmChatApiRef);
-      const [loading, setLoading] = useState5(false);
-      const [error, setError] = useState5(null);
-      const handleGenerate = async () => {
-        setLoading(true);
-        setError(null);
-        try {
-          const keyInfo = await chatApi.mintChatKey();
-          onChange({ alias: keyInfo.key_alias, token: keyInfo.key });
-        } catch (err) {
-          setError(err.message);
-        } finally {
-          setLoading(false);
-        }
-      };
-      const handleDelete = async () => {
-        if (!value.token) return;
-        try {
-          await chatApi.deleteChatKey(value.token);
-        } catch {
-        }
-        onDelete?.();
-        onChange({ alias: "", token: "" });
-      };
-      if (value.token) {
-        return /* @__PURE__ */ React6.createElement(Box4, { sx: { display: "flex", alignItems: "center", gap: 1, minWidth: 200 } }, /* @__PURE__ */ React6.createElement(KeyIcon, { fontSize: "small", color: "success" }), /* @__PURE__ */ React6.createElement(Typography6, { variant: "body2", sx: { flex: 1, overflow: "hidden", textOverflow: "ellipsis" } }, value.alias || "chat key"), /* @__PURE__ */ React6.createElement(Tooltip, { title: "Delete chat key" }, /* @__PURE__ */ React6.createElement(IconButton, { edge: "end", size: "small", onClick: handleDelete }, /* @__PURE__ */ React6.createElement(DeleteIcon, { fontSize: "small" }))));
-      }
-      return /* @__PURE__ */ React6.createElement(Box4, { sx: { minWidth: 200 } }, /* @__PURE__ */ React6.createElement(
-        Button,
-        {
-          size: "small",
-          variant: "outlined",
-          startIcon: loading ? /* @__PURE__ */ React6.createElement(CircularProgress2, { size: 16 }) : /* @__PURE__ */ React6.createElement(KeyIcon, null),
-          onClick: handleGenerate,
-          disabled: loading
-        },
-        loading ? "Minting\u2026" : "Generate chat key"
-      ), error && /* @__PURE__ */ React6.createElement(Typography6, { variant: "caption", color: "error", sx: { display: "block", mt: 0.5 } }, error));
-    };
-  }
-});
-
-// src/components/OptionPicker.tsx
-import React7 from "react";
-import { Select as Select3, MenuItem as MenuItem3, FormControl as FormControl3, InputLabel as InputLabel3 } from "@mui/material";
-var OptionPicker;
-var init_OptionPicker = __esm({
-  "src/components/OptionPicker.tsx"() {
-    "use strict";
-    OptionPicker = ({
-      label,
-      value,
-      options,
-      onChange,
-      loading,
-      noneLabel = "Default"
-    }) => {
-      return /* @__PURE__ */ React7.createElement(FormControl3, { size: "small", sx: { minWidth: 160 } }, /* @__PURE__ */ React7.createElement(InputLabel3, { shrink: true }, label), /* @__PURE__ */ React7.createElement(
-        Select3,
-        {
-          value,
-          label,
-          displayEmpty: true,
-          onChange: (e) => onChange(e.target.value),
-          disabled: loading
-        },
-        /* @__PURE__ */ React7.createElement(MenuItem3, { value: "" }, /* @__PURE__ */ React7.createElement("em", null, noneLabel)),
-        options.map((o) => /* @__PURE__ */ React7.createElement(MenuItem3, { key: o.id, value: o.id }, o.label))
-      ));
-    };
-  }
-});
-
 // src/components/PersonaAvatar.tsx
-import React8 from "react";
-import { Avatar, Box as Box5 } from "@mui/material";
+import React2 from "react";
+import { Avatar, Box as Box2 } from "@mui/material";
 var PersonaAvatar;
 var init_PersonaAvatar = __esm({
   "src/components/PersonaAvatar.tsx"() {
@@ -1399,8 +1079,8 @@ var init_PersonaAvatar = __esm({
       size = 32
     }) => {
       const ringSize = size + 4;
-      return /* @__PURE__ */ React8.createElement(Box5, { sx: { position: "relative", width: ringSize, height: ringSize, flexShrink: 0 } }, /* @__PURE__ */ React8.createElement(
-        Box5,
+      return /* @__PURE__ */ React2.createElement(Box2, { sx: { position: "relative", width: ringSize, height: ringSize, flexShrink: 0 } }, /* @__PURE__ */ React2.createElement(
+        Box2,
         {
           sx: {
             position: "absolute",
@@ -1417,7 +1097,7 @@ var init_PersonaAvatar = __esm({
             }
           }
         }
-      ), /* @__PURE__ */ React8.createElement(
+      ), /* @__PURE__ */ React2.createElement(
         Avatar,
         {
           sx: {
@@ -1438,15 +1118,15 @@ var init_PersonaAvatar = __esm({
 });
 
 // src/components/CodeBlock.tsx
-import React9, { useState as useState6 } from "react";
-import { Box as Box6, IconButton as IconButton2, Tooltip as Tooltip2 } from "@mui/material";
+import React3, { useState as useState2 } from "react";
+import { Box as Box3, IconButton, Tooltip } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import CheckIcon from "@mui/icons-material/Check";
 function extractText(node) {
   if (typeof node === "string") return node;
   if (typeof node === "number") return String(node);
   if (Array.isArray(node)) return node.map(extractText).join("");
-  if (React9.isValidElement(node)) {
+  if (React3.isValidElement(node)) {
     return extractText(node.props.children);
   }
   return "";
@@ -1461,10 +1141,10 @@ var init_CodeBlock = __esm({
       children,
       ...props
     }) => {
-      const [copied, setCopied] = useState6(false);
+      const [copied, setCopied] = useState2(false);
       const isBlock = /language-/.test(className ?? "");
       if (!isBlock) {
-        return /* @__PURE__ */ React9.createElement("code", { className, style: { fontFamily: MONO_FONT_STACK }, ...props }, children);
+        return /* @__PURE__ */ React3.createElement("code", { className, style: { fontFamily: MONO_FONT_STACK }, ...props }, children);
       }
       const handleCopy = () => {
         const text = extractText(children).replace(/\n$/, "");
@@ -1473,8 +1153,8 @@ var init_CodeBlock = __esm({
           setTimeout(() => setCopied(false), 1500);
         });
       };
-      return /* @__PURE__ */ React9.createElement(Box6, { sx: { position: "relative", "&:hover .litellm-copy-btn": { opacity: 1 } } }, /* @__PURE__ */ React9.createElement(Tooltip2, { title: copied ? "Copied" : "Copy code" }, /* @__PURE__ */ React9.createElement(
-        IconButton2,
+      return /* @__PURE__ */ React3.createElement(Box3, { sx: { position: "relative", "&:hover .litellm-copy-btn": { opacity: 1 } } }, /* @__PURE__ */ React3.createElement(Tooltip, { title: copied ? "Copied" : "Copy code" }, /* @__PURE__ */ React3.createElement(
+        IconButton,
         {
           size: "small",
           className: "litellm-copy-btn",
@@ -1490,15 +1170,15 @@ var init_CodeBlock = __esm({
             borderColor: "divider"
           }
         },
-        copied ? /* @__PURE__ */ React9.createElement(CheckIcon, { fontSize: "inherit" }) : /* @__PURE__ */ React9.createElement(ContentCopyIcon, { fontSize: "inherit" })
-      )), /* @__PURE__ */ React9.createElement("code", { className, style: { fontFamily: MONO_FONT_STACK }, ...props }, children));
+        copied ? /* @__PURE__ */ React3.createElement(CheckIcon, { fontSize: "inherit" }) : /* @__PURE__ */ React3.createElement(ContentCopyIcon, { fontSize: "inherit" })
+      )), /* @__PURE__ */ React3.createElement("code", { className, style: { fontFamily: MONO_FONT_STACK }, ...props }, children));
     };
   }
 });
 
 // src/components/AssistantMessage.tsx
-import React10, { useState as useState7 } from "react";
-import { Box as Box7, IconButton as IconButton3, Tooltip as Tooltip3 } from "@mui/material";
+import React4, { useState as useState3 } from "react";
+import { Box as Box4, IconButton as IconButton2, Tooltip as Tooltip2 } from "@mui/material";
 import ThumbUpIcon from "@mui/icons-material/ThumbUp";
 import ThumbUpOutlinedIcon from "@mui/icons-material/ThumbUpOutlined";
 import ThumbDownIcon from "@mui/icons-material/ThumbDown";
@@ -1529,7 +1209,7 @@ var init_AssistantMessage = __esm({
       onFeedback,
       onRegenerate
     }) => {
-      const [copied, setCopied] = useState7(false);
+      const [copied, setCopied] = useState3(false);
       const showActions = !!message.content && !isStreaming;
       const handleCopy = () => {
         navigator.clipboard?.writeText(message.content).then(() => {
@@ -1539,7 +1219,7 @@ var init_AssistantMessage = __esm({
       };
       let body;
       if (message.content) {
-        body = /* @__PURE__ */ React10.createElement(
+        body = /* @__PURE__ */ React4.createElement(
           ReactMarkdown,
           {
             remarkPlugins: [remarkGfm, remarkMath],
@@ -1549,8 +1229,8 @@ var init_AssistantMessage = __esm({
           message.content
         );
       } else if (isStreaming) {
-        body = /* @__PURE__ */ React10.createElement(
-          Box7,
+        body = /* @__PURE__ */ React4.createElement(
+          Box4,
           {
             component: "span",
             sx: {
@@ -1567,8 +1247,8 @@ var init_AssistantMessage = __esm({
       } else {
         body = null;
       }
-      return /* @__PURE__ */ React10.createElement(
-        Box7,
+      return /* @__PURE__ */ React4.createElement(
+        Box4,
         {
           sx: {
             display: "flex",
@@ -1578,9 +1258,9 @@ var init_AssistantMessage = __esm({
             "&:hover .litellm-actions": { opacity: 1 }
           }
         },
-        /* @__PURE__ */ React10.createElement(PersonaAvatar, { label: avatarLabel.slice(0, 2).toUpperCase(), isStreaming, size: 28 }),
-        /* @__PURE__ */ React10.createElement(Box7, { sx: { minWidth: 0, flex: 1 } }, /* @__PURE__ */ React10.createElement(
-          Box7,
+        /* @__PURE__ */ React4.createElement(PersonaAvatar, { label: avatarLabel.slice(0, 2).toUpperCase(), isStreaming, size: 28 }),
+        /* @__PURE__ */ React4.createElement(Box4, { sx: { minWidth: 0, flex: 1 } }, /* @__PURE__ */ React4.createElement(
+          Box4,
           {
             sx: {
               bgcolor: "background.paper",
@@ -1598,33 +1278,33 @@ var init_AssistantMessage = __esm({
             }
           },
           body
-        ), showActions && /* @__PURE__ */ React10.createElement(
-          Box7,
+        ), showActions && /* @__PURE__ */ React4.createElement(
+          Box4,
           {
             className: "litellm-actions",
             sx: { display: "flex", gap: 0.25, mt: 0.25, opacity: 0, transition: "opacity 0.15s" }
           },
-          onFeedback && /* @__PURE__ */ React10.createElement(React10.Fragment, null, /* @__PURE__ */ React10.createElement(
-            IconButton3,
+          onFeedback && /* @__PURE__ */ React4.createElement(React4.Fragment, null, /* @__PURE__ */ React4.createElement(
+            IconButton2,
             {
               size: "small",
               "aria-label": "Good response",
               color: message.feedback === "up" ? "primary" : "default",
               onClick: () => onFeedback(message.id, "up")
             },
-            message.feedback === "up" ? /* @__PURE__ */ React10.createElement(ThumbUpIcon, { fontSize: "small" }) : /* @__PURE__ */ React10.createElement(ThumbUpOutlinedIcon, { fontSize: "small" })
-          ), /* @__PURE__ */ React10.createElement(
-            IconButton3,
+            message.feedback === "up" ? /* @__PURE__ */ React4.createElement(ThumbUpIcon, { fontSize: "small" }) : /* @__PURE__ */ React4.createElement(ThumbUpOutlinedIcon, { fontSize: "small" })
+          ), /* @__PURE__ */ React4.createElement(
+            IconButton2,
             {
               size: "small",
               "aria-label": "Bad response",
               color: message.feedback === "down" ? "primary" : "default",
               onClick: () => onFeedback(message.id, "down")
             },
-            message.feedback === "down" ? /* @__PURE__ */ React10.createElement(ThumbDownIcon, { fontSize: "small" }) : /* @__PURE__ */ React10.createElement(ThumbDownOutlinedIcon, { fontSize: "small" })
+            message.feedback === "down" ? /* @__PURE__ */ React4.createElement(ThumbDownIcon, { fontSize: "small" }) : /* @__PURE__ */ React4.createElement(ThumbDownOutlinedIcon, { fontSize: "small" })
           )),
-          onRegenerate && /* @__PURE__ */ React10.createElement(Tooltip3, { title: "Regenerate" }, /* @__PURE__ */ React10.createElement(IconButton3, { size: "small", "aria-label": "Regenerate", onClick: () => onRegenerate(message.id) }, /* @__PURE__ */ React10.createElement(ReplayIcon, { fontSize: "small" }))),
-          /* @__PURE__ */ React10.createElement(Tooltip3, { title: copied ? "Copied" : "Copy" }, /* @__PURE__ */ React10.createElement(IconButton3, { size: "small", "aria-label": "Copy", onClick: handleCopy }, copied ? /* @__PURE__ */ React10.createElement(CheckIcon2, { fontSize: "small" }) : /* @__PURE__ */ React10.createElement(ContentCopyIcon2, { fontSize: "small" })))
+          onRegenerate && /* @__PURE__ */ React4.createElement(Tooltip2, { title: "Regenerate" }, /* @__PURE__ */ React4.createElement(IconButton2, { size: "small", "aria-label": "Regenerate", onClick: () => onRegenerate(message.id) }, /* @__PURE__ */ React4.createElement(ReplayIcon, { fontSize: "small" }))),
+          /* @__PURE__ */ React4.createElement(Tooltip2, { title: copied ? "Copied" : "Copy" }, /* @__PURE__ */ React4.createElement(IconButton2, { size: "small", "aria-label": "Copy", onClick: handleCopy }, copied ? /* @__PURE__ */ React4.createElement(CheckIcon2, { fontSize: "small" }) : /* @__PURE__ */ React4.createElement(ContentCopyIcon2, { fontSize: "small" })))
         ))
       );
     };
@@ -1648,8 +1328,8 @@ var init_safeUrl = __esm({
 });
 
 // src/components/UserMessage.tsx
-import React11, { useState as useState8 } from "react";
-import { Box as Box8, Button as Button2, Chip as Chip4, IconButton as IconButton4, TextField as TextField3, Tooltip as Tooltip4 } from "@mui/material";
+import React5, { useState as useState4 } from "react";
+import { Box as Box5, Button, Chip as Chip2, IconButton as IconButton3, TextField, Tooltip as Tooltip3 } from "@mui/material";
 import ContentCopyIcon3 from "@mui/icons-material/ContentCopy";
 import CheckIcon3 from "@mui/icons-material/Check";
 import EditIcon from "@mui/icons-material/Edit";
@@ -1660,9 +1340,9 @@ var init_UserMessage = __esm({
     "use strict";
     init_safeUrl();
     UserMessage = ({ message, onEditAndResend }) => {
-      const [editing, setEditing] = useState8(false);
-      const [draft, setDraft] = useState8(message.content);
-      const [copied, setCopied] = useState8(false);
+      const [editing, setEditing] = useState4(false);
+      const [draft, setDraft] = useState4(message.content);
+      const [copied, setCopied] = useState4(false);
       const handleCopy = () => {
         navigator.clipboard?.writeText(message.content).then(() => {
           setCopied(true);
@@ -1681,8 +1361,8 @@ var init_UserMessage = __esm({
         setEditing(false);
       };
       if (editing) {
-        return /* @__PURE__ */ React11.createElement(Box8, { sx: { alignSelf: "flex-end", maxWidth: "80%", width: "100%", display: "flex", flexDirection: "column", gap: 0.5 } }, /* @__PURE__ */ React11.createElement(
-          TextField3,
+        return /* @__PURE__ */ React5.createElement(Box5, { sx: { alignSelf: "flex-end", maxWidth: "80%", width: "100%", display: "flex", flexDirection: "column", gap: 0.5 } }, /* @__PURE__ */ React5.createElement(
+          TextField,
           {
             value: draft,
             onChange: (e) => setDraft(e.target.value),
@@ -1692,10 +1372,10 @@ var init_UserMessage = __esm({
             size: "small",
             fullWidth: true
           }
-        ), /* @__PURE__ */ React11.createElement(Box8, { sx: { display: "flex", gap: 1, justifyContent: "flex-end" } }, /* @__PURE__ */ React11.createElement(Button2, { size: "small", onClick: () => setEditing(false) }, "Cancel"), /* @__PURE__ */ React11.createElement(Button2, { size: "small", variant: "contained", onClick: saveEdit, disabled: !draft.trim() }, "Save & resend")));
+        ), /* @__PURE__ */ React5.createElement(Box5, { sx: { display: "flex", gap: 1, justifyContent: "flex-end" } }, /* @__PURE__ */ React5.createElement(Button, { size: "small", onClick: () => setEditing(false) }, "Cancel"), /* @__PURE__ */ React5.createElement(Button, { size: "small", variant: "contained", onClick: saveEdit, disabled: !draft.trim() }, "Save & resend")));
       }
-      return /* @__PURE__ */ React11.createElement(
-        Box8,
+      return /* @__PURE__ */ React5.createElement(
+        Box5,
         {
           sx: {
             alignSelf: "flex-end",
@@ -1703,11 +1383,11 @@ var init_UserMessage = __esm({
             "&:hover .litellm-actions": { opacity: 1 }
           }
         },
-        message.attachedUrl && /* @__PURE__ */ React11.createElement(Box8, { sx: { display: "flex", justifyContent: "flex-end", mb: 0.5 } }, /* @__PURE__ */ React11.createElement(Tooltip4, { title: message.attachedUrl.url }, /* @__PURE__ */ React11.createElement(
-          Chip4,
+        message.attachedUrl && /* @__PURE__ */ React5.createElement(Box5, { sx: { display: "flex", justifyContent: "flex-end", mb: 0.5 } }, /* @__PURE__ */ React5.createElement(Tooltip3, { title: message.attachedUrl.url }, /* @__PURE__ */ React5.createElement(
+          Chip2,
           {
             size: "small",
-            icon: /* @__PURE__ */ React11.createElement(LinkIcon, { fontSize: "small" }),
+            icon: /* @__PURE__ */ React5.createElement(LinkIcon, { fontSize: "small" }),
             label: message.attachedUrl.title,
             variant: "outlined",
             ...safeHref(message.attachedUrl.url) ? {
@@ -1719,8 +1399,8 @@ var init_UserMessage = __esm({
             } : {}
           }
         ))),
-        /* @__PURE__ */ React11.createElement(
-          Box8,
+        /* @__PURE__ */ React5.createElement(
+          Box5,
           {
             sx: {
               bgcolor: "action.hover",
@@ -1734,14 +1414,14 @@ var init_UserMessage = __esm({
           },
           message.content
         ),
-        /* @__PURE__ */ React11.createElement(
-          Box8,
+        /* @__PURE__ */ React5.createElement(
+          Box5,
           {
             className: "litellm-actions",
             sx: { display: "flex", gap: 0.25, mt: 0.25, justifyContent: "flex-end", opacity: 0, transition: "opacity 0.15s" }
           },
-          onEditAndResend && /* @__PURE__ */ React11.createElement(Tooltip4, { title: "Edit & resend" }, /* @__PURE__ */ React11.createElement(IconButton4, { size: "small", "aria-label": "Edit and resend", onClick: startEdit }, /* @__PURE__ */ React11.createElement(EditIcon, { fontSize: "small" }))),
-          /* @__PURE__ */ React11.createElement(Tooltip4, { title: copied ? "Copied" : "Copy" }, /* @__PURE__ */ React11.createElement(IconButton4, { size: "small", "aria-label": "Copy", onClick: handleCopy }, copied ? /* @__PURE__ */ React11.createElement(CheckIcon3, { fontSize: "small" }) : /* @__PURE__ */ React11.createElement(ContentCopyIcon3, { fontSize: "small" })))
+          onEditAndResend && /* @__PURE__ */ React5.createElement(Tooltip3, { title: "Edit & resend" }, /* @__PURE__ */ React5.createElement(IconButton3, { size: "small", "aria-label": "Edit and resend", onClick: startEdit }, /* @__PURE__ */ React5.createElement(EditIcon, { fontSize: "small" }))),
+          /* @__PURE__ */ React5.createElement(Tooltip3, { title: copied ? "Copied" : "Copy" }, /* @__PURE__ */ React5.createElement(IconButton3, { size: "small", "aria-label": "Copy", onClick: handleCopy }, copied ? /* @__PURE__ */ React5.createElement(CheckIcon3, { fontSize: "small" }) : /* @__PURE__ */ React5.createElement(ContentCopyIcon3, { fontSize: "small" })))
         )
       );
     };
@@ -1749,8 +1429,8 @@ var init_UserMessage = __esm({
 });
 
 // src/components/MessageList.tsx
-import React12 from "react";
-import { Box as Box9, Typography as Typography7 } from "@mui/material";
+import React6 from "react";
+import { Box as Box6, Typography as Typography2 } from "@mui/material";
 function groupMessages(messages) {
   const groups = [];
   let current = null;
@@ -1783,8 +1463,8 @@ var init_MessageList = __esm({
       onEditAndResend
     }) => {
       const groups = groupMessages(messages);
-      return /* @__PURE__ */ React12.createElement(
-        Box9,
+      return /* @__PURE__ */ React6.createElement(
+        Box6,
         {
           sx: {
             flex: 1,
@@ -1796,7 +1476,7 @@ var init_MessageList = __esm({
             gap: 1.5
           }
         },
-        groups.map((group, gi) => /* @__PURE__ */ React12.createElement(React12.Fragment, { key: group.user?.id ?? `g${gi}` }, group.user && /* @__PURE__ */ React12.createElement(UserMessage, { message: group.user, onEditAndResend }), group.assistants.length > 1 ? /* @__PURE__ */ React12.createElement(Box9, { sx: { display: "flex", gap: 1.5, overflowX: "auto", width: "100%" } }, group.assistants.map((msg) => /* @__PURE__ */ React12.createElement(Box9, { key: msg.id, sx: { flex: "1 1 320px", minWidth: 280, maxWidth: "none" } }, msg.compareModel && /* @__PURE__ */ React12.createElement(Typography7, { variant: "caption", color: "text.secondary", sx: { display: "block", mb: 0.25 } }, msg.compareModel), /* @__PURE__ */ React12.createElement(
+        groups.map((group, gi) => /* @__PURE__ */ React6.createElement(React6.Fragment, { key: group.user?.id ?? `g${gi}` }, group.user && /* @__PURE__ */ React6.createElement(UserMessage, { message: group.user, onEditAndResend }), group.assistants.length > 1 ? /* @__PURE__ */ React6.createElement(Box6, { sx: { display: "flex", gap: 1.5, overflowX: "auto", width: "100%" } }, group.assistants.map((msg) => /* @__PURE__ */ React6.createElement(Box6, { key: msg.id, sx: { flex: "1 1 320px", minWidth: 280, maxWidth: "none" } }, msg.compareModel && /* @__PURE__ */ React6.createElement(Typography2, { variant: "caption", color: "text.secondary", sx: { display: "block", mb: 0.25 } }, msg.compareModel), /* @__PURE__ */ React6.createElement(
           AssistantMessage,
           {
             message: msg,
@@ -1805,7 +1485,7 @@ var init_MessageList = __esm({
             onFeedback,
             onRegenerate
           }
-        )))) : group.assistants.map((msg) => /* @__PURE__ */ React12.createElement(
+        )))) : group.assistants.map((msg) => /* @__PURE__ */ React6.createElement(
           AssistantMessage,
           {
             key: msg.id,
@@ -1822,7 +1502,7 @@ var init_MessageList = __esm({
 });
 
 // src/components/ErrorBanner.tsx
-import React13 from "react";
+import React7 from "react";
 import { Alert, AlertTitle } from "@mui/material";
 var ErrorBanner;
 var init_ErrorBanner = __esm({
@@ -1830,30 +1510,30 @@ var init_ErrorBanner = __esm({
     "use strict";
     ErrorBanner = ({ error, onDismiss }) => {
       if (!error) return null;
-      return /* @__PURE__ */ React13.createElement(Alert, { severity: "error", onClose: onDismiss, sx: { mb: 1 } }, /* @__PURE__ */ React13.createElement(AlertTitle, null, "Chat error"), error);
+      return /* @__PURE__ */ React7.createElement(Alert, { severity: "error", onClose: onDismiss, sx: { mb: 1 } }, /* @__PURE__ */ React7.createElement(AlertTitle, null, "Chat error"), error);
     };
   }
 });
 
 // src/components/SourcesPanel.tsx
-import React14 from "react";
-import { Box as Box10, Chip as Chip5, Typography as Typography8 } from "@mui/material";
+import React8 from "react";
+import { Box as Box7, Chip as Chip3, Typography as Typography3 } from "@mui/material";
 var SourcesPanel;
 var init_SourcesPanel = __esm({
   "src/components/SourcesPanel.tsx"() {
     "use strict";
     init_safeUrl();
     SourcesPanel = ({ citations }) => {
-      return /* @__PURE__ */ React14.createElement(Box10, { sx: { p: 1.5 } }, /* @__PURE__ */ React14.createElement(Typography8, { variant: "overline", color: "text.secondary" }, "Sources"), citations.length === 0 ? /* @__PURE__ */ React14.createElement(Typography8, { variant: "body2", color: "text.secondary", sx: { mt: 0.5 } }, "No sources for the latest reply yet.") : citations.map((c, i) => /* @__PURE__ */ React14.createElement(Box10, { key: i, sx: { mt: 1.5 } }, /* @__PURE__ */ React14.createElement(Box10, { sx: { display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" } }, /* @__PURE__ */ React14.createElement(Typography8, { variant: "body2", fontWeight: 500 }, safeHref(c.url) ? /* @__PURE__ */ React14.createElement("a", { href: safeHref(c.url), target: "_blank", rel: "noopener noreferrer" }, c.filename) : c.filename), c.source && /* @__PURE__ */ React14.createElement(
-        Chip5,
+      return /* @__PURE__ */ React8.createElement(Box7, { sx: { p: 1.5 } }, /* @__PURE__ */ React8.createElement(Typography3, { variant: "overline", color: "text.secondary" }, "Sources"), citations.length === 0 ? /* @__PURE__ */ React8.createElement(Typography3, { variant: "body2", color: "text.secondary", sx: { mt: 0.5 } }, "No sources for the latest reply yet.") : citations.map((c, i) => /* @__PURE__ */ React8.createElement(Box7, { key: i, sx: { mt: 1.5 } }, /* @__PURE__ */ React8.createElement(Box7, { sx: { display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" } }, /* @__PURE__ */ React8.createElement(Typography3, { variant: "body2", fontWeight: 500 }, safeHref(c.url) ? /* @__PURE__ */ React8.createElement("a", { href: safeHref(c.url), target: "_blank", rel: "noopener noreferrer" }, c.filename) : c.filename), c.source && /* @__PURE__ */ React8.createElement(
+        Chip3,
         {
           size: "small",
           label: c.source === "web" ? "Web" : "Knowledge base",
           variant: "outlined",
           color: c.source === "web" ? "secondary" : "default"
         }
-      ), /* @__PURE__ */ React14.createElement(Chip5, { size: "small", label: c.score.toFixed(3), color: "primary", variant: "outlined" })), /* @__PURE__ */ React14.createElement(
-        Typography8,
+      ), /* @__PURE__ */ React8.createElement(Chip3, { size: "small", label: c.score.toFixed(3), color: "primary", variant: "outlined" })), /* @__PURE__ */ React8.createElement(
+        Typography3,
         {
           variant: "body2",
           color: "text.secondary",
@@ -1873,8 +1553,8 @@ var init_SourcesPanel = __esm({
 });
 
 // src/components/UsagePanel.tsx
-import React15 from "react";
-import { Box as Box11, Divider, LinearProgress, Typography as Typography9 } from "@mui/material";
+import React9 from "react";
+import { Box as Box8, Divider, LinearProgress, Typography as Typography4 } from "@mui/material";
 function formatUsd(n) {
   return `$${n.toFixed(4)}`;
 }
@@ -1882,14 +1562,14 @@ var Stat, UsagePanel;
 var init_UsagePanel = __esm({
   "src/components/UsagePanel.tsx"() {
     "use strict";
-    Stat = ({ label, value }) => /* @__PURE__ */ React15.createElement(Box11, { sx: { display: "flex", justifyContent: "space-between", py: 0.25 } }, /* @__PURE__ */ React15.createElement(Typography9, { variant: "body2", color: "text.secondary" }, label), /* @__PURE__ */ React15.createElement(Typography9, { variant: "body2", fontWeight: 500 }, value));
+    Stat = ({ label, value }) => /* @__PURE__ */ React9.createElement(Box8, { sx: { display: "flex", justifyContent: "space-between", py: 0.25 } }, /* @__PURE__ */ React9.createElement(Typography4, { variant: "body2", color: "text.secondary" }, label), /* @__PURE__ */ React9.createElement(Typography4, { variant: "body2", fontWeight: 500 }, value));
     UsagePanel = ({
       lastTurnUsage,
       totalTokens,
       keySpend
     }) => {
       const budgetPct = keySpend?.max_budget && keySpend.max_budget > 0 ? Math.min(100, keySpend.spend / keySpend.max_budget * 100) : null;
-      return /* @__PURE__ */ React15.createElement(Box11, { sx: { p: 1.5 } }, /* @__PURE__ */ React15.createElement(Typography9, { variant: "overline", color: "text.secondary" }, "Usage"), !lastTurnUsage && !keySpend ? /* @__PURE__ */ React15.createElement(Typography9, { variant: "body2", color: "text.secondary", sx: { mt: 0.5 } }, "Send a message to see token and budget usage.") : /* @__PURE__ */ React15.createElement(Box11, { sx: { mt: 0.5 } }, lastTurnUsage && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Stat, { label: "This turn", value: `${lastTurnUsage.total_tokens.toLocaleString()} tokens` }), /* @__PURE__ */ React15.createElement(Stat, { label: "Prompt / completion", value: `${lastTurnUsage.prompt_tokens.toLocaleString()} / ${lastTurnUsage.completion_tokens.toLocaleString()}` }), /* @__PURE__ */ React15.createElement(Stat, { label: "Session total", value: `${totalTokens.toLocaleString()} tokens` })), keySpend && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Divider, { sx: { my: 1 } }), /* @__PURE__ */ React15.createElement(Stat, { label: "Spent", value: formatUsd(keySpend.spend) }), keySpend.max_budget != null && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Stat, { label: "Budget", value: `${formatUsd(keySpend.spend)} / ${formatUsd(keySpend.max_budget)}` }), /* @__PURE__ */ React15.createElement(
+      return /* @__PURE__ */ React9.createElement(Box8, { sx: { p: 1.5 } }, /* @__PURE__ */ React9.createElement(Typography4, { variant: "overline", color: "text.secondary" }, "Usage"), !lastTurnUsage && !keySpend ? /* @__PURE__ */ React9.createElement(Typography4, { variant: "body2", color: "text.secondary", sx: { mt: 0.5 } }, "Send a message to see token and budget usage.") : /* @__PURE__ */ React9.createElement(Box8, { sx: { mt: 0.5 } }, lastTurnUsage && /* @__PURE__ */ React9.createElement(React9.Fragment, null, /* @__PURE__ */ React9.createElement(Stat, { label: "This turn", value: `${lastTurnUsage.total_tokens.toLocaleString()} tokens` }), /* @__PURE__ */ React9.createElement(Stat, { label: "Prompt / completion", value: `${lastTurnUsage.prompt_tokens.toLocaleString()} / ${lastTurnUsage.completion_tokens.toLocaleString()}` }), /* @__PURE__ */ React9.createElement(Stat, { label: "Session total", value: `${totalTokens.toLocaleString()} tokens` })), keySpend && /* @__PURE__ */ React9.createElement(React9.Fragment, null, /* @__PURE__ */ React9.createElement(Divider, { sx: { my: 1 } }), /* @__PURE__ */ React9.createElement(Stat, { label: "Spent", value: formatUsd(keySpend.spend) }), keySpend.max_budget != null && /* @__PURE__ */ React9.createElement(React9.Fragment, null, /* @__PURE__ */ React9.createElement(Stat, { label: "Budget", value: `${formatUsd(keySpend.spend)} / ${formatUsd(keySpend.max_budget)}` }), /* @__PURE__ */ React9.createElement(
         LinearProgress,
         {
           variant: "determinate",
@@ -1903,26 +1583,26 @@ var init_UsagePanel = __esm({
 });
 
 // src/components/ThreadSidebar.tsx
-import React16 from "react";
+import React10 from "react";
 import {
-  Box as Box12,
-  Button as Button3,
+  Box as Box9,
+  Button as Button2,
   List,
   ListItem,
   ListItemButton,
   ListItemText,
-  IconButton as IconButton5,
+  IconButton as IconButton4,
   Divider as Divider2,
-  Typography as Typography10,
+  Typography as Typography5,
   Collapse,
-  Tooltip as Tooltip5,
+  Tooltip as Tooltip4,
   InputBase,
   Menu,
-  MenuItem as MenuItem4,
+  MenuItem,
   ListItemIcon
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
-import DeleteIcon2 from "@mui/icons-material/Delete";
+import DeleteIcon from "@mui/icons-material/Delete";
 import SettingsIcon from "@mui/icons-material/Settings";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import SearchIcon from "@mui/icons-material/Search";
@@ -1966,8 +1646,8 @@ var init_ThreadSidebar = __esm({
       onDelete
     }) => {
       const menuTargetThread = threads.find((t) => t.id === menuTarget) ?? null;
-      return /* @__PURE__ */ React16.createElement(
-        Box12,
+      return /* @__PURE__ */ React10.createElement(
+        Box9,
         {
           sx: {
             width: collapsed ? SIDEBAR_RAIL_WIDTH : SIDEBAR_WIDTH,
@@ -1980,9 +1660,9 @@ var init_ThreadSidebar = __esm({
             transition: "width 0.15s"
           }
         },
-        /* @__PURE__ */ React16.createElement(Box12, { sx: { display: "flex", alignItems: "center", justifyContent: collapsed ? "center" : "flex-end", px: 0.5, py: 0.5 } }, /* @__PURE__ */ React16.createElement(Tooltip5, { title: collapsed ? "Expand sidebar" : "Collapse sidebar" }, /* @__PURE__ */ React16.createElement(IconButton5, { size: "small", onClick: onToggleCollapsed }, collapsed ? /* @__PURE__ */ React16.createElement(ChevronRightIcon, { fontSize: "small" }) : /* @__PURE__ */ React16.createElement(ChevronLeftIcon, { fontSize: "small" })))),
-        collapsed ? /* @__PURE__ */ React16.createElement(Box12, { sx: { display: "flex", flexDirection: "column", alignItems: "center", gap: 1, pt: 1 } }, /* @__PURE__ */ React16.createElement(Tooltip5, { title: "New chat", placement: "right" }, /* @__PURE__ */ React16.createElement(IconButton5, { onClick: onNewThread }, /* @__PURE__ */ React16.createElement(AddIcon, null))), /* @__PURE__ */ React16.createElement(Tooltip5, { title: "Settings", placement: "right" }, /* @__PURE__ */ React16.createElement(IconButton5, { onClick: onToggleCollapsed }, /* @__PURE__ */ React16.createElement(SettingsIcon, null)))) : /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box12, { sx: { flexShrink: 0 } }, /* @__PURE__ */ React16.createElement(
-          Box12,
+        /* @__PURE__ */ React10.createElement(Box9, { sx: { display: "flex", alignItems: "center", justifyContent: collapsed ? "center" : "flex-end", px: 0.5, py: 0.5 } }, /* @__PURE__ */ React10.createElement(Tooltip4, { title: collapsed ? "Expand sidebar" : "Collapse sidebar" }, /* @__PURE__ */ React10.createElement(IconButton4, { size: "small", onClick: onToggleCollapsed }, collapsed ? /* @__PURE__ */ React10.createElement(ChevronRightIcon, { fontSize: "small" }) : /* @__PURE__ */ React10.createElement(ChevronLeftIcon, { fontSize: "small" })))),
+        collapsed ? /* @__PURE__ */ React10.createElement(Box9, { sx: { display: "flex", flexDirection: "column", alignItems: "center", gap: 1, pt: 1 } }, /* @__PURE__ */ React10.createElement(Tooltip4, { title: "New chat", placement: "right" }, /* @__PURE__ */ React10.createElement(IconButton4, { onClick: onNewThread }, /* @__PURE__ */ React10.createElement(AddIcon, null))), /* @__PURE__ */ React10.createElement(Tooltip4, { title: "Settings", placement: "right" }, /* @__PURE__ */ React10.createElement(IconButton4, { onClick: onToggleCollapsed }, /* @__PURE__ */ React10.createElement(SettingsIcon, null)))) : /* @__PURE__ */ React10.createElement(React10.Fragment, null, /* @__PURE__ */ React10.createElement(Box9, { sx: { flexShrink: 0 } }, /* @__PURE__ */ React10.createElement(
+          Box9,
           {
             sx: {
               display: "flex",
@@ -1994,9 +1674,9 @@ var init_ThreadSidebar = __esm({
             },
             onClick: onToggleShowSettings
           },
-          /* @__PURE__ */ React16.createElement(SettingsIcon, { fontSize: "small", sx: { mr: 1 } }),
-          /* @__PURE__ */ React16.createElement(Typography10, { variant: "overline", sx: { flex: 1 } }, "Settings"),
-          /* @__PURE__ */ React16.createElement(
+          /* @__PURE__ */ React10.createElement(SettingsIcon, { fontSize: "small", sx: { mr: 1 } }),
+          /* @__PURE__ */ React10.createElement(Typography5, { variant: "overline", sx: { flex: 1 } }, "Settings"),
+          /* @__PURE__ */ React10.createElement(
             ExpandMoreIcon,
             {
               fontSize: "small",
@@ -2006,17 +1686,17 @@ var init_ThreadSidebar = __esm({
               }
             }
           )
-        ), /* @__PURE__ */ React16.createElement(Collapse, { in: showSettings }, /* @__PURE__ */ React16.createElement(Box12, { sx: { p: 1.5, display: "flex", flexDirection: "column", gap: 1.5 } }, settingsSlot))), /* @__PURE__ */ React16.createElement(Divider2, null), /* @__PURE__ */ React16.createElement(Box12, { sx: { p: 1.5, display: "flex", gap: 1 } }, /* @__PURE__ */ React16.createElement(
-          Button3,
+        ), /* @__PURE__ */ React10.createElement(Collapse, { in: showSettings }, /* @__PURE__ */ React10.createElement(Box9, { sx: { p: 1.5, display: "flex", flexDirection: "column", gap: 1.5 } }, settingsSlot))), /* @__PURE__ */ React10.createElement(Divider2, null), /* @__PURE__ */ React10.createElement(Box9, { sx: { p: 1.5, display: "flex", gap: 1 } }, /* @__PURE__ */ React10.createElement(
+          Button2,
           {
             fullWidth: true,
             variant: "outlined",
-            startIcon: /* @__PURE__ */ React16.createElement(AddIcon, null),
+            startIcon: /* @__PURE__ */ React10.createElement(AddIcon, null),
             onClick: onNewThread,
             size: "small"
           },
           "New chat"
-        ), /* @__PURE__ */ React16.createElement(Tooltip5, { title: "Import thread" }, /* @__PURE__ */ React16.createElement(IconButton5, { size: "small", onClick: () => importInputRef.current?.click() }, /* @__PURE__ */ React16.createElement(FileUploadIcon, { fontSize: "small" }))), /* @__PURE__ */ React16.createElement(
+        ), /* @__PURE__ */ React10.createElement(Tooltip4, { title: "Import thread" }, /* @__PURE__ */ React10.createElement(IconButton4, { size: "small", onClick: () => importInputRef.current?.click() }, /* @__PURE__ */ React10.createElement(FileUploadIcon, { fontSize: "small" }))), /* @__PURE__ */ React10.createElement(
           "input",
           {
             ref: importInputRef,
@@ -2025,14 +1705,14 @@ var init_ThreadSidebar = __esm({
             hidden: true,
             onChange: onImportFile
           }
-        )), importError && /* @__PURE__ */ React16.createElement(Box12, { sx: { px: 1.5, pb: 1 } }, /* @__PURE__ */ React16.createElement(Typography10, { variant: "caption", color: "error" }, importError)), /* @__PURE__ */ React16.createElement(Box12, { sx: { px: 1.5, pb: 1 } }, /* @__PURE__ */ React16.createElement(Tooltip5, { title: persistenceTooltip }, /* @__PURE__ */ React16.createElement(Typography10, { variant: "caption", color: "text.secondary" }, persistenceText))), /* @__PURE__ */ React16.createElement(Box12, { sx: { px: 1.5, pb: 1 } }, /* @__PURE__ */ React16.createElement(
+        )), importError && /* @__PURE__ */ React10.createElement(Box9, { sx: { px: 1.5, pb: 1 } }, /* @__PURE__ */ React10.createElement(Typography5, { variant: "caption", color: "error" }, importError)), /* @__PURE__ */ React10.createElement(Box9, { sx: { px: 1.5, pb: 1 } }, /* @__PURE__ */ React10.createElement(Tooltip4, { title: persistenceTooltip }, /* @__PURE__ */ React10.createElement(Typography5, { variant: "caption", color: "text.secondary" }, persistenceText))), /* @__PURE__ */ React10.createElement(Box9, { sx: { px: 1.5, pb: 1 } }, /* @__PURE__ */ React10.createElement(
           InputBase,
           {
             fullWidth: true,
             placeholder: "Search threads\u2026",
             value: searchQuery,
             onChange: (e) => onSearchQueryChange(e.target.value),
-            startAdornment: /* @__PURE__ */ React16.createElement(SearchIcon, { fontSize: "small", sx: { mr: 0.75, color: "text.secondary" } }),
+            startAdornment: /* @__PURE__ */ React10.createElement(SearchIcon, { fontSize: "small", sx: { mr: 0.75, color: "text.secondary" } }),
             sx: {
               border: 1,
               borderColor: "divider",
@@ -2042,22 +1722,22 @@ var init_ThreadSidebar = __esm({
               fontSize: "0.85rem"
             }
           }
-        )), /* @__PURE__ */ React16.createElement(Box12, { sx: { flex: 1, overflowY: "auto", minHeight: 0 } }, /* @__PURE__ */ React16.createElement(List, { dense: true }, visibleThreads.map((t) => /* @__PURE__ */ React16.createElement(
+        )), /* @__PURE__ */ React10.createElement(Box9, { sx: { flex: 1, overflowY: "auto", minHeight: 0 } }, /* @__PURE__ */ React10.createElement(List, { dense: true }, visibleThreads.map((t) => /* @__PURE__ */ React10.createElement(
           ListItem,
           {
             key: t.id,
             disablePadding: true,
-            secondaryAction: /* @__PURE__ */ React16.createElement(IconButton5, { edge: "end", size: "small", onClick: (e) => onOpenMenu(e, t.id) }, /* @__PURE__ */ React16.createElement(MoreVertIcon, { fontSize: "small" }))
+            secondaryAction: /* @__PURE__ */ React10.createElement(IconButton4, { edge: "end", size: "small", onClick: (e) => onOpenMenu(e, t.id) }, /* @__PURE__ */ React10.createElement(MoreVertIcon, { fontSize: "small" }))
           },
-          /* @__PURE__ */ React16.createElement(
+          /* @__PURE__ */ React10.createElement(
             ListItemButton,
             {
               selected: activeThreadId === t.id,
               onClick: () => onSelectThread(t.id),
               sx: { pr: 6 }
             },
-            t.pinned && /* @__PURE__ */ React16.createElement(PushPinIcon, { fontSize: "small", sx: { mr: 0.75, color: "text.secondary" } }),
-            /* @__PURE__ */ React16.createElement(
+            t.pinned && /* @__PURE__ */ React10.createElement(PushPinIcon, { fontSize: "small", sx: { mr: 0.75, color: "text.secondary" } }),
+            /* @__PURE__ */ React10.createElement(
               ListItemText,
               {
                 primary: t.title,
@@ -2066,38 +1746,532 @@ var init_ThreadSidebar = __esm({
               }
             )
           )
-        )), visibleThreads.length === 0 && /* @__PURE__ */ React16.createElement(Typography10, { variant: "caption", color: "text.secondary", sx: { px: 2, py: 1, display: "block" } }, searchQuery ? "No threads match your search." : "No threads yet."))), /* @__PURE__ */ React16.createElement(Menu, { anchorEl: menuAnchor, open: !!menuAnchor, onClose: onCloseMenu }, /* @__PURE__ */ React16.createElement(
-          MenuItem4,
+        )), visibleThreads.length === 0 && /* @__PURE__ */ React10.createElement(Typography5, { variant: "caption", color: "text.secondary", sx: { px: 2, py: 1, display: "block" } }, searchQuery ? "No threads match your search." : "No threads yet."))), /* @__PURE__ */ React10.createElement(Menu, { anchorEl: menuAnchor, open: !!menuAnchor, onClose: onCloseMenu }, /* @__PURE__ */ React10.createElement(
+          MenuItem,
           {
             onClick: () => {
               if (menuTarget) onTogglePin(menuTarget);
               onCloseMenu();
             }
           },
-          /* @__PURE__ */ React16.createElement(ListItemIcon, null, menuTargetThread?.pinned ? /* @__PURE__ */ React16.createElement(PushPinIcon, { fontSize: "small" }) : /* @__PURE__ */ React16.createElement(PushPinOutlinedIcon, { fontSize: "small" })),
+          /* @__PURE__ */ React10.createElement(ListItemIcon, null, menuTargetThread?.pinned ? /* @__PURE__ */ React10.createElement(PushPinIcon, { fontSize: "small" }) : /* @__PURE__ */ React10.createElement(PushPinOutlinedIcon, { fontSize: "small" })),
           menuTargetThread?.pinned ? "Unpin" : "Pin"
-        ), /* @__PURE__ */ React16.createElement(
-          MenuItem4,
+        ), /* @__PURE__ */ React10.createElement(
+          MenuItem,
           {
             onClick: () => {
               if (menuTarget) onExport(menuTarget);
               onCloseMenu();
             }
           },
-          /* @__PURE__ */ React16.createElement(ListItemIcon, null, /* @__PURE__ */ React16.createElement(FileDownloadIcon, { fontSize: "small" })),
+          /* @__PURE__ */ React10.createElement(ListItemIcon, null, /* @__PURE__ */ React10.createElement(FileDownloadIcon, { fontSize: "small" })),
           "Export"
-        ), /* @__PURE__ */ React16.createElement(
-          MenuItem4,
+        ), /* @__PURE__ */ React10.createElement(
+          MenuItem,
           {
             onClick: () => {
               if (menuTarget) onDelete(menuTarget);
               onCloseMenu();
             }
           },
-          /* @__PURE__ */ React16.createElement(ListItemIcon, null, /* @__PURE__ */ React16.createElement(DeleteIcon2, { fontSize: "small" })),
+          /* @__PURE__ */ React10.createElement(ListItemIcon, null, /* @__PURE__ */ React10.createElement(DeleteIcon, { fontSize: "small" })),
           "Delete"
         )))
       );
+    };
+  }
+});
+
+// src/components/PersonaPicker.tsx
+import React11 from "react";
+import { Select, MenuItem as MenuItem2, FormControl, InputLabel, Typography as Typography6 } from "@mui/material";
+var PersonaPicker;
+var init_PersonaPicker = __esm({
+  "src/components/PersonaPicker.tsx"() {
+    "use strict";
+    PersonaPicker = ({
+      value,
+      personas,
+      loading,
+      error,
+      onChange
+    }) => {
+      return /* @__PURE__ */ React11.createElement(FormControl, { size: "small", error: !!error, sx: { minWidth: 200 } }, /* @__PURE__ */ React11.createElement(InputLabel, { shrink: true }, "Persona"), /* @__PURE__ */ React11.createElement(
+        Select,
+        {
+          value,
+          label: "Persona",
+          displayEmpty: true,
+          onChange: (e) => {
+            const id = e.target.value;
+            onChange(id, personas.find((p) => p.id === id));
+          },
+          disabled: loading
+        },
+        /* @__PURE__ */ React11.createElement(MenuItem2, { value: "" }, /* @__PURE__ */ React11.createElement("em", null, "None")),
+        personas.map((p) => /* @__PURE__ */ React11.createElement(MenuItem2, { key: p.id, value: p.id }, p.title))
+      ), error && /* @__PURE__ */ React11.createElement(Typography6, { variant: "caption", color: "error", sx: { mt: 0.5 } }, error));
+    };
+  }
+});
+
+// src/components/KeyPicker.tsx
+import React12, { useState as useState5 } from "react";
+import { Button as Button3, Box as Box10, Typography as Typography7, CircularProgress as CircularProgress2, Tooltip as Tooltip5, IconButton as IconButton5 } from "@mui/material";
+import KeyIcon from "@mui/icons-material/VpnKey";
+import DeleteIcon2 from "@mui/icons-material/Delete";
+import { useApi as useApi2 } from "@backstage/core-plugin-api";
+var KeyPicker;
+var init_KeyPicker = __esm({
+  "src/components/KeyPicker.tsx"() {
+    "use strict";
+    init_api();
+    KeyPicker = ({ value, onChange, onDelete }) => {
+      const chatApi = useApi2(liteLlmChatApiRef);
+      const [loading, setLoading] = useState5(false);
+      const [error, setError] = useState5(null);
+      const handleGenerate = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+          const keyInfo = await chatApi.mintChatKey();
+          onChange({ alias: keyInfo.key_alias, token: keyInfo.key });
+        } catch (err) {
+          setError(err.message);
+        } finally {
+          setLoading(false);
+        }
+      };
+      const handleDelete = async () => {
+        if (!value.token) return;
+        try {
+          await chatApi.deleteChatKey(value.token);
+        } catch {
+        }
+        onDelete?.();
+        onChange({ alias: "", token: "" });
+      };
+      if (value.token) {
+        return /* @__PURE__ */ React12.createElement(Box10, { sx: { display: "flex", alignItems: "center", gap: 1, minWidth: 200 } }, /* @__PURE__ */ React12.createElement(KeyIcon, { fontSize: "small", color: "success" }), /* @__PURE__ */ React12.createElement(Typography7, { variant: "body2", sx: { flex: 1, overflow: "hidden", textOverflow: "ellipsis" } }, value.alias || "chat key"), /* @__PURE__ */ React12.createElement(Tooltip5, { title: "Delete chat key" }, /* @__PURE__ */ React12.createElement(IconButton5, { edge: "end", size: "small", onClick: handleDelete }, /* @__PURE__ */ React12.createElement(DeleteIcon2, { fontSize: "small" }))));
+      }
+      return /* @__PURE__ */ React12.createElement(Box10, { sx: { minWidth: 200 } }, /* @__PURE__ */ React12.createElement(
+        Button3,
+        {
+          size: "small",
+          variant: "outlined",
+          startIcon: loading ? /* @__PURE__ */ React12.createElement(CircularProgress2, { size: 16 }) : /* @__PURE__ */ React12.createElement(KeyIcon, null),
+          onClick: handleGenerate,
+          disabled: loading
+        },
+        loading ? "Minting\u2026" : "Generate chat key"
+      ), error && /* @__PURE__ */ React12.createElement(Typography7, { variant: "caption", color: "error", sx: { display: "block", mt: 0.5 } }, error));
+    };
+  }
+});
+
+// src/components/OptionPicker.tsx
+import React13 from "react";
+import { Select as Select2, MenuItem as MenuItem3, FormControl as FormControl2, InputLabel as InputLabel2 } from "@mui/material";
+var OptionPicker;
+var init_OptionPicker = __esm({
+  "src/components/OptionPicker.tsx"() {
+    "use strict";
+    OptionPicker = ({
+      label,
+      value,
+      options,
+      onChange,
+      loading,
+      noneLabel = "Default"
+    }) => {
+      return /* @__PURE__ */ React13.createElement(FormControl2, { size: "small", sx: { minWidth: 160 } }, /* @__PURE__ */ React13.createElement(InputLabel2, { shrink: true }, label), /* @__PURE__ */ React13.createElement(
+        Select2,
+        {
+          value,
+          label,
+          displayEmpty: true,
+          onChange: (e) => onChange(e.target.value),
+          disabled: loading
+        },
+        /* @__PURE__ */ React13.createElement(MenuItem3, { value: "" }, /* @__PURE__ */ React13.createElement("em", null, noneLabel)),
+        options.map((o) => /* @__PURE__ */ React13.createElement(MenuItem3, { key: o.id, value: o.id }, o.label))
+      ));
+    };
+  }
+});
+
+// src/components/ModelPicker.tsx
+import React14, { useEffect as useEffect2, useState as useState6 } from "react";
+import { Select as Select3, MenuItem as MenuItem4, FormControl as FormControl3, InputLabel as InputLabel3, Typography as Typography8 } from "@mui/material";
+import { useApi as useApi3 } from "@backstage/core-plugin-api";
+import { liteLlmApiRef } from "@acarmisc/backstage-plugin-litellm";
+var ModelPicker;
+var init_ModelPicker = __esm({
+  "src/components/ModelPicker.tsx"() {
+    "use strict";
+    ModelPicker = ({
+      value,
+      onChange,
+      defaultModel
+    }) => {
+      const liteLlmApi = useApi3(liteLlmApiRef);
+      const [models, setModels] = useState6([]);
+      const [loading, setLoading] = useState6(true);
+      const [error, setError] = useState6(null);
+      useEffect2(() => {
+        let alive = true;
+        liteLlmApi.listModels().then((all) => {
+          if (!alive) return;
+          const m = all.filter((x) => !x.model_name.startsWith("claude"));
+          setModels(m);
+          if (!value && m.length) {
+            const def = defaultModel && m.find((x) => x.model_name === defaultModel)?.model_name || m[0].model_name;
+            onChange(def);
+          }
+        }).catch((err) => {
+          if (alive) setError(err.message ?? "Failed to load models");
+        }).finally(() => alive && setLoading(false));
+        return () => {
+          alive = false;
+        };
+      }, []);
+      return /* @__PURE__ */ React14.createElement(FormControl3, { size: "small", error: !!error, sx: { minWidth: 200 } }, /* @__PURE__ */ React14.createElement(InputLabel3, null, "Model"), /* @__PURE__ */ React14.createElement(
+        Select3,
+        {
+          value,
+          label: "Model",
+          onChange: (e) => onChange(e.target.value),
+          disabled: loading
+        },
+        models.map((m) => /* @__PURE__ */ React14.createElement(MenuItem4, { key: m.model_name, value: m.model_name }, m.model_name))
+      ), error && /* @__PURE__ */ React14.createElement(Typography8, { variant: "caption", color: "error", sx: { mt: 0.5 } }, error));
+    };
+  }
+});
+
+// src/components/CompareModelPicker.tsx
+import React15, { useEffect as useEffect3, useState as useState7 } from "react";
+import { Autocomplete, Box as Box11, Checkbox, Chip as Chip4, TextField as TextField2, Typography as Typography9 } from "@mui/material";
+import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
+import CheckBoxIcon from "@mui/icons-material/CheckBox";
+import { useApi as useApi4 } from "@backstage/core-plugin-api";
+import { liteLlmApiRef as liteLlmApiRef2 } from "@acarmisc/backstage-plugin-litellm";
+var CompareModelPicker;
+var init_CompareModelPicker = __esm({
+  "src/components/CompareModelPicker.tsx"() {
+    "use strict";
+    CompareModelPicker = ({ value, onChange }) => {
+      const liteLlmApi = useApi4(liteLlmApiRef2);
+      const [models, setModels] = useState7([]);
+      const [loading, setLoading] = useState7(true);
+      const [error, setError] = useState7(null);
+      useEffect3(() => {
+        let alive = true;
+        liteLlmApi.listModels().then((all) => {
+          if (!alive) return;
+          setModels(all.filter((x) => !x.model_name.startsWith("claude")));
+        }).catch((err) => {
+          if (alive) setError(err.message ?? "Failed to load models");
+        }).finally(() => alive && setLoading(false));
+        return () => {
+          alive = false;
+        };
+      }, [liteLlmApi]);
+      return /* @__PURE__ */ React15.createElement(Box11, null, /* @__PURE__ */ React15.createElement(
+        Autocomplete,
+        {
+          multiple: true,
+          size: "small",
+          options: models,
+          value: models.filter((m) => value.includes(m.model_name)),
+          loading,
+          disableCloseOnSelect: true,
+          getOptionLabel: (m) => m.model_name,
+          isOptionEqualToValue: (a, b) => a.model_name === b.model_name,
+          onChange: (_e, newValue) => onChange(newValue.map((m) => m.model_name)),
+          renderOption: (props, option, { selected: isSelected }) => /* @__PURE__ */ React15.createElement("li", { ...props, key: option.model_name }, /* @__PURE__ */ React15.createElement(
+            Checkbox,
+            {
+              icon: /* @__PURE__ */ React15.createElement(CheckBoxOutlineBlankIcon, { fontSize: "small" }),
+              checkedIcon: /* @__PURE__ */ React15.createElement(CheckBoxIcon, { fontSize: "small" }),
+              checked: isSelected,
+              size: "small",
+              sx: { mr: 1, p: 0 }
+            }
+          ), option.model_name),
+          renderTags: (tagValue, getTagProps) => tagValue.map((option, index) => /* @__PURE__ */ React15.createElement(Chip4, { ...getTagProps({ index }), key: option.model_name, size: "small", label: option.model_name })),
+          renderInput: (params) => /* @__PURE__ */ React15.createElement(
+            TextField2,
+            {
+              ...params,
+              label: "Compare models",
+              placeholder: value.length ? void 0 : "Pick 2+ models\u2026",
+              error: !!error
+            }
+          ),
+          sx: { minWidth: 200 }
+        }
+      ), error && /* @__PURE__ */ React15.createElement(Typography9, { variant: "caption", color: "error", sx: { display: "block", mt: 0.5 } }, error));
+    };
+  }
+});
+
+// src/components/VectorStorePicker.tsx
+import React16, { useEffect as useEffect4, useState as useState8 } from "react";
+import { Autocomplete as Autocomplete2, Box as Box12, Checkbox as Checkbox2, Chip as Chip5, TextField as TextField3, Typography as Typography10 } from "@mui/material";
+import CheckBoxOutlineBlankIcon2 from "@mui/icons-material/CheckBoxOutlineBlank";
+import CheckBoxIcon2 from "@mui/icons-material/CheckBox";
+import { useApi as useApi5 } from "@backstage/core-plugin-api";
+var VectorStorePicker;
+var init_VectorStorePicker = __esm({
+  "src/components/VectorStorePicker.tsx"() {
+    "use strict";
+    init_api();
+    VectorStorePicker = ({
+      value,
+      onChange,
+      defaultVectorStoreIds
+    }) => {
+      const chatApi = useApi5(liteLlmChatApiRef);
+      const [stores, setStores] = useState8([]);
+      const [loading, setLoading] = useState8(true);
+      const [error, setError] = useState8(null);
+      useEffect4(() => {
+        let alive = true;
+        chatApi.listVectorStores().then((s) => {
+          if (!alive) return;
+          setStores(s);
+          if (value.length === 0 && s.length && defaultVectorStoreIds?.length) {
+            const defaults = defaultVectorStoreIds.filter(
+              (id) => s.some((x) => x.id === id)
+            );
+            if (defaults.length) onChange(defaults);
+          }
+        }).catch((err) => {
+          if (alive) setError(err.message ?? "Failed to load knowledge bases");
+        }).finally(() => alive && setLoading(false));
+        return () => {
+          alive = false;
+        };
+      }, []);
+      const selected = stores.filter((s) => value.includes(s.id));
+      return /* @__PURE__ */ React16.createElement(Box12, null, /* @__PURE__ */ React16.createElement(
+        Autocomplete2,
+        {
+          multiple: true,
+          size: "small",
+          options: stores,
+          value: selected,
+          loading,
+          disableCloseOnSelect: true,
+          getOptionLabel: (s) => s.name,
+          isOptionEqualToValue: (a, b) => a.id === b.id,
+          onChange: (_e, newValue) => onChange(newValue.map((s) => s.id)),
+          renderOption: (props, option, { selected: isSelected }) => /* @__PURE__ */ React16.createElement("li", { ...props, key: option.id }, /* @__PURE__ */ React16.createElement(
+            Checkbox2,
+            {
+              icon: /* @__PURE__ */ React16.createElement(CheckBoxOutlineBlankIcon2, { fontSize: "small" }),
+              checkedIcon: /* @__PURE__ */ React16.createElement(CheckBoxIcon2, { fontSize: "small" }),
+              checked: isSelected,
+              size: "small",
+              sx: { mr: 1, p: 0 }
+            }
+          ), option.name, " ", option.file_count != null ? `(${option.file_count})` : ""),
+          renderTags: (tagValue, getTagProps) => tagValue.map((option, index) => /* @__PURE__ */ React16.createElement(
+            Chip5,
+            {
+              ...getTagProps({ index }),
+              key: option.id,
+              size: "small",
+              label: option.name
+            }
+          )),
+          renderInput: (params) => /* @__PURE__ */ React16.createElement(
+            TextField3,
+            {
+              ...params,
+              label: "Knowledge bases",
+              placeholder: value.length ? void 0 : "None (no grounding)",
+              error: !!error
+            }
+          ),
+          sx: { minWidth: 200 }
+        }
+      ), error && /* @__PURE__ */ React16.createElement(Typography10, { variant: "caption", color: "error", sx: { display: "block", mt: 0.5 } }, error));
+    };
+  }
+});
+
+// src/components/SettingsPanel.tsx
+import React17 from "react";
+import {
+  Box as Box13,
+  Typography as Typography11,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  Switch,
+  FormControlLabel,
+  TextField as TextField4
+} from "@mui/material";
+import ExpandMoreIcon2 from "@mui/icons-material/ExpandMore";
+var REASONING_EFFORT_OPTIONS, SettingsPanel;
+var init_SettingsPanel = __esm({
+  "src/components/SettingsPanel.tsx"() {
+    "use strict";
+    init_PersonaPicker();
+    init_KeyPicker();
+    init_OptionPicker();
+    init_ModelPicker();
+    init_CompareModelPicker();
+    init_VectorStorePicker();
+    REASONING_EFFORT_OPTIONS = [
+      { id: "low", label: "Low" },
+      { id: "medium", label: "Medium" },
+      { id: "high", label: "High" }
+    ];
+    SettingsPanel = ({
+      configError,
+      personaId,
+      personas,
+      personasLoading,
+      personasError,
+      onPersonaChange,
+      toneId,
+      onToneChange,
+      traits,
+      traitsLoading,
+      focusId,
+      onFocusChange,
+      customSystemPrompt,
+      onCustomSystemPromptChange,
+      keyVal,
+      onKeyChange,
+      onDeleteKey,
+      compareMode,
+      onCompareModeChange,
+      compareModelsSel,
+      onCompareModelsChange,
+      model,
+      onModelChange,
+      config,
+      vectorStoreIds,
+      onVectorStoreIdsChange,
+      webSearch,
+      onWebSearchChange,
+      verbosityId,
+      onVerbosityChange,
+      reasoningEffort,
+      onReasoningEffortChange
+    }) => {
+      return /* @__PURE__ */ React17.createElement(React17.Fragment, null, configError && /* @__PURE__ */ React17.createElement(Typography11, { variant: "caption", color: "error" }, "Couldn't load chat defaults: ", configError), /* @__PURE__ */ React17.createElement(
+        PersonaPicker,
+        {
+          value: personaId,
+          personas,
+          loading: personasLoading,
+          error: personasError,
+          onChange: onPersonaChange
+        }
+      ), /* @__PURE__ */ React17.createElement(Box13, { sx: { display: "flex", gap: 1.5, flexWrap: "wrap" } }, /* @__PURE__ */ React17.createElement(
+        OptionPicker,
+        {
+          label: "Tone",
+          value: toneId,
+          options: traits.tones,
+          onChange: onToneChange,
+          loading: traitsLoading
+        }
+      ), /* @__PURE__ */ React17.createElement(
+        OptionPicker,
+        {
+          label: "Focus",
+          value: focusId,
+          options: traits.focuses,
+          onChange: onFocusChange,
+          loading: traitsLoading
+        }
+      )), /* @__PURE__ */ React17.createElement(
+        TextField4,
+        {
+          label: "Custom system prompt",
+          placeholder: personaId ? "Appended after the persona system prompt\u2026" : "Used as the system prompt (no persona selected)\u2026",
+          value: customSystemPrompt,
+          onChange: (e) => onCustomSystemPromptChange(e.target.value),
+          multiline: true,
+          minRows: 2,
+          maxRows: 6,
+          size: "small",
+          fullWidth: true
+        }
+      ), /* @__PURE__ */ React17.createElement(
+        KeyPicker,
+        {
+          value: keyVal,
+          onChange: onKeyChange,
+          onDelete: onDeleteKey
+        }
+      ), /* @__PURE__ */ React17.createElement(
+        FormControlLabel,
+        {
+          control: /* @__PURE__ */ React17.createElement(
+            Switch,
+            {
+              size: "small",
+              checked: compareMode,
+              onChange: (e) => onCompareModeChange(e.target.checked)
+            }
+          ),
+          label: /* @__PURE__ */ React17.createElement(Typography11, { variant: "body2" }, "Compare models side-by-side")
+        }
+      ), compareMode ? /* @__PURE__ */ React17.createElement(CompareModelPicker, { value: compareModelsSel, onChange: onCompareModelsChange }) : /* @__PURE__ */ React17.createElement(ModelPicker, { value: model, onChange: onModelChange, defaultModel: config.defaultModel }), /* @__PURE__ */ React17.createElement(
+        Accordion,
+        {
+          disableGutters: true,
+          variant: "outlined",
+          sx: { "&:before": { display: "none" } }
+        },
+        /* @__PURE__ */ React17.createElement(AccordionSummary, { expandIcon: /* @__PURE__ */ React17.createElement(ExpandMoreIcon2, { fontSize: "small" }) }, /* @__PURE__ */ React17.createElement(Typography11, { variant: "body2", sx: { fontWeight: 500 } }, "Advanced")),
+        /* @__PURE__ */ React17.createElement(AccordionDetails, { sx: { display: "flex", flexDirection: "column", gap: 1.5 } }, /* @__PURE__ */ React17.createElement(
+          VectorStorePicker,
+          {
+            value: vectorStoreIds,
+            onChange: onVectorStoreIdsChange,
+            defaultVectorStoreIds: config.defaultVectorStoreIds
+          }
+        ), /* @__PURE__ */ React17.createElement(
+          FormControlLabel,
+          {
+            control: /* @__PURE__ */ React17.createElement(
+              Switch,
+              {
+                size: "small",
+                checked: webSearch,
+                onChange: (e) => onWebSearchChange(e.target.checked)
+              }
+            ),
+            label: /* @__PURE__ */ React17.createElement(Typography11, { variant: "body2" }, "Include web search")
+          }
+        ), /* @__PURE__ */ React17.createElement(Box13, { sx: { display: "flex", gap: 1.5, flexWrap: "wrap" } }, /* @__PURE__ */ React17.createElement(
+          OptionPicker,
+          {
+            label: "Verbosity",
+            value: verbosityId,
+            options: traits.verbosities,
+            onChange: onVerbosityChange,
+            loading: traitsLoading
+          }
+        ), /* @__PURE__ */ React17.createElement(
+          OptionPicker,
+          {
+            label: "Reasoning effort",
+            value: reasoningEffort,
+            options: REASONING_EFFORT_OPTIONS,
+            onChange: (id) => onReasoningEffortChange(id),
+            noneLabel: "Model default"
+          }
+        )))
+      ));
     };
   }
 });
@@ -2107,23 +2281,16 @@ var ChatPage_exports = {};
 __export(ChatPage_exports, {
   ChatPage: () => ChatPage
 });
-import React17, { useEffect as useEffect5, useMemo, useRef as useRef2, useState as useState9 } from "react";
+import React18, { useEffect as useEffect5, useMemo, useRef as useRef2, useState as useState9 } from "react";
 import {
-  Box as Box13,
+  Box as Box14,
   IconButton as IconButton6,
   Divider as Divider3,
-  Typography as Typography11,
+  Typography as Typography12,
   Tooltip as Tooltip6,
   InputBase as InputBase2,
-  TextField as TextField4,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-  Chip as Chip6,
-  Switch,
-  FormControlLabel
+  Chip as Chip6
 } from "@mui/material";
-import ExpandMoreIcon2 from "@mui/icons-material/ExpandMore";
 import ChatIcon from "@mui/icons-material/Chat";
 import SendIcon from "@mui/icons-material/Send";
 import StopIcon from "@mui/icons-material/Stop";
@@ -2144,34 +2311,24 @@ function sortThreads(threads) {
     return b.updatedAt - a.updatedAt;
   });
 }
-var RIGHT_RAIL_WIDTH, CHAT_MAX_WIDTH, URL_TOKEN_RE, URL_PREVIEW_DEBOUNCE_MS, REASONING_EFFORT_OPTIONS, ChatPage;
+var RIGHT_RAIL_WIDTH, CHAT_MAX_WIDTH, URL_TOKEN_RE, URL_PREVIEW_DEBOUNCE_MS, ChatPage;
 var init_ChatPage = __esm({
   "src/components/ChatPage.tsx"() {
     "use strict";
     init_api();
     init_useChat();
     init_theme();
-    init_ModelPicker();
-    init_CompareModelPicker();
-    init_VectorStorePicker();
-    init_PersonaPicker();
     init_PersonaHomepage();
-    init_KeyPicker();
-    init_OptionPicker();
     init_MessageList();
     init_ErrorBanner();
     init_SourcesPanel();
     init_UsagePanel();
     init_ThreadSidebar();
+    init_SettingsPanel();
     RIGHT_RAIL_WIDTH = 300;
     CHAT_MAX_WIDTH = 900;
     URL_TOKEN_RE = /#(https:\/\/\S+)/;
     URL_PREVIEW_DEBOUNCE_MS = 500;
-    REASONING_EFFORT_OPTIONS = [
-      { id: "low", label: "Low" },
-      { id: "medium", label: "Medium" },
-      { id: "high", label: "High" }
-    ];
     ChatPage = () => {
       const chatApi = useApi6(liteLlmChatApiRef);
       const identityApi = useApi6(identityApiRef);
@@ -2377,153 +2534,82 @@ var init_ChatPage = __esm({
       }
       let urlPreviewChip = null;
       if (urlPreviewLoading) {
-        urlPreviewChip = /* @__PURE__ */ React17.createElement(Chip6, { size: "small", icon: /* @__PURE__ */ React17.createElement(LinkIcon2, { fontSize: "small" }), label: "Fetching page\u2026", variant: "outlined" });
+        urlPreviewChip = /* @__PURE__ */ React18.createElement(Chip6, { size: "small", icon: /* @__PURE__ */ React18.createElement(LinkIcon2, { fontSize: "small" }), label: "Fetching page\u2026", variant: "outlined" });
       } else if (urlPreviewError) {
-        urlPreviewChip = /* @__PURE__ */ React17.createElement(
+        urlPreviewChip = /* @__PURE__ */ React18.createElement(
           Chip6,
           {
             size: "small",
             color: "error",
-            icon: /* @__PURE__ */ React17.createElement(LinkIcon2, { fontSize: "small" }),
+            icon: /* @__PURE__ */ React18.createElement(LinkIcon2, { fontSize: "small" }),
             label: urlPreviewError,
             variant: "outlined",
             onDelete: dismissUrlPreview,
-            deleteIcon: /* @__PURE__ */ React17.createElement(CloseIcon, { fontSize: "small" })
+            deleteIcon: /* @__PURE__ */ React18.createElement(CloseIcon, { fontSize: "small" })
           }
         );
       } else if (urlPreview) {
-        urlPreviewChip = /* @__PURE__ */ React17.createElement(Tooltip6, { title: urlPreview.url }, /* @__PURE__ */ React17.createElement(
+        urlPreviewChip = /* @__PURE__ */ React18.createElement(Tooltip6, { title: urlPreview.url }, /* @__PURE__ */ React18.createElement(
           Chip6,
           {
             size: "small",
-            icon: /* @__PURE__ */ React17.createElement(LinkIcon2, { fontSize: "small" }),
+            icon: /* @__PURE__ */ React18.createElement(LinkIcon2, { fontSize: "small" }),
             label: `Page attached: ${urlPreview.title}`,
             variant: "outlined",
             onDelete: dismissUrlPreview,
-            deleteIcon: /* @__PURE__ */ React17.createElement(CloseIcon, { fontSize: "small" })
+            deleteIcon: /* @__PURE__ */ React18.createElement(CloseIcon, { fontSize: "small" })
           }
         ));
       }
-      return /* @__PURE__ */ React17.createElement(Box13, { sx: { display: "flex", height: "100dvh", overflow: "hidden" } }, /* @__PURE__ */ React17.createElement(
+      return /* @__PURE__ */ React18.createElement(Box14, { sx: { display: "flex", height: "100dvh", overflow: "hidden" } }, /* @__PURE__ */ React18.createElement(
         ThreadSidebar,
         {
           collapsed: sidebarCollapsed,
           onToggleCollapsed: () => setSidebarCollapsed((v) => !v),
           showSettings,
           onToggleShowSettings: () => setShowSettings((v) => !v),
-          settingsSlot: /* @__PURE__ */ React17.createElement(React17.Fragment, null, configError && /* @__PURE__ */ React17.createElement(Typography11, { variant: "caption", color: "error" }, "Couldn't load chat defaults: ", configError), /* @__PURE__ */ React17.createElement(
-            PersonaPicker,
+          settingsSlot: /* @__PURE__ */ React18.createElement(
+            SettingsPanel,
             {
-              value: personaId,
+              configError,
+              personaId,
               personas,
-              loading: personasLoading,
-              error: personasError,
-              onChange: handlePersonaChange
-            }
-          ), /* @__PURE__ */ React17.createElement(Box13, { sx: { display: "flex", gap: 1.5, flexWrap: "wrap" } }, /* @__PURE__ */ React17.createElement(
-            OptionPicker,
-            {
-              label: "Tone",
-              value: toneId,
-              options: traits.tones,
-              onChange: setToneId,
-              loading: traitsLoading
-            }
-          ), /* @__PURE__ */ React17.createElement(
-            OptionPicker,
-            {
-              label: "Focus",
-              value: focusId,
-              options: traits.focuses,
-              onChange: setFocusId,
-              loading: traitsLoading
-            }
-          )), /* @__PURE__ */ React17.createElement(
-            TextField4,
-            {
-              label: "Custom system prompt",
-              placeholder: personaId ? "Appended after the persona system prompt\u2026" : "Used as the system prompt (no persona selected)\u2026",
-              value: customSystemPrompt,
-              onChange: (e) => setCustomSystemPrompt(e.target.value),
-              multiline: true,
-              minRows: 2,
-              maxRows: 6,
-              size: "small",
-              fullWidth: true
-            }
-          ), /* @__PURE__ */ React17.createElement(
-            KeyPicker,
-            {
-              value: keyVal,
-              onChange: setKeyVal,
-              onDelete: () => {
+              personasLoading,
+              personasError,
+              onPersonaChange: handlePersonaChange,
+              toneId,
+              onToneChange: setToneId,
+              traits,
+              traitsLoading,
+              focusId,
+              onFocusChange: setFocusId,
+              customSystemPrompt,
+              onCustomSystemPromptChange: setCustomSystemPrompt,
+              keyVal,
+              onKeyChange: setKeyVal,
+              onDeleteKey: () => {
                 if (chat.activeThread?.keyToken) {
                   chatApi.deleteChatKey(chat.activeThread.keyToken).catch(() => {
                   });
                 }
-              }
+              },
+              compareMode,
+              onCompareModeChange: setCompareModeUi,
+              compareModelsSel,
+              onCompareModelsChange: setCompareModelsSel,
+              model,
+              onModelChange: setModel,
+              config,
+              vectorStoreIds,
+              onVectorStoreIdsChange: setVectorStoreIds,
+              webSearch,
+              onWebSearchChange: setWebSearch,
+              verbosityId,
+              onVerbosityChange: setVerbosityId,
+              reasoningEffort,
+              onReasoningEffortChange: setReasoningEffort
             }
-          ), /* @__PURE__ */ React17.createElement(
-            FormControlLabel,
-            {
-              control: /* @__PURE__ */ React17.createElement(
-                Switch,
-                {
-                  size: "small",
-                  checked: compareMode,
-                  onChange: (e) => setCompareModeUi(e.target.checked)
-                }
-              ),
-              label: /* @__PURE__ */ React17.createElement(Typography11, { variant: "body2" }, "Compare models side-by-side")
-            }
-          ), compareMode ? /* @__PURE__ */ React17.createElement(CompareModelPicker, { value: compareModelsSel, onChange: setCompareModelsSel }) : /* @__PURE__ */ React17.createElement(ModelPicker, { value: model, onChange: setModel, defaultModel: config.defaultModel }), /* @__PURE__ */ React17.createElement(
-            Accordion,
-            {
-              disableGutters: true,
-              variant: "outlined",
-              sx: { "&:before": { display: "none" } }
-            },
-            /* @__PURE__ */ React17.createElement(AccordionSummary, { expandIcon: /* @__PURE__ */ React17.createElement(ExpandMoreIcon2, { fontSize: "small" }) }, /* @__PURE__ */ React17.createElement(Typography11, { variant: "body2", sx: { fontWeight: 500 } }, "Advanced")),
-            /* @__PURE__ */ React17.createElement(AccordionDetails, { sx: { display: "flex", flexDirection: "column", gap: 1.5 } }, /* @__PURE__ */ React17.createElement(
-              VectorStorePicker,
-              {
-                value: vectorStoreIds,
-                onChange: setVectorStoreIds,
-                defaultVectorStoreIds: config.defaultVectorStoreIds
-              }
-            ), /* @__PURE__ */ React17.createElement(
-              FormControlLabel,
-              {
-                control: /* @__PURE__ */ React17.createElement(
-                  Switch,
-                  {
-                    size: "small",
-                    checked: webSearch,
-                    onChange: (e) => setWebSearch(e.target.checked)
-                  }
-                ),
-                label: /* @__PURE__ */ React17.createElement(Typography11, { variant: "body2" }, "Include web search")
-              }
-            ), /* @__PURE__ */ React17.createElement(Box13, { sx: { display: "flex", gap: 1.5, flexWrap: "wrap" } }, /* @__PURE__ */ React17.createElement(
-              OptionPicker,
-              {
-                label: "Verbosity",
-                value: verbosityId,
-                options: traits.verbosities,
-                onChange: setVerbosityId,
-                loading: traitsLoading
-              }
-            ), /* @__PURE__ */ React17.createElement(
-              OptionPicker,
-              {
-                label: "Reasoning effort",
-                value: reasoningEffort,
-                options: REASONING_EFFORT_OPTIONS,
-                onChange: (id) => setReasoningEffort(id),
-                noneLabel: "Model default"
-              }
-            )))
-          )),
+          ),
           onNewThread: chat.newThread,
           importInputRef,
           onImportFile: handleImportFile,
@@ -2544,8 +2630,8 @@ var init_ChatPage = __esm({
           onExport: (id) => chat.exportThread(id),
           onDelete: (id) => chat.deleteThread(id)
         }
-      ), /* @__PURE__ */ React17.createElement(
-        Box13,
+      ), /* @__PURE__ */ React18.createElement(
+        Box14,
         {
           sx: {
             flex: 3,
@@ -2554,8 +2640,8 @@ var init_ChatPage = __esm({
             overflow: "hidden"
           }
         },
-        /* @__PURE__ */ React17.createElement(
-          Box13,
+        /* @__PURE__ */ React18.createElement(
+          Box14,
           {
             sx: {
               width: "100%",
@@ -2565,8 +2651,8 @@ var init_ChatPage = __esm({
               overflow: "hidden"
             }
           },
-          /* @__PURE__ */ React17.createElement(
-            Box13,
+          /* @__PURE__ */ React18.createElement(
+            Box14,
             {
               sx: {
                 flexShrink: 0,
@@ -2579,13 +2665,13 @@ var init_ChatPage = __esm({
                 gap: 1
               }
             },
-            /* @__PURE__ */ React17.createElement(ChatIcon, { fontSize: "small", color: "action" }),
-            /* @__PURE__ */ React17.createElement(Typography11, { variant: "subtitle2", noWrap: true, sx: { flex: 1 } }, chat.activeThread?.title ?? "AI Chat"),
-            /* @__PURE__ */ React17.createElement(Tooltip6, { title: rightPanelCollapsed ? "Show context panel" : "Hide context panel" }, /* @__PURE__ */ React17.createElement(IconButton6, { size: "small", onClick: () => setRightPanelCollapsed((v) => !v) }, rightPanelCollapsed ? /* @__PURE__ */ React17.createElement(ChevronLeftIcon2, { fontSize: "small" }) : /* @__PURE__ */ React17.createElement(ChevronRightIcon2, { fontSize: "small" })))
+            /* @__PURE__ */ React18.createElement(ChatIcon, { fontSize: "small", color: "action" }),
+            /* @__PURE__ */ React18.createElement(Typography12, { variant: "subtitle2", noWrap: true, sx: { flex: 1 } }, chat.activeThread?.title ?? "AI Chat"),
+            /* @__PURE__ */ React18.createElement(Tooltip6, { title: rightPanelCollapsed ? "Show context panel" : "Hide context panel" }, /* @__PURE__ */ React18.createElement(IconButton6, { size: "small", onClick: () => setRightPanelCollapsed((v) => !v) }, rightPanelCollapsed ? /* @__PURE__ */ React18.createElement(ChevronLeftIcon2, { fontSize: "small" }) : /* @__PURE__ */ React18.createElement(ChevronRightIcon2, { fontSize: "small" })))
           ),
-          chat.error && /* @__PURE__ */ React17.createElement(Box13, { sx: { px: 2, pt: 1 } }, /* @__PURE__ */ React17.createElement(ErrorBanner, { error: chat.error, onDismiss: chat.clearError })),
-          /* @__PURE__ */ React17.createElement(
-            Box13,
+          chat.error && /* @__PURE__ */ React18.createElement(Box14, { sx: { px: 2, pt: 1 } }, /* @__PURE__ */ React18.createElement(ErrorBanner, { error: chat.error, onDismiss: chat.clearError })),
+          /* @__PURE__ */ React18.createElement(
+            Box14,
             {
               ref: messagesContainerRef,
               sx: {
@@ -2594,7 +2680,7 @@ var init_ChatPage = __esm({
                 minHeight: 0
               }
             },
-            messages.length === 0 ? /* @__PURE__ */ React17.createElement(
+            messages.length === 0 ? /* @__PURE__ */ React18.createElement(
               PersonaHomepage,
               {
                 personas,
@@ -2603,7 +2689,7 @@ var init_ChatPage = __esm({
                 selectedId: personaId,
                 onSelect: handlePersonaChange
               }
-            ) : /* @__PURE__ */ React17.createElement(
+            ) : /* @__PURE__ */ React18.createElement(
               MessageList,
               {
                 messages,
@@ -2613,11 +2699,11 @@ var init_ChatPage = __esm({
                 onEditAndResend: chat.editAndResend
               }
             ),
-            /* @__PURE__ */ React17.createElement("div", { ref: messagesEndRef })
+            /* @__PURE__ */ React18.createElement("div", { ref: messagesEndRef })
           ),
-          (urlPreviewLoading || urlPreview || urlPreviewError) && /* @__PURE__ */ React17.createElement(Box13, { sx: { px: 2, pt: 1 } }, urlPreviewChip),
-          /* @__PURE__ */ React17.createElement(
-            Box13,
+          (urlPreviewLoading || urlPreview || urlPreviewError) && /* @__PURE__ */ React18.createElement(Box14, { sx: { px: 2, pt: 1 } }, urlPreviewChip),
+          /* @__PURE__ */ React18.createElement(
+            Box14,
             {
               sx: {
                 flexShrink: 0,
@@ -2630,7 +2716,7 @@ var init_ChatPage = __esm({
                 alignItems: "flex-end"
               }
             },
-            /* @__PURE__ */ React17.createElement(
+            /* @__PURE__ */ React18.createElement(
               InputBase2,
               {
                 multiline: true,
@@ -2652,20 +2738,20 @@ var init_ChatPage = __esm({
                 }
               }
             ),
-            isStreaming ? /* @__PURE__ */ React17.createElement(Tooltip6, { title: "Stop" }, /* @__PURE__ */ React17.createElement(IconButton6, { color: "error", onClick: chat.stopGeneration }, /* @__PURE__ */ React17.createElement(StopIcon, null))) : /* @__PURE__ */ React17.createElement(Tooltip6, { title: "Send" }, /* @__PURE__ */ React17.createElement(
+            isStreaming ? /* @__PURE__ */ React18.createElement(Tooltip6, { title: "Stop" }, /* @__PURE__ */ React18.createElement(IconButton6, { color: "error", onClick: chat.stopGeneration }, /* @__PURE__ */ React18.createElement(StopIcon, null))) : /* @__PURE__ */ React18.createElement(Tooltip6, { title: "Send" }, /* @__PURE__ */ React18.createElement(
               IconButton6,
               {
                 color: "primary",
                 onClick: handleSend,
                 disabled: !input.trim() || !keyVal.token || compareMode && compareModelsSel.length === 0
               },
-              /* @__PURE__ */ React17.createElement(SendIcon, null)
+              /* @__PURE__ */ React18.createElement(SendIcon, null)
             ))
           ),
-          statusParts.length > 0 && /* @__PURE__ */ React17.createElement(Box13, { sx: { px: 2, pb: 1 } }, /* @__PURE__ */ React17.createElement(Typography11, { variant: "caption", color: "text.secondary" }, statusParts.join(" \xB7 ")))
+          statusParts.length > 0 && /* @__PURE__ */ React18.createElement(Box14, { sx: { px: 2, pb: 1 } }, /* @__PURE__ */ React18.createElement(Typography12, { variant: "caption", color: "text.secondary" }, statusParts.join(" \xB7 ")))
         )
-      ), !rightPanelCollapsed && /* @__PURE__ */ React17.createElement(
-        Box13,
+      ), !rightPanelCollapsed && /* @__PURE__ */ React18.createElement(
+        Box14,
         {
           sx: {
             width: RIGHT_RAIL_WIDTH,
@@ -2677,9 +2763,9 @@ var init_ChatPage = __esm({
             overflowY: "auto"
           }
         },
-        /* @__PURE__ */ React17.createElement(SourcesPanel, { citations: chat.citations }),
-        /* @__PURE__ */ React17.createElement(Divider3, null),
-        /* @__PURE__ */ React17.createElement(
+        /* @__PURE__ */ React18.createElement(SourcesPanel, { citations: chat.citations }),
+        /* @__PURE__ */ React18.createElement(Divider3, null),
+        /* @__PURE__ */ React18.createElement(
           UsagePanel,
           {
             lastTurnUsage,
@@ -2693,19 +2779,19 @@ var init_ChatPage = __esm({
 });
 
 // src/components/BarList.tsx
-import React18 from "react";
-import { Box as Box14, Typography as Typography12 } from "@mui/material";
+import React19 from "react";
+import { Box as Box15, Typography as Typography13 } from "@mui/material";
 var BarList;
 var init_BarList = __esm({
   "src/components/BarList.tsx"() {
     "use strict";
     BarList = ({ rows, emptyLabel = "No data yet." }) => {
       if (rows.length === 0) {
-        return /* @__PURE__ */ React18.createElement(Typography12, { variant: "body2", color: "text.secondary" }, emptyLabel);
+        return /* @__PURE__ */ React19.createElement(Typography13, { variant: "body2", color: "text.secondary" }, emptyLabel);
       }
       const max = Math.max(...rows.map((r) => r.count), 1);
-      return /* @__PURE__ */ React18.createElement(Box14, { sx: { display: "flex", flexDirection: "column", gap: 1 } }, rows.map((row) => /* @__PURE__ */ React18.createElement(Box14, { key: row.key, sx: { display: "flex", alignItems: "center", gap: 1 } }, /* @__PURE__ */ React18.createElement(Typography12, { variant: "body2", sx: { width: 180, flexShrink: 0 }, noWrap: true, title: row.key }, row.key), /* @__PURE__ */ React18.createElement(Box14, { sx: { flex: 1, bgcolor: "action.hover", borderRadius: 1, overflow: "hidden", height: 18 } }, /* @__PURE__ */ React18.createElement(
-        Box14,
+      return /* @__PURE__ */ React19.createElement(Box15, { sx: { display: "flex", flexDirection: "column", gap: 1 } }, rows.map((row) => /* @__PURE__ */ React19.createElement(Box15, { key: row.key, sx: { display: "flex", alignItems: "center", gap: 1 } }, /* @__PURE__ */ React19.createElement(Typography13, { variant: "body2", sx: { width: 180, flexShrink: 0 }, noWrap: true, title: row.key }, row.key), /* @__PURE__ */ React19.createElement(Box15, { sx: { flex: 1, bgcolor: "action.hover", borderRadius: 1, overflow: "hidden", height: 18 } }, /* @__PURE__ */ React19.createElement(
+        Box15,
         {
           sx: {
             width: `${row.count / max * 100}%`,
@@ -2714,7 +2800,7 @@ var init_BarList = __esm({
             borderRadius: 1
           }
         }
-      )), /* @__PURE__ */ React18.createElement(Typography12, { variant: "body2", sx: { width: 40, textAlign: "right", flexShrink: 0 } }, row.count))));
+      )), /* @__PURE__ */ React19.createElement(Typography13, { variant: "body2", sx: { width: 40, textAlign: "right", flexShrink: 0 } }, row.count))));
     };
   }
 });
@@ -2724,8 +2810,8 @@ var AnalyticsPage_exports = {};
 __export(AnalyticsPage_exports, {
   AnalyticsPage: () => AnalyticsPage
 });
-import React19, { useEffect as useEffect6, useState as useState10 } from "react";
-import { Box as Box15, Paper, Select as Select4, MenuItem as MenuItem5, Typography as Typography13, Alert as Alert2 } from "@mui/material";
+import React20, { useEffect as useEffect6, useState as useState10 } from "react";
+import { Box as Box16, Paper, Select as Select4, MenuItem as MenuItem5, Typography as Typography14, Alert as Alert2 } from "@mui/material";
 import { useApi as useApi7 } from "@backstage/core-plugin-api";
 var RANGES, AnalyticsPage;
 var init_AnalyticsPage = __esm({
@@ -2768,14 +2854,14 @@ var init_AnalyticsPage = __esm({
         };
       }, [chatApi, range]);
       const feedbackRows = feedback ? [{ key: "\u{1F44D} up", count: feedback.up }, { key: "\u{1F44E} down", count: feedback.down }] : [];
-      return /* @__PURE__ */ React19.createElement(Box15, { sx: { p: 3, maxWidth: 900, mx: "auto" } }, /* @__PURE__ */ React19.createElement(Box15, { sx: { display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 } }, /* @__PURE__ */ React19.createElement(Typography13, { variant: "h5" }, "AI Chat analytics"), /* @__PURE__ */ React19.createElement(Select4, { size: "small", value: range, onChange: (e) => setRange(e.target.value) }, RANGES.map((r) => /* @__PURE__ */ React19.createElement(MenuItem5, { key: r.value, value: r.value }, r.label)))), error && /* @__PURE__ */ React19.createElement(Alert2, { severity: "error", sx: { mb: 2 } }, error), /* @__PURE__ */ React19.createElement(Box15, { sx: { display: "flex", flexDirection: "column", gap: 2 } }, /* @__PURE__ */ React19.createElement(Paper, { variant: "outlined", sx: { p: 2 } }, /* @__PURE__ */ React19.createElement(Typography13, { variant: "subtitle1", sx: { mb: 1.5 } }, "Turns by persona"), /* @__PURE__ */ React19.createElement(BarList, { rows: byPersona, emptyLabel: loading ? "Loading\u2026" : "No chat turns in this range." })), /* @__PURE__ */ React19.createElement(Paper, { variant: "outlined", sx: { p: 2 } }, /* @__PURE__ */ React19.createElement(Typography13, { variant: "subtitle1", sx: { mb: 1.5 } }, "Turns by model"), /* @__PURE__ */ React19.createElement(BarList, { rows: byModel, emptyLabel: loading ? "Loading\u2026" : "No chat turns in this range." })), /* @__PURE__ */ React19.createElement(Paper, { variant: "outlined", sx: { p: 2 } }, /* @__PURE__ */ React19.createElement(Typography13, { variant: "subtitle1", sx: { mb: 1.5 } }, "Feedback (all time)"), /* @__PURE__ */ React19.createElement(BarList, { rows: feedbackRows, emptyLabel: loading ? "Loading\u2026" : "No feedback recorded yet." }))));
+      return /* @__PURE__ */ React20.createElement(Box16, { sx: { p: 3, maxWidth: 900, mx: "auto" } }, /* @__PURE__ */ React20.createElement(Box16, { sx: { display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 } }, /* @__PURE__ */ React20.createElement(Typography14, { variant: "h5" }, "AI Chat analytics"), /* @__PURE__ */ React20.createElement(Select4, { size: "small", value: range, onChange: (e) => setRange(e.target.value) }, RANGES.map((r) => /* @__PURE__ */ React20.createElement(MenuItem5, { key: r.value, value: r.value }, r.label)))), error && /* @__PURE__ */ React20.createElement(Alert2, { severity: "error", sx: { mb: 2 } }, error), /* @__PURE__ */ React20.createElement(Box16, { sx: { display: "flex", flexDirection: "column", gap: 2 } }, /* @__PURE__ */ React20.createElement(Paper, { variant: "outlined", sx: { p: 2 } }, /* @__PURE__ */ React20.createElement(Typography14, { variant: "subtitle1", sx: { mb: 1.5 } }, "Turns by persona"), /* @__PURE__ */ React20.createElement(BarList, { rows: byPersona, emptyLabel: loading ? "Loading\u2026" : "No chat turns in this range." })), /* @__PURE__ */ React20.createElement(Paper, { variant: "outlined", sx: { p: 2 } }, /* @__PURE__ */ React20.createElement(Typography14, { variant: "subtitle1", sx: { mb: 1.5 } }, "Turns by model"), /* @__PURE__ */ React20.createElement(BarList, { rows: byModel, emptyLabel: loading ? "Loading\u2026" : "No chat turns in this range." })), /* @__PURE__ */ React20.createElement(Paper, { variant: "outlined", sx: { p: 2 } }, /* @__PURE__ */ React20.createElement(Typography14, { variant: "subtitle1", sx: { mb: 1.5 } }, "Feedback (all time)"), /* @__PURE__ */ React20.createElement(BarList, { rows: feedbackRows, emptyLabel: loading ? "Loading\u2026" : "No feedback recorded yet." }))));
     };
   }
 });
 
 // src/plugin.tsx
 init_api();
-import React20 from "react";
+import React21 from "react";
 import { Chat as ChatIcon2, BarChart as BarChartIcon } from "@mui/icons-material";
 import {
   createFrontendPlugin,
@@ -2794,10 +2880,10 @@ var chatPage = PageBlueprint.make({
   params: {
     path: "/ai-chat",
     title: "AI Chat",
-    icon: /* @__PURE__ */ React20.createElement(ChatIcon2, null),
+    icon: /* @__PURE__ */ React21.createElement(ChatIcon2, null),
     loader: async () => {
       const { ChatPage: ChatPage2 } = await Promise.resolve().then(() => (init_ChatPage(), ChatPage_exports));
-      return /* @__PURE__ */ React20.createElement(ChatPage2, null);
+      return /* @__PURE__ */ React21.createElement(ChatPage2, null);
     }
   }
 });
@@ -2806,10 +2892,10 @@ var analyticsPage = PageBlueprint.make({
   params: {
     path: "/ai-chat/analytics",
     title: "AI Chat Analytics",
-    icon: /* @__PURE__ */ React20.createElement(BarChartIcon, null),
+    icon: /* @__PURE__ */ React21.createElement(BarChartIcon, null),
     loader: async () => {
       const { AnalyticsPage: AnalyticsPage2 } = await Promise.resolve().then(() => (init_AnalyticsPage(), AnalyticsPage_exports));
-      return /* @__PURE__ */ React20.createElement(AnalyticsPage2, null);
+      return /* @__PURE__ */ React21.createElement(AnalyticsPage2, null);
     }
   }
 });
