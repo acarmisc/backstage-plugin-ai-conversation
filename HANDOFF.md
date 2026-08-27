@@ -156,9 +156,11 @@ GitLab CI (`.gitlab-ci.yml`) on push to `main`:
 
 6. **CSP still references `abssrv.it`**: `connect-src` has both domains now, but Keycloak auth endpoint is `auth.ces.abssrv.it`. If Keycloak moves to `abstractstaging.it`, CSP needs update.
 
-7. **`@backstage/core-components` + `react-use`** in frontend deps but unused. Can remove to slim bundle.
+7. ~~**`@backstage/core-components` + `react-use`** in frontend deps but unused.~~ Removed (phase22 cleanup, `HANDOFF-ai-sdk-migration.md`).
 
-8. **`@backstage/types`** in backend deps but unused. Can remove.
+8. ~~**`@backstage/types`** in backend deps but unused.~~ Removed (phase22 cleanup).
+
+Note: this doc predates the litellm-chat → ai-conversation rebrand and the AI SDK migration (`HANDOFF-ai-sdk-migration.md`). For current package names/routes see `TODO-rebrand-followup.md`; for the current frontend state engine (`useThreads` + `@ai-sdk/react`, superseding the `useChat.ts` this doc describes) see `HANDOFF-ai-sdk-migration.md` and `AGENTS.md`.
 
 ## Review history
 

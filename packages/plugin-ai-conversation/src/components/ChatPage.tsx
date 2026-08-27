@@ -32,6 +32,9 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import LinkIcon from '@mui/icons-material/Link';
 import CloseIcon from '@mui/icons-material/Close';
+import AttachFileIcon from '@mui/icons-material/AttachFile';
+import { convertFileListToFileUIParts } from 'ai';
+import type { FileUIPart } from 'ai';
 import { useApi, identityApiRef } from '@backstage/core-plugin-api';
 import { aiConversationApiRef } from '../api';
 import { useThreads } from '../hooks/useThreads';
@@ -51,6 +54,11 @@ const RIGHT_RAIL_WIDTH = 300;
 const CHAT_MAX_WIDTH = 900;
 const URL_TOKEN_RE = /#(https:\/\/\S+)/;
 const URL_PREVIEW_DEBOUNCE_MS = 500;
+// Mirrors plugin-ai-conversation-backend/src/attachments.ts — kept in sync
+// manually since the two packages don't share a types module. A mismatch
+// here just means the user sees a later 400 instead of an earlier one.
+const MAX_ATTACHMENTS_PER_MESSAGE = 4;
+const ALLOWED_ATTACHMENT_MEDIA_TYPES = 'image/png,image/jpeg,image/webp,image/gif';
 
 function threadMatchesQuery(thread: Thread, query: string): boolean {
   const q = query.trim().toLowerCase();
@@ -111,10 +119,13 @@ export const ChatPage: React.FC = () => {
   const [dismissedUrl, setDismissedUrl] = useState<string | null>(null);
   const [traits, setTraits] = useState<ChatTraits>({ tones: [], focuses: [], verbosities: [] });
   const [traitsLoading, setTraitsLoading] = useState(true);
+  const [stagedFiles, setStagedFiles] = useState<FileUIPart[]>([]);
+  const [attachError, setAttachError] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
+  const attachInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     injectDesignSystemAssets();
@@ -242,18 +253,20 @@ export const ChatPage: React.FC = () => {
         ? { url: urlPreview.url, title: urlPreview.title }
         : undefined;
     const compareModelsOverride = compareMode ? compareModelsSel : undefined;
+    const files = stagedFiles.length > 0 ? stagedFiles : undefined;
     if (!chat.activeThread) {
       chat.newThread();
       // newThread() setState is async; defer sendMessage to the next tick
       // so it sees the freshly created active thread.
-      requestAnimationFrame(() => chat.sendMessage(text, attachedUrl, compareModelsOverride));
+      requestAnimationFrame(() => chat.sendMessage(text, attachedUrl, compareModelsOverride, files));
     } else {
-      chat.sendMessage(text, attachedUrl, compareModelsOverride);
+      chat.sendMessage(text, attachedUrl, compareModelsOverride, files);
     }
     setInput('');
     setUrlPreview(null);
     setUrlPreviewError(null);
     setDismissedUrl(null);
+    setStagedFiles([]);
   };
 
   const dismissUrlPreview = () => {
@@ -294,6 +307,27 @@ export const ChatPage: React.FC = () => {
     } catch (err: any) {
       setImportError(err.message ?? 'Failed to import thread');
     }
+  };
+
+  const handleAttachFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files ?? undefined;
+    e.target.value = '';
+    if (!fileList?.length) return;
+    if (stagedFiles.length + fileList.length > MAX_ATTACHMENTS_PER_MESSAGE) {
+      setAttachError(`You can attach up to ${MAX_ATTACHMENTS_PER_MESSAGE} images per message`);
+      return;
+    }
+    try {
+      const parts = await convertFileListToFileUIParts(fileList);
+      setStagedFiles(prev => [...prev, ...parts]);
+      setAttachError(null);
+    } catch {
+      setAttachError('Failed to read attached file');
+    }
+  };
+
+  const removeStagedFile = (index: number) => {
+    setStagedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const menuTargetThread = chat.threads.find(t => t.id === threadMenuTarget) ?? null;
@@ -659,6 +693,33 @@ export const ChatPage: React.FC = () => {
             </Box>
           )}
 
+          {/* Staged file attachments */}
+          {(stagedFiles.length > 0 || attachError) && (
+            <Box sx={{ px: 2, pt: 1, display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+              {stagedFiles.map((f, i) => (
+                <Chip
+                  key={i}
+                  size="small"
+                  icon={<AttachFileIcon fontSize="small" />}
+                  label={f.filename ?? f.mediaType}
+                  variant="outlined"
+                  onDelete={() => removeStagedFile(i)}
+                  deleteIcon={<CloseIcon fontSize="small" />}
+                />
+              ))}
+              {attachError && (
+                <Chip
+                  size="small"
+                  color="error"
+                  label={attachError}
+                  variant="outlined"
+                  onDelete={() => setAttachError(null)}
+                  deleteIcon={<CloseIcon fontSize="small" />}
+                />
+              )}
+            </Box>
+          )}
+
           {/* Fixed composer */}
           <Box
             sx={{
@@ -672,6 +733,19 @@ export const ChatPage: React.FC = () => {
               alignItems: 'flex-end',
             }}
           >
+            <Tooltip title="Attach image">
+              <IconButton size="small" onClick={() => attachInputRef.current?.click()} disabled={!keyVal.token}>
+                <AttachFileIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <input
+              ref={attachInputRef}
+              type="file"
+              accept={ALLOWED_ATTACHMENT_MEDIA_TYPES}
+              multiple
+              hidden
+              onChange={handleAttachFiles}
+            />
             <InputBase
               multiline
               minRows={1}

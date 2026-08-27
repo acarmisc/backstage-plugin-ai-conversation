@@ -2293,7 +2293,7 @@ function sortThreads(threads) {
     return b.updatedAt - a.updatedAt;
   });
 }
-var import_react21, import_material17, import_Add, import_Delete2, import_Settings2, import_Chat, import_Send, import_Stop, import_Search, import_MoreVert, import_PushPin, import_PushPinOutlined, import_FileDownload, import_FileUpload, import_ChevronLeft, import_ChevronRight, import_Link2, import_Close, import_core_plugin_api8, SIDEBAR_WIDTH, SIDEBAR_RAIL_WIDTH, RIGHT_RAIL_WIDTH, CHAT_MAX_WIDTH, URL_TOKEN_RE, URL_PREVIEW_DEBOUNCE_MS, ChatPage;
+var import_react21, import_material17, import_Add, import_Delete2, import_Settings2, import_Chat, import_Send, import_Stop, import_Search, import_MoreVert, import_PushPin, import_PushPinOutlined, import_FileDownload, import_FileUpload, import_ChevronLeft, import_ChevronRight, import_Link2, import_Close, import_AttachFile, import_ai2, import_core_plugin_api8, SIDEBAR_WIDTH, SIDEBAR_RAIL_WIDTH, RIGHT_RAIL_WIDTH, CHAT_MAX_WIDTH, URL_TOKEN_RE, URL_PREVIEW_DEBOUNCE_MS, MAX_ATTACHMENTS_PER_MESSAGE, ALLOWED_ATTACHMENT_MEDIA_TYPES, ChatPage;
 var init_ChatPage = __esm({
   "src/components/ChatPage.tsx"() {
     "use strict";
@@ -2315,6 +2315,8 @@ var init_ChatPage = __esm({
     import_ChevronRight = __toESM(require("@mui/icons-material/ChevronRight"));
     import_Link2 = __toESM(require("@mui/icons-material/Link"));
     import_Close = __toESM(require("@mui/icons-material/Close"));
+    import_AttachFile = __toESM(require("@mui/icons-material/AttachFile"));
+    import_ai2 = require("ai");
     import_core_plugin_api8 = require("@backstage/core-plugin-api");
     init_api();
     init_useThreads();
@@ -2332,6 +2334,8 @@ var init_ChatPage = __esm({
     CHAT_MAX_WIDTH = 900;
     URL_TOKEN_RE = /#(https:\/\/\S+)/;
     URL_PREVIEW_DEBOUNCE_MS = 500;
+    MAX_ATTACHMENTS_PER_MESSAGE = 4;
+    ALLOWED_ATTACHMENT_MEDIA_TYPES = "image/png,image/jpeg,image/webp,image/gif";
     ChatPage = () => {
       const chatApi = (0, import_core_plugin_api8.useApi)(aiConversationApiRef);
       const identityApi = (0, import_core_plugin_api8.useApi)(import_core_plugin_api8.identityApiRef);
@@ -2375,9 +2379,12 @@ var init_ChatPage = __esm({
       const [dismissedUrl, setDismissedUrl] = (0, import_react21.useState)(null);
       const [traits, setTraits] = (0, import_react21.useState)({ tones: [], focuses: [], verbosities: [] });
       const [traitsLoading, setTraitsLoading] = (0, import_react21.useState)(true);
+      const [stagedFiles, setStagedFiles] = (0, import_react21.useState)([]);
+      const [attachError, setAttachError] = (0, import_react21.useState)(null);
       const messagesEndRef = (0, import_react21.useRef)(null);
       const messagesContainerRef = (0, import_react21.useRef)(null);
       const importInputRef = (0, import_react21.useRef)(null);
+      const attachInputRef = (0, import_react21.useRef)(null);
       (0, import_react21.useEffect)(() => {
         injectDesignSystemAssets();
         chatApi.getChatConfig().then(setConfig).catch((err) => setConfigError(err.message ?? "Failed to reach the chat backend"));
@@ -2467,16 +2474,18 @@ var init_ChatPage = __esm({
         const activeUrlMatch = text.match(URL_TOKEN_RE)?.[1];
         const attachedUrl = activeUrlMatch && urlPreview?.url === activeUrlMatch && activeUrlMatch !== dismissedUrl ? { url: urlPreview.url, title: urlPreview.title } : void 0;
         const compareModelsOverride = compareMode ? compareModelsSel : void 0;
+        const files = stagedFiles.length > 0 ? stagedFiles : void 0;
         if (!chat.activeThread) {
           chat.newThread();
-          requestAnimationFrame(() => chat.sendMessage(text, attachedUrl, compareModelsOverride));
+          requestAnimationFrame(() => chat.sendMessage(text, attachedUrl, compareModelsOverride, files));
         } else {
-          chat.sendMessage(text, attachedUrl, compareModelsOverride);
+          chat.sendMessage(text, attachedUrl, compareModelsOverride, files);
         }
         setInput("");
         setUrlPreview(null);
         setUrlPreviewError(null);
         setDismissedUrl(null);
+        setStagedFiles([]);
       };
       const dismissUrlPreview = () => {
         if (urlPreview) setDismissedUrl(urlPreview.url);
@@ -2512,6 +2521,25 @@ var init_ChatPage = __esm({
         } catch (err) {
           setImportError(err.message ?? "Failed to import thread");
         }
+      };
+      const handleAttachFiles = async (e) => {
+        const fileList = e.target.files ?? void 0;
+        e.target.value = "";
+        if (!fileList?.length) return;
+        if (stagedFiles.length + fileList.length > MAX_ATTACHMENTS_PER_MESSAGE) {
+          setAttachError(`You can attach up to ${MAX_ATTACHMENTS_PER_MESSAGE} images per message`);
+          return;
+        }
+        try {
+          const parts = await (0, import_ai2.convertFileListToFileUIParts)(fileList);
+          setStagedFiles((prev) => [...prev, ...parts]);
+          setAttachError(null);
+        } catch {
+          setAttachError("Failed to read attached file");
+        }
+      };
+      const removeStagedFile = (index) => {
+        setStagedFiles((prev) => prev.filter((_, i) => i !== index));
       };
       const menuTargetThread = chat.threads.find((t) => t.id === threadMenuTarget) ?? null;
       const lastTurnUsage = chat.activeThread?.lastTurnUsage ?? null;
@@ -2779,6 +2807,28 @@ var init_ChatPage = __esm({
             /* @__PURE__ */ import_react21.default.createElement("div", { ref: messagesEndRef })
           ),
           (urlPreviewLoading || urlPreview || urlPreviewError) && /* @__PURE__ */ import_react21.default.createElement(import_material17.Box, { sx: { px: 2, pt: 1 } }, urlPreviewChip),
+          (stagedFiles.length > 0 || attachError) && /* @__PURE__ */ import_react21.default.createElement(import_material17.Box, { sx: { px: 2, pt: 1, display: "flex", gap: 0.5, flexWrap: "wrap" } }, stagedFiles.map((f, i) => /* @__PURE__ */ import_react21.default.createElement(
+            import_material17.Chip,
+            {
+              key: i,
+              size: "small",
+              icon: /* @__PURE__ */ import_react21.default.createElement(import_AttachFile.default, { fontSize: "small" }),
+              label: f.filename ?? f.mediaType,
+              variant: "outlined",
+              onDelete: () => removeStagedFile(i),
+              deleteIcon: /* @__PURE__ */ import_react21.default.createElement(import_Close.default, { fontSize: "small" })
+            }
+          )), attachError && /* @__PURE__ */ import_react21.default.createElement(
+            import_material17.Chip,
+            {
+              size: "small",
+              color: "error",
+              label: attachError,
+              variant: "outlined",
+              onDelete: () => setAttachError(null),
+              deleteIcon: /* @__PURE__ */ import_react21.default.createElement(import_Close.default, { fontSize: "small" })
+            }
+          )),
           /* @__PURE__ */ import_react21.default.createElement(
             import_material17.Box,
             {
@@ -2793,6 +2843,18 @@ var init_ChatPage = __esm({
                 alignItems: "flex-end"
               }
             },
+            /* @__PURE__ */ import_react21.default.createElement(import_material17.Tooltip, { title: "Attach image" }, /* @__PURE__ */ import_react21.default.createElement(import_material17.IconButton, { size: "small", onClick: () => attachInputRef.current?.click(), disabled: !keyVal.token }, /* @__PURE__ */ import_react21.default.createElement(import_AttachFile.default, { fontSize: "small" }))),
+            /* @__PURE__ */ import_react21.default.createElement(
+              "input",
+              {
+                ref: attachInputRef,
+                type: "file",
+                accept: ALLOWED_ATTACHMENT_MEDIA_TYPES,
+                multiple: true,
+                hidden: true,
+                onChange: handleAttachFiles
+              }
+            ),
             /* @__PURE__ */ import_react21.default.createElement(
               import_material17.InputBase,
               {

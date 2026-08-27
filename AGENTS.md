@@ -29,7 +29,7 @@ The chat plugin reuses all of this by **importing from the govai package**, not 
 | Packaging | Separate plugin pair (`plugin-ai-conversation` + `plugin-ai-conversation-backend`) | Independently versionable; keeps governance and chat concerns decoupled; matches govai's monorepo pattern. |
 | Thread persistence | Client-side ephemeral by default (React state + localStorage); **opt-in server-side persistence** via `litellm.aiConversation.persistence.enabled` (phase16) | LiteLLM is stateless — each turn resends full history anyway, so DB persistence was deferred until users actually asked for cross-device/durable history. Now available as an operator-controlled toggle: `chat_threads` table (`plugin-ai-conversation-backend/migrations/20260819130000_chat_threads.js`), `GET/PUT/DELETE /api/ai-conversation/threads[/:id]`, gated 404 when disabled. When enabled, the backend becomes authoritative — `useChat` loads the server's thread list on mount and syncs the active thread + create/delete/pin/import mutations back; localStorage is kept as a fast local cache/offline fallback either way. Auto-deletion after `ttlDays` (default 30, `0` = unlimited) runs via `coreServices.scheduler` (not a plain interval — DB-backed leader coordination matters here since the target deployment runs 2 Backstage replicas, see "Target environment" below). Message feedback (thumbs up/down) remains its own separate `chat_message_feedback` table/mechanism, a snapshotted event rather than full thread history. |
 | RAG endpoint | `/v1/rag/query` primary, `/v1/chat/completions` + `vector_store_ids` fallback | `/v1/rag/query` is model-agnostic (prepend-context, not provider-native tool). Fallback handles LiteLLM versions where `/rag/query` isn't mounted. |
-| Chat key strategy | User picks a key in the UI (dropdown from their existing keys) | Spend attribution to the user's chosen key; per-key budget/limits enforced natively by LiteLLM; no surprise auto-minted keys. |
+| Chat key strategy | Backend auto-mints a dedicated `sk-` key per thread via the master key (`POST /chat/key`), returned to the browser once and stored in that thread's state; deleted on thread delete | Superseded the original "user picks an existing key from a dropdown" plan — LiteLLM's `listKeys` only returns hashed/masked tokens, unusable for auth. See `HANDOFF.md` decision #3. |
 | UI surfaces | Full chat page at `/ai-conversation` | v1 ships the page. Sidebar modal and home widget are future work. |
 | Cross-package reuse | Import `LiteLLMClient`, `resolveUserId`, `toLiteLLMUserId`, `getOrProvisionUser`, `ProvisioningError`, types from govai backend; import `LiteLlmApi`, `liteLlmApiRef`, types from govai frontend | Govai is the single source of truth for identity, key management, and the LiteLLM client. Chat plugin adds only chat-specific routes and components. |
 | Persona source | Backstage catalog `Component` entities (`spec.type: chat-persona`), own type — not `app-config.yaml`, not the sibling `ai-agent` type | Self-service authoring (any team commits a `catalog-info.yaml`), ownership/RBAC/tags for free. `ai-agent` models externally-invocable, health-probed agents; a persona has no endpoint to probe and would pollute that inventory with permanent `unknown` status. Personas live in `git@gitlab.az.abssrv.it:innovation/ces-ai-personas.git`, auto-discovered by the existing GitLab catalog provider — no host app-config change needed. |
@@ -161,8 +161,7 @@ New `AiConversationApi` + `aiConversationApiRef`. Reuses the existing `liteLlmAp
 | Method | Purpose |
 |---|---|
 | `listVectorStores()` | `GET /api/ai-conversation/vector_stores` → `VectorStore[]` |
-| `chatStream(req, onToken, onDone, onError)` | Opens `fetch` to `/api/ai-conversation/chat/stream`, reads SSE via `ReadableStream` reader, parses `data:` lines, calls callbacks. Returns `AbortController` for stop. |
-| `chatCompletions(req)` | Non-streaming variant. |
+| `chatCompletions(req)` | Non-streaming variant. Streaming goes through `useThreads`'s `@ai-sdk/react` transport, not a hand-rolled `api.ts` method (see below). |
 
 ### Types (`src/types.ts`)
 
@@ -170,17 +169,19 @@ New `AiConversationApi` + `aiConversationApiRef`. Reuses the existing `liteLlmAp
 interface VectorStore { id: string; name: string; file_count?: number; status?: string; }
 interface ChatRequest { model: string; messages: Message[]; vector_store_ids?: string[]; top_k?: number; user_key: string; }
 interface Message { role: 'user' | 'assistant' | 'system'; content: string; }
-interface ChatStreamChunk { delta?: string; error?: string; search_results?: SearchResult[]; usage?: UsageInfo; }
-interface SearchResult { filename: string; score: number; text: string; }
-interface Citation { filename: string; score: number; snippet: string; }
 interface ChatResult { content: string; citations: Citation[]; }
+interface Citation { filename: string; score: number; snippet: string; }
 ```
 
-### State management (`src/hooks/useChat.ts`)
+### State management (`src/hooks/useThreads.ts`)
 
-- `threads: Thread[]` in `useState`, persisted to `localStorage` under `ai-conversation:threads:<userId>`.
-- `Thread = { id, title, messages: Message[], model, vectorStoreIds, keyAlias, createdAt, updatedAt, totalTokens, lastTurnUsage }`.
-- `useChat` exposes: `threads`, `activeThread`, `newThread()`, `selectThread(id)`, `deleteThread(id)`, `sendMessage(text)`, `stopGeneration()`.
+Replaced the original hand-rolled `useChat.ts` (manual SSE reader, abort-per-message map, truncate-and-resend logic) with the [Vercel AI SDK](https://ai-sdk.dev)'s `@ai-sdk/react` `useChat` as the streaming/state engine — see `HANDOFF-ai-sdk-migration.md` for the full migration writeup.
+
+- `threads: Thread[]` in `useState`, persisted to `localStorage` under `ai-conversation:threads:<userId>` (or server-side via `chat_threads` when `litellm.aiConversation.persistence.enabled`).
+- `Thread.messages` is now `AiConversationUIMessage[]` (the AI SDK's `UIMessage` shape — typed `parts`: text/file/tool-call/`data-citations`/`data-usage` — not a flat `content: string`), enabling attachments and per-message citations/usage.
+- One `@ai-sdk/react` `useChat` instance per active thread, pointed at `POST /api/ai-conversation/chat/stream` (adapted server-side to the AI SDK's UI Message Stream Protocol — see `uiMessageStream.ts`). Compare mode runs N concurrent instances, one per selected model, coordinated by `runCompareSend`.
+- `useThreads` exposes: `threads`, `activeThread`, `newThread()`, `selectThread(id)`, `deleteThread(id)`, `sendMessage(text, attachedUrl?, compareModelsOverride?, files?)`, `regenerateFrom(id)`, `editAndResend(id, text)`, `stopGeneration()`, `exportThread`/`importThread`, `togglePin`, `submitFeedback`.
+- Attachments: the composer converts a `FileList` to `FileUIPart[]` via the SDK's `convertFileListToFileUIParts` and passes it through `sendMessage`'s `files` parameter; the backend (`attachments.ts`) validates mime/size/count and rejects non-multimodal models before forwarding to LiteLLM as `image_url` content parts.
 
 ### Components
 
@@ -244,10 +245,11 @@ backstage-plugin-litellm-rag-ai/
     │       ├── api.ts
     │       ├── types.ts
     │       ├── hooks/
-    │       │   ├── useChat.ts
+    │       │   ├── useThreads.ts
     │       │   └── threadPersistence.ts
     │       └── components/
     │           ├── ChatPage.tsx
+    │           ├── ChatSettingsPanel.tsx
     │           ├── ChatComposer.tsx
     │           ├── MessageList.tsx
     │           ├── ModelPicker.tsx
@@ -292,7 +294,6 @@ backstage-plugin-litellm-rag-ai/
 
 - **Bridge/CLI auth for chat** — chat is browser-only. The govai Keycloak bridge is for key minting by the Abby CLI.
 - **Custom chunking/reranker/hybrid search** — LiteLLM's `retrieval_config` gives `top_k` and optional rerank. If fine-grained retrieval control is needed later, build a dedicated retrieval service.
-- **File upload** — pgvector ingests files via its own admin API. Backstage chat is query-side only.
 - **Sidebar modal / home widget** — v1 ships the `/ai-conversation` page only.
 
 ## Known gaps (phase10-15)
