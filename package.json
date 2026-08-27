@@ -1,16 +1,16 @@
 {
-  "name": "@acarmisc/backstage-plugin-litellm-chat-monorepo",
+  "name": "@acarmisc/backstage-plugin-ai-conversation-monorepo",
   "version": "0.0.1",
   "private": true,
-  "description": "LiteLLM RAG Chat plugin packages for Backstage. Designed for use within Backstage monorepo.",
+  "description": "AI Conversation plugin packages for Backstage, powered by LiteLLM RAG. Designed for use within Backstage monorepo.",
   "packageManager": "yarn@4.5.1",
   "workspaces": [
     "packages/*"
   ],
   "scripts": {
-    "build": "yarn workspace @acarmisc/backstage-plugin-litellm-chat build && yarn workspace @acarmisc/backstage-plugin-litellm-chat-backend build",
-    "test": "echo 'Use from Backstage monorepo: yarn workspace @acarmisc/backstage-plugin-litellm-chat test'",
-    "lint": "yarn workspace @acarmisc/backstage-plugin-litellm-chat lint && yarn workspace @acarmisc/backstage-plugin-litellm-chat-backend lint"
+    "build": "yarn workspace @acarmisc/backstage-plugin-ai-conversation build && yarn workspace @acarmisc/backstage-plugin-ai-conversation-backend build",
+    "test": "echo 'Use from Backstage monorepo: yarn workspace @acarmisc/backstage-plugin-ai-conversation test'",
+    "lint": "yarn workspace @acarmisc/backstage-plugin-ai-conversation lint && yarn workspace @acarmisc/backstage-plugin-ai-conversation-backend lint"
   },
   "devDependencies": {
     "typescript": "^5.0.0"

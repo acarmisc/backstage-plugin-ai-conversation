@@ -1,4 +1,4 @@
-# AGENTS.md — LiteLLM Chat Plugin for Backstage
+# AGENTS.md — AI Conversation Plugin for Backstage
 
 ## Mission
 
@@ -26,11 +26,11 @@ The chat plugin reuses all of this by **importing from the govai package**, not 
 
 | Decision | Choice | Rationale |
 |---|---|---|
-| Packaging | Separate plugin pair (`plugin-litellm-chat` + `plugin-litellm-chat-backend`) | Independently versionable; keeps governance and chat concerns decoupled; matches govai's monorepo pattern. |
-| Thread persistence | Client-side ephemeral by default (React state + localStorage); **opt-in server-side persistence** via `litellm.chat.persistence.enabled` (phase16) | LiteLLM is stateless — each turn resends full history anyway, so DB persistence was deferred until users actually asked for cross-device/durable history. Now available as an operator-controlled toggle: `chat_threads` table (`plugin-litellm-chat-backend/migrations/20260819130000_chat_threads.js`), `GET/PUT/DELETE /api/litellm-chat/threads[/:id]`, gated 404 when disabled. When enabled, the backend becomes authoritative — `useChat` loads the server's thread list on mount and syncs the active thread + create/delete/pin/import mutations back; localStorage is kept as a fast local cache/offline fallback either way. Auto-deletion after `ttlDays` (default 30, `0` = unlimited) runs via `coreServices.scheduler` (not a plain interval — DB-backed leader coordination matters here since the target deployment runs 2 Backstage replicas, see "Target environment" below). Message feedback (thumbs up/down) remains its own separate `chat_message_feedback` table/mechanism, a snapshotted event rather than full thread history. |
+| Packaging | Separate plugin pair (`plugin-ai-conversation` + `plugin-ai-conversation-backend`) | Independently versionable; keeps governance and chat concerns decoupled; matches govai's monorepo pattern. |
+| Thread persistence | Client-side ephemeral by default (React state + localStorage); **opt-in server-side persistence** via `litellm.aiConversation.persistence.enabled` (phase16) | LiteLLM is stateless — each turn resends full history anyway, so DB persistence was deferred until users actually asked for cross-device/durable history. Now available as an operator-controlled toggle: `chat_threads` table (`plugin-ai-conversation-backend/migrations/20260819130000_chat_threads.js`), `GET/PUT/DELETE /api/ai-conversation/threads[/:id]`, gated 404 when disabled. When enabled, the backend becomes authoritative — `useChat` loads the server's thread list on mount and syncs the active thread + create/delete/pin/import mutations back; localStorage is kept as a fast local cache/offline fallback either way. Auto-deletion after `ttlDays` (default 30, `0` = unlimited) runs via `coreServices.scheduler` (not a plain interval — DB-backed leader coordination matters here since the target deployment runs 2 Backstage replicas, see "Target environment" below). Message feedback (thumbs up/down) remains its own separate `chat_message_feedback` table/mechanism, a snapshotted event rather than full thread history. |
 | RAG endpoint | `/v1/rag/query` primary, `/v1/chat/completions` + `vector_store_ids` fallback | `/v1/rag/query` is model-agnostic (prepend-context, not provider-native tool). Fallback handles LiteLLM versions where `/rag/query` isn't mounted. |
 | Chat key strategy | User picks a key in the UI (dropdown from their existing keys) | Spend attribution to the user's chosen key; per-key budget/limits enforced natively by LiteLLM; no surprise auto-minted keys. |
-| UI surfaces | Full chat page at `/ai-chat` | v1 ships the page. Sidebar modal and home widget are future work. |
+| UI surfaces | Full chat page at `/ai-conversation` | v1 ships the page. Sidebar modal and home widget are future work. |
 | Cross-package reuse | Import `LiteLLMClient`, `resolveUserId`, `toLiteLLMUserId`, `getOrProvisionUser`, `ProvisioningError`, types from govai backend; import `LiteLlmApi`, `liteLlmApiRef`, types from govai frontend | Govai is the single source of truth for identity, key management, and the LiteLLM client. Chat plugin adds only chat-specific routes and components. |
 | Persona source | Backstage catalog `Component` entities (`spec.type: chat-persona`), own type — not `app-config.yaml`, not the sibling `ai-agent` type | Self-service authoring (any team commits a `catalog-info.yaml`), ownership/RBAC/tags for free. `ai-agent` models externally-invocable, health-probed agents; a persona has no endpoint to probe and would pollute that inventory with permanent `unknown` status. Personas live in `git@gitlab.az.abssrv.it:innovation/ces-ai-personas.git`, auto-discovered by the existing GitLab catalog provider — no host app-config change needed. |
 | Persona system-prompt resolution | Server-side, by `persona_id` (catalog entity ref) | `/personas` returns picker metadata only (title/description/defaults) — never the system-prompt text. The backend resolves the full entity and prepends the prompt as a system message inside `/chat/stream` and `/chat/completions`, so the prompt never round-trips through the browser and can't be edited via localStorage tampering. The prompt comes from either an inline `chat-persona.acarmisc.org/system-prompt` annotation (legacy, one-liners) or a `system-prompt-ref` pointing at a Markdown `SKILL.md` — fetched via `UrlReaderService` relative to the entity's `backstage.io/managed-by-location`, frontmatter stripped, and `{{include: <path>}}` directives expanded recursively (cycle-guarded) into one composed prompt (`ref` wins over inline). Composed prompts are cached in-memory for 5 min. See `persona.ts`. |
@@ -72,9 +72,9 @@ The chat plugin reuses all of this by **importing from the govai package**, not 
 | `litellmPlugin` | The frontend plugin (registers the `/litellm` page + API). The chat plugin is a **separate** plugin that coexists. |
 | Types: `UserInfo`, `VirtualKey`, `ModelInfo`, etc. | Shared type definitions. |
 
-## New plugin: backend (`@acarmisc/backstage-plugin-litellm-chat-backend`)
+## New plugin: backend (`@acarmisc/backstage-plugin-ai-conversation-backend`)
 
-### Routes (all under `/api/litellm-chat`, all Backstage-auth-authenticated)
+### Routes (all under `/api/ai-conversation`, all Backstage-auth-authenticated)
 
 | Route | Method | Purpose |
 |---|---|---|
@@ -84,7 +84,7 @@ The chat plugin reuses all of this by **importing from the govai package**, not 
 | `/chat/traits` | GET | Static tone/focus/verbosity option lists for the pickers (id/label only — see `traits.ts`). |
 | `/chat/stream` | POST | Streaming chat proxy. The one new piece of engineering. Accepts optional `persona_id`, `tone_id`, `focus_id`, `verbosity_id` (composed server-side into one system message, in that order, persona first — see `composeSystemPrompt` in `router.ts`), and `reasoning_effort` (`low`\|`medium`\|`high`, forwarded to LiteLLM as-is, not composed into the prompt). |
 | `/chat/completions` | POST | Non-streaming chat variant. |
-| `/threads` | GET | (phase16) Lists the authenticated user's persisted threads. 404 when `litellm.chat.persistence.enabled` is false. |
+| `/threads` | GET | (phase16) Lists the authenticated user's persisted threads. 404 when `litellm.aiConversation.persistence.enabled` is false. |
 | `/threads/:id` | PUT | (phase16) Upserts a thread (title/pinned/data — `data` is opaque JSON, size-capped at 1MB). 404 when persistence is disabled. |
 | `/threads/:id` | DELETE | (phase16) Deletes one persisted thread, scoped to the authenticated user. 404 when persistence is disabled. |
 
@@ -123,7 +123,7 @@ Reads the same `litellm.baseUrl` / `litellm.masterKey` / `litellm.userIdDomain` 
 
 ```yaml
 litellm:
-  chat:
+  aiConversation:
     defaultModel: claude-3-5-sonnet        # optional, pre-selected in UI
     defaultVectorStoreIds: []               # optional, pre-selected in UI
     maxRequestBudget:                       # optional, USD guard (real enforcement is per-key in LiteLLM)
@@ -136,7 +136,7 @@ litellm:
 
 ```typescript
 createBackendPlugin({
-  pluginId: 'litellm-chat',
+  pluginId: 'ai-conversation',
   register(reg) {
     reg.registerInit({
       deps: { httpRouter, config, logger, auth, discovery },
@@ -151,16 +151,16 @@ createBackendPlugin({
 
 No `addAuthPolicy` overrides — all routes use Backstage auth (no Keycloak bridge for chat in v1).
 
-## New plugin: frontend (`@acarmisc/backstage-plugin-litellm-chat`)
+## New plugin: frontend (`@acarmisc/backstage-plugin-ai-conversation`)
 
 ### API client (`src/api.ts`)
 
-New `LiteLlmChatApi` + `liteLlmChatApiRef`. Reuses the existing `liteLlmApiRef` from govai for `/keys` and `/models`.
+New `AiConversationApi` + `aiConversationApiRef`. Reuses the existing `liteLlmApiRef` from govai for `/keys` and `/models`.
 
 | Method | Purpose |
 |---|---|
-| `listVectorStores()` | `GET /api/litellm-chat/vector_stores` → `VectorStore[]` |
-| `chatStream(req, onToken, onDone, onError)` | Opens `fetch` to `/api/litellm-chat/chat/stream`, reads SSE via `ReadableStream` reader, parses `data:` lines, calls callbacks. Returns `AbortController` for stop. |
+| `listVectorStores()` | `GET /api/ai-conversation/vector_stores` → `VectorStore[]` |
+| `chatStream(req, onToken, onDone, onError)` | Opens `fetch` to `/api/ai-conversation/chat/stream`, reads SSE via `ReadableStream` reader, parses `data:` lines, calls callbacks. Returns `AbortController` for stop. |
 | `chatCompletions(req)` | Non-streaming variant. |
 
 ### Types (`src/types.ts`)
@@ -177,7 +177,7 @@ interface ChatResult { content: string; citations: Citation[]; }
 
 ### State management (`src/hooks/useChat.ts`)
 
-- `threads: Thread[]` in `useState`, persisted to `localStorage` under `litellm-chat:threads:<userId>`.
+- `threads: Thread[]` in `useState`, persisted to `localStorage` under `ai-conversation:threads:<userId>`.
 - `Thread = { id, title, messages: Message[], model, vectorStoreIds, keyAlias, createdAt, updatedAt, totalTokens, lastTurnUsage }`.
 - `useChat` exposes: `threads`, `activeThread`, `newThread()`, `selectThread(id)`, `deleteThread(id)`, `sendMessage(text)`, `stopGeneration()`.
 
@@ -185,7 +185,7 @@ interface ChatResult { content: string; citations: Citation[]; }
 
 | Component | Responsibility |
 |---|---|
-| `ChatPage` | Page shell at `/ai-chat`. Left thread sidebar, main chat area. |
+| `ChatPage` | Page shell at `/ai-conversation`. Left thread sidebar, main chat area. |
 | `ChatComposer` | Textarea + send button + stop button. Pickers row above it. |
 | `PersonaPicker` | Dropdown from `listPersonas()` (catalog `chat-persona` entities). Selecting one prefills `ModelPicker`/`VectorStorePicker` from its defaults (user can still override) and sends `persona_id` with the request. |
 | `OptionPicker` | Generic small Select (label + options + onChange), factored out of `PersonaPicker`/`ModelPicker`'s shared shape. Instantiated for Tone, Focus, Verbosity (options from `getChatTraits()`) and Reasoning effort (fixed `low`/`medium`/`high`, no backend call — see "Tone/Focus/Verbosity/Reasoning" below). |
@@ -203,23 +203,23 @@ interface ChatResult { content: string; citations: Citation[]; }
 ```tsx
 const liteLlmChatApi = ApiBlueprint.make({
   params: defineParams => defineParams({
-    api: liteLlmChatApiRef,
+    api: aiConversationApiRef,
     deps: { fetchApi: fetchApiRef },
-    factory: ({ fetchApi }) => new LiteLlmChatApi(fetchApi),
+    factory: ({ fetchApi }) => new AiConversationApi(fetchApi),
   }),
 });
 
 const chatPage = PageBlueprint.make({
   params: {
-    path: '/ai-chat',
+    path: '/ai-conversation',
     title: 'AI Chat',
     icon: <ChatIcon />,
     loader: async () => (await import('./components/ChatPage')).ChatPage,
   },
 });
 
-export const litellmChatPlugin = createFrontendPlugin({
-  pluginId: 'litellm-chat',
+export const aiConversationPlugin = createFrontendPlugin({
+  pluginId: 'ai-conversation',
   extensions: [liteLlmChatApi, chatPage],
 });
 ```
@@ -233,7 +233,7 @@ backstage-plugin-litellm-rag-ai/
 ├── todo.txt                               # phased task list
 ├── README.md
 └── packages/
-    ├── plugin-litellm-chat/               # @acarmisc/backstage-plugin-litellm-chat
+    ├── plugin-ai-conversation/               # @acarmisc/backstage-plugin-ai-conversation
     │   ├── package.json
     │   ├── build.js
     │   ├── tsconfig.json
@@ -254,7 +254,7 @@ backstage-plugin-litellm-rag-ai/
     │           ├── KeyPicker.tsx
     │           ├── CitationsPanel.tsx
     │           └── ErrorBanner.tsx
-    └── plugin-litellm-chat-backend/       # @acarmisc/backstage-plugin-litellm-chat-backend
+    └── plugin-ai-conversation-backend/       # @acarmisc/backstage-plugin-ai-conversation-backend
         ├── package.json
         ├── build.js
         ├── config.d.ts
@@ -274,7 +274,7 @@ backstage-plugin-litellm-rag-ai/
 2. **Verify LLM** — confirm `/v1/rag/query` exists on v1.90.0, confirm `/v1/chat/completions` + `vector_store_ids` fallback shape, confirm `/v1/vector_stores` returns pgvector stores, verify SSE passthrough through Backstage's `HttpRouterService`.
 3. **Backend stream** — `proxySSE()` in `stream.ts`: headers, pipe, error handling, client disconnect.
 4. **Backend router** — `/health`, `/vector_stores`, `/chat/stream`, `/chat/completions`. Import govai machinery. Plugin registration.
-5. **Frontend API** — `LiteLlmChatApi`, types, SSE reader, `AbortController`.
+5. **Frontend API** — `AiConversationApi`, types, SSE reader, `AbortController`.
 6. **Frontend hooks** — `useChat` thread state, localStorage, `sendMessage`, `stopGeneration`.
 7. **Frontend UI** — all components, pickers, plugin registration, exports.
 8. **Integration** — wire into target Backstage, deploy to GKE, verify against live pgvector.
@@ -284,19 +284,19 @@ backstage-plugin-litellm-rag-ai/
 12. **LaTeX + `#url` context** — `remark-math`/`rehype-katex` in the markdown pipeline (KaTeX CSS loaded via runtime `<link>`, not bundled — the esbuild pipeline has no CSS loader). `#https://...` in the composer resolves via `POST /fetch-context` (SSRF-guarded: https-only, DNS-resolved private/loopback/link-local/metadata-address blocking re-checked on every redirect hop, timeout, response-size cap — see `urlContext.ts`); the fetched page is injected server-side as one-off context, never round-tripping the full text through the browser.
 13. **Multi-model compare** — per-thread `mode: 'single' | 'compare'`; compare mode streams the same prompt to several models in parallel (`runCompareSend`), each into its own message sharing a `turnId`, rendered as side-by-side columns. Required moving `useChat` off a single global `AbortController`/`isStreaming` flag onto a `Map<messageId, AbortController>` plus a `streamingMessageIds` set.
 14. **Web search toggle** — passes `web_search` through as LiteLLM's `web_search_options` alongside (not instead of) any selected knowledge bases; sources panel labels results Web vs Knowledge base by a `url`-field heuristic (LiteLLM doesn't tag result origin explicitly). Assumes the target LiteLLM deployment has a native web-search-capable model — **unverified against the live proxy**, see the "Known gaps" note below.
-15. **Analytics dashboard** — `chat_events` migration + best-effort per-turn logging (thread_id/user_ref/model/persona_id/grounded, not message content), `GET /feedback/summary` + `GET /usage/summary?groupBy=persona|model&range=`, `/ai-chat/analytics` page with hand-rolled bar charts (no new charting dependency). The summary endpoints return aggregate counts only, so they're reachable by any authenticated user — genuine admin-only *page* access requires a permission-policy in the target Backstage app, which this repo doesn't own (see "Known gaps").
-16. **Opt-in server-side thread persistence** — `chat_threads` migration (`id`+`user_ref` composite PK, opaque JSON `data` column) behind `litellm.chat.persistence.enabled` (default `false`). `GET/PUT/DELETE /api/litellm-chat/threads[/:id]`, each 404ing when persistence is off. `data` is never interpreted server-side — it's the frontend's `Thread` shape minus the live `keyToken`/`keyAlias` credential (same exclusion `exportThread()` already applied — see `hooks/threadPersistence.ts`'s `toSaveThreadBody`/`fromPersisted`), size-capped at 1MB per thread (`persistence.ts`). `useChat` treats the backend as authoritative once enabled: loads the server's list on mount (replacing whatever localStorage had), and syncs the active thread on the same 400ms debounce that already drives the localStorage write, plus immediate syncs on create/delete/pin/import — localStorage keeps writing regardless, as an offline cache/fallback. Auto-deletion after `ttlDays` (default 30, `0` = unlimited) runs via `coreServices.scheduler`, not a plain `setInterval` — the target deployment runs 2 Backstage replicas (see "Target environment"), and the scheduler service's DB-backed task locking is what keeps the sweep from running twice per tick.
+15. **Analytics dashboard** — `chat_events` migration + best-effort per-turn logging (thread_id/user_ref/model/persona_id/grounded, not message content), `GET /feedback/summary` + `GET /usage/summary?groupBy=persona|model&range=`, `/ai-conversation/analytics` page with hand-rolled bar charts (no new charting dependency). The summary endpoints return aggregate counts only, so they're reachable by any authenticated user — genuine admin-only *page* access requires a permission-policy in the target Backstage app, which this repo doesn't own (see "Known gaps").
+16. **Opt-in server-side thread persistence** — `chat_threads` migration (`id`+`user_ref` composite PK, opaque JSON `data` column) behind `litellm.aiConversation.persistence.enabled` (default `false`). `GET/PUT/DELETE /api/ai-conversation/threads[/:id]`, each 404ing when persistence is off. `data` is never interpreted server-side — it's the frontend's `Thread` shape minus the live `keyToken`/`keyAlias` credential (same exclusion `exportThread()` already applied — see `hooks/threadPersistence.ts`'s `toSaveThreadBody`/`fromPersisted`), size-capped at 1MB per thread (`persistence.ts`). `useChat` treats the backend as authoritative once enabled: loads the server's list on mount (replacing whatever localStorage had), and syncs the active thread on the same 400ms debounce that already drives the localStorage write, plus immediate syncs on create/delete/pin/import — localStorage keeps writing regardless, as an offline cache/fallback. Auto-deletion after `ttlDays` (default 30, `0` = unlimited) runs via `coreServices.scheduler`, not a plain `setInterval` — the target deployment runs 2 Backstage replicas (see "Target environment"), and the scheduler service's DB-backed task locking is what keeps the sweep from running twice per tick.
 
 ## Things NOT in v1
 
 - **Bridge/CLI auth for chat** — chat is browser-only. The govai Keycloak bridge is for key minting by the Abby CLI.
 - **Custom chunking/reranker/hybrid search** — LiteLLM's `retrieval_config` gives `top_k` and optional rerank. If fine-grained retrieval control is needed later, build a dedicated retrieval service.
 - **File upload** — pgvector ingests files via its own admin API. Backstage chat is query-side only.
-- **Sidebar modal / home widget** — v1 ships the `/ai-chat` page only.
+- **Sidebar modal / home widget** — v1 ships the `/ai-conversation` page only.
 
 ## Known gaps (phase10-15)
 
-- **`/ai-chat/analytics` is not actually admin-gated.** The endpoints it reads (`GET /feedback/summary`, `GET /usage/summary`) only ever return aggregate counts — no message content, no per-user breakdown — so the exposure is low, but nothing in this repo restricts the *page* to admins. That requires a permission-policy in the target Backstage app (same category of change as the sidebar nav entry / route registration already documented under "Files changed in target Backstage" in HANDOFF.md), which this repo doesn't own.
+- **`/ai-conversation/analytics` is not actually admin-gated.** The endpoints it reads (`GET /feedback/summary`, `GET /usage/summary`) only ever return aggregate counts — no message content, no per-user breakdown — so the exposure is low, but nothing in this repo restricts the *page* to admins. That requires a permission-policy in the target Backstage app (same category of change as the sidebar nav entry / route registration already documented under "Files changed in target Backstage" in HANDOFF.md), which this repo doesn't own.
 - **`web_search` (phase14) assumes LiteLLM has a native web-search-capable model/tool** reachable via `web_search_options` on `/v1/chat/completions`. Unverified against the live proxy — if the target deployment doesn't have one, the flag is a silent no-op upstream rather than an error. If that turns out to be the case, the fallback plan (self-hosted SearXNG, integrated server-side with its own citations) is a materially bigger job — see the original feature plan's phase14 estimate split (~2 days vs ~1-1.5 weeks).
 - **The `#url` SSRF guard checks addresses at DNS-resolution time, not at connect time.** `assertPublicHostname` resolves the host and rejects private/loopback/link-local/metadata addresses (re-checked on every redirect hop), but the `fetch()` that follows resolves the name again independently — a host that answers with a public address on the first lookup and an internal one on the second would slip through. Closing that means pinning the vetted address for the actual connection (an undici `Agent` with a custom `connect.lookup`), deferred. The straightforward attacks — an internal hostname, an IP literal in any of its textual spellings, or a redirect to either — are blocked, and `isBlockedAddress` is unit-tested against the non-canonical IPv6 forms specifically.
 - **KaTeX CSS and the JetBrains Mono webfont load from public CDNs at runtime** (`theme.ts`), because the esbuild pipeline has no CSS loader. Besides the CSP entries that needs, it makes the chat page depend on `cdn.jsdelivr.net`/`fonts.googleapis.com` being reachable from the browser — worth bundling the KaTeX CSS (esbuild `text` loader → injected `<style>`) if the target deployment is ever locked down.
@@ -309,12 +309,12 @@ backstage-plugin-litellm-rag-ai/
 
 ```bash
 # Build (from target Backstage monorepo)
-yarn workspace @acarmisc/backstage-plugin-litellm-chat build
-yarn workspace @acarmisc/backstage-plugin-litellm-chat-backend build
+yarn workspace @acarmisc/backstage-plugin-ai-conversation build
+yarn workspace @acarmisc/backstage-plugin-ai-conversation-backend build
 
 # Test
-yarn workspace @acarmisc/backstage-plugin-litellm-chat test
-yarn workspace @acarmisc/backstage-plugin-litellm-chat-backend test
+yarn workspace @acarmisc/backstage-plugin-ai-conversation test
+yarn workspace @acarmisc/backstage-plugin-ai-conversation-backend test
 ```
 
 ## Release
@@ -322,8 +322,8 @@ yarn workspace @acarmisc/backstage-plugin-litellm-chat-backend test
 Same tag pattern as govai:
 
 ```bash
-git tag litellm-chat@X.Y.Z          # or litellm-chat-backend@X.Y.Z
-git push origin litellm-chat@X.Y.Z
+git tag ai-conversation@X.Y.Z          # or ai-conversation-backend@X.Y.Z
+git push origin ai-conversation@X.Y.Z
 ```
 
 CI verifies tag version matches `package.json`, builds, publishes to npm, creates GitHub Release.

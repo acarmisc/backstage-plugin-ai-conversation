@@ -7,7 +7,7 @@ The plugin is well-structured and the frontend system pattern (ApiBlueprint/Page
 ## Critical issues (must fix before build)
 
 ### C1. Backend imports symbols that govai does not export — build fails
-`packages/plugin-litellm-chat-backend/src/router.ts:6-8` imports:
+`packages/plugin-ai-conversation-backend/src/router.ts:6-8` imports:
 ```ts
 import { resolveUserId, toLiteLLMUserId } from '@acarmisc/backstage-plugin-litellm-backend';
 ```
@@ -100,7 +100,7 @@ AGENTS.md:184 lists `StreamingIndicator` as a component. The repo has no `Stream
 `KeyPicker.tsx:5` imports `import type { VirtualKey } from '@acarmisc/backstage-plugin-litellm'`. Govai's `index.ts:10` does `export * from './types'` and `types.ts` exports `VirtualKey`. This works. However, `KeyPicker.tsx:48` reads `x.key` and `x.key_alias` — govai's `VirtualKey` type has `key: string` and `key_alias?: string`. The `k.key.slice(0, 7)` assumes `key` is a string (it is). Fine, but the `key_alias` fallback uses `k.key.slice(0, 8) + '…'` at line 51 vs `k.key.slice(0, 7) + '…'` at line 60 — inconsistent truncation length (8 vs 7). Minor cosmetic.
 
 ### M7. `config.d.ts` may conflict with govai's `config.d.ts`
-Both govai backend and chat backend define `config.d.ts` with `litellm.*` config. When both plugins are installed in the same Backstage app, Backstage merges config schemas. The chat backend's `config.d.ts` re-declares `litellm.baseUrl`, `litellm.masterKey`, `litellm.userIdDomain` (already in govai's) plus the new `litellm.chat.*`. TypeScript interface merging should merge these (additive), but if field types differ it errors. The chat backend marks `masterKey` as `@visibility secret` and govai likely does too — verify they match. Low risk but worth checking after both are wired in.
+Both govai backend and chat backend define `config.d.ts` with `litellm.*` config. When both plugins are installed in the same Backstage app, Backstage merges config schemas. The chat backend's `config.d.ts` re-declares `litellm.baseUrl`, `litellm.masterKey`, `litellm.userIdDomain` (already in govai's) plus the new `litellm.aiConversation.*`. TypeScript interface merging should merge these (additive), but if field types differ it errors. The chat backend marks `masterKey` as `@visibility secret` and govai likely does too — verify they match. Low risk but worth checking after both are wired in.
 
 ## Verified against GKE
 
@@ -138,7 +138,7 @@ Target app: `/Users/andrea/Projects/abstract-ces/playground/backstage-abstract-c
 | Chat backend `plugin.ts` pattern matches | YES — identical to govai's working `plugin.ts` (minus the bridge auth policy, which chat doesn't need) |
 | `identityApiRef` import from `@backstage/core-plugin-api` | Correct — `identityApiRef` is exported from `@backstage/core-plugin-api` (used in `ChatPage.tsx:14`) |
 
-**Conclusion:** The plugin registration pattern is correct for this target app. No frontend-system migration needed. The chat plugin can be wired in by adding `litellmChatPlugin` to `App.tsx` features and `backend.add(import('@acarmisc/backstage-plugin-litellm-chat-backend'))` to `backend/src/index.ts`.
+**Conclusion:** The plugin registration pattern is correct for this target app. No frontend-system migration needed. The chat plugin can be wired in by adding `aiConversationPlugin` to `App.tsx` features and `backend.add(import('@acarmisc/backstage-plugin-ai-conversation-backend'))` to `backend/src/index.ts`.
 
 ## File-by-file findings
 
@@ -160,7 +160,7 @@ Target app: `/Users/andrea/Projects/abstract-ces/playground/backstage-abstract-c
 - `src/plugin.tsx` — Correct. Matches govai's pattern exactly. Will work in target app.
 - `src/api.ts` — **I5** (SSE chunk shape mismatch). SSE reader (lines 72-99) handles partial chunks correctly via `buffer.split('\n')` + `buffer = lines.pop()`. `AbortController` returned correctly (line 107). `getChatConfig` graceful fallback (line 44). `chatCompletions` citation mapping (lines 123-129) handles multiple field name variants — good defensive coding.
 - `src/types.ts` — Matches AGENTS.md:157-164. Adds `ChatConfig` and `Thread` (with `keyToken` — reasonable extension for client-side key storage).
-- `src/hooks/useChat.ts` — **I2** (deleteThread stale closure), **I1** (`prev` unused). `sendMessage` correctly patches the assistant message via functional `setThreads` (lines 176-187). localStorage key `litellm-chat:threads:<userId>` matches AGENTS.md:169. Thread title auto-set on first message (line 138) — nice.
+- `src/hooks/useChat.ts` — **I2** (deleteThread stale closure), **I1** (`prev` unused). `sendMessage` correctly patches the assistant message via functional `setThreads` (lines 176-187). localStorage key `ai-conversation:threads:<userId>` matches AGENTS.md:169. Thread title auto-set on first message (line 138) — nice.
 - `src/components/ChatPage.tsx` — **I1** (unused `Typography`, invalid `secondaryAction` prop, `ErrorBanner` type mismatch). `identityApiRef` usage correct. `userId` set to `'oidc'` or `'default'` based on token presence (line 44) — simplistic but functional.
 - `src/components/ChatComposer.tsx` — Fine. Enter-to-send, Shift+Enter for newline. Stop button appears during streaming.
 - `src/components/MessageList.tsx` — **M4** (no markdown rendering). Citation display logic (line 46) only shows on last assistant message when not streaming — correct.
@@ -191,4 +191,4 @@ Target app: `/Users/andrea/Projects/abstract-ces/playground/backstage-abstract-c
 8. **Fix M4** — Add `react-markdown` + `remark-gfm` to frontend deps. Render assistant content as markdown with sanitization.
 9. **Document I6** — Add `/config` route to AGENTS.md route table, or note in README.
 10. **Verify M7** — After wiring both govai + chat backend in the target app, run `backstage-cli config:check` to confirm no `config.d.ts` merge conflicts.
-11. **Integration test** — After fixes 1-7, `yarn add` both packages to the target Backstage monorepo, add `litellmChatPlugin` to `App.tsx` features and `backend.add(import('@acarmisc/backstage-plugin-litellm-chat-backend'))` to `backend/src/index.ts`, build, and verify `/ai-chat` loads.
+11. **Integration test** — After fixes 1-7, `yarn add` both packages to the target Backstage monorepo, add `aiConversationPlugin` to `App.tsx` features and `backend.add(import('@acarmisc/backstage-plugin-ai-conversation-backend'))` to `backend/src/index.ts`, build, and verify `/ai-conversation` loads.

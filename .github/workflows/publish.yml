@@ -1,8 +1,8 @@
 name: Publish to npm
 
 # Release process (see AGENTS.md):
-#   git tag litellm-chat@X.Y.Z          # or litellm-chat-backend@X.Y.Z
-#   git push origin litellm-chat@X.Y.Z
+#   git tag ai-conversation@X.Y.Z          # or ai-conversation-backend@X.Y.Z
+#   git push origin ai-conversation@X.Y.Z
 #
 # The tag prefix selects which workspace package gets published, and its
 # version must match the version already committed in that package's
@@ -11,8 +11,8 @@ name: Publish to npm
 on:
   push:
     tags:
-      - "litellm-chat@*"
-      - "litellm-chat-backend@*"
+      - "ai-conversation@*"
+      - "ai-conversation-backend@*"
 
 permissions:
   contents: write
@@ -37,15 +37,15 @@ jobs:
         run: |
           TAG="${GITHUB_REF_NAME}"
           case "$TAG" in
-            litellm-chat-backend@*)
-              echo "workspace=@acarmisc/backstage-plugin-litellm-chat-backend" >> "$GITHUB_OUTPUT"
-              echo "dir=packages/plugin-litellm-chat-backend" >> "$GITHUB_OUTPUT"
-              echo "version=${TAG#litellm-chat-backend@}" >> "$GITHUB_OUTPUT"
+            ai-conversation-backend@*)
+              echo "workspace=@acarmisc/backstage-plugin-ai-conversation-backend" >> "$GITHUB_OUTPUT"
+              echo "dir=packages/plugin-ai-conversation-backend" >> "$GITHUB_OUTPUT"
+              echo "version=${TAG#ai-conversation-backend@}" >> "$GITHUB_OUTPUT"
               ;;
-            litellm-chat@*)
-              echo "workspace=@acarmisc/backstage-plugin-litellm-chat" >> "$GITHUB_OUTPUT"
-              echo "dir=packages/plugin-litellm-chat" >> "$GITHUB_OUTPUT"
-              echo "version=${TAG#litellm-chat@}" >> "$GITHUB_OUTPUT"
+            ai-conversation@*)
+              echo "workspace=@acarmisc/backstage-plugin-ai-conversation" >> "$GITHUB_OUTPUT"
+              echo "dir=packages/plugin-ai-conversation" >> "$GITHUB_OUTPUT"
+              echo "version=${TAG#ai-conversation@}" >> "$GITHUB_OUTPUT"
               ;;
             *)
               echo "::error::Unrecognized tag pattern: $TAG"

@@ -1,4 +1,4 @@
-# Handoff — LiteLLM Chat Plugin for Backstage
+# Handoff — AI Conversation Plugin for Backstage
 
 ## What shipped
 
@@ -7,17 +7,17 @@ Two npm packages + wired into target Backstage on GKE:
 | Package | Version | npm |
 |---|---|---|
 | `@acarmisc/backstage-plugin-litellm-backend` (govai) | 0.3.4 | New exports: `resolveUserId`, `toLiteLLMUserId`, `getOrProvisionUser`, `ProvisioningError` |
-| `@acarmisc/backstage-plugin-litellm-chat` (frontend) | 0.5.0 | ChatGPT-style UI, SSE reader, thread localStorage, persona picker |
-| `@acarmisc/backstage-plugin-litellm-chat-backend` (backend) | 0.4.0 | SSE proxy, vector store listing, chat key mint/delete, catalog-backed personas |
+| `@acarmisc/backstage-plugin-ai-conversation` (frontend) | 0.5.0 | ChatGPT-style UI, SSE reader, thread localStorage, persona picker |
+| `@acarmisc/backstage-plugin-ai-conversation-backend` (backend) | 0.4.0 | SSE proxy, vector store listing, chat key mint/delete, catalog-backed personas |
 
-**Live at:** https://backstage.ces.abstractstaging.it/ai-chat
+**Live at:** https://backstage.ces.abstractstaging.it/ai-conversation
 
 ## Architecture
 
 Thin client: Backstage = UI + streaming proxy + identity bridge. LiteLLM owns RAG.
 
 ```
-Browser → /api/litellm-chat/chat/stream → LiteLLM /v1/chat/completions (+ vector_store_ids)
+Browser → /api/ai-conversation/chat/stream → LiteLLM /v1/chat/completions (+ vector_store_ids)
                                          → LiteLLM /v1/rag/query (fallback)
 ```
 
@@ -57,18 +57,18 @@ Personas are `chat-persona` catalog Components (not app-config) — self-service
 
 | Route | Method | Purpose |
 |---|---|---|
-| `/api/litellm-chat/health` | GET | Health check |
-| `/api/litellm-chat/config` | GET | Chat defaults (defaultModel, defaultVectorStoreIds, maxRequestBudget) |
-| `/api/litellm-chat/vector_stores` | GET | List LiteLLM vector stores (normalized) |
-| `/api/litellm-chat/personas` | GET | List `chat-persona` catalog entities (metadata only, no system prompt) |
-| `/api/litellm-chat/chat/key` | POST | Mint dedicated chat key (returns real sk-) |
-| `/api/litellm-chat/chat/key` | DELETE | Delete chat key |
-| `/api/litellm-chat/chat/key/:alias/spend` | GET | Current spend/max_budget for a chat key, by alias |
-| `/api/litellm-chat/chat/stream` | POST | SSE streaming chat (RAG or plain) |
-| `/api/litellm-chat/chat/completions` | POST | Non-streaming chat |
-| `/api/litellm-chat/threads` | GET | List the caller's persisted threads. 404 if `litellm.chat.persistence.enabled` is false |
-| `/api/litellm-chat/threads/:id` | PUT | Upsert a persisted thread (title/pinned/data) |
-| `/api/litellm-chat/threads/:id` | DELETE | Delete a persisted thread |
+| `/api/ai-conversation/health` | GET | Health check |
+| `/api/ai-conversation/config` | GET | Chat defaults (defaultModel, defaultVectorStoreIds, maxRequestBudget) |
+| `/api/ai-conversation/vector_stores` | GET | List LiteLLM vector stores (normalized) |
+| `/api/ai-conversation/personas` | GET | List `chat-persona` catalog entities (metadata only, no system prompt) |
+| `/api/ai-conversation/chat/key` | POST | Mint dedicated chat key (returns real sk-) |
+| `/api/ai-conversation/chat/key` | DELETE | Delete chat key |
+| `/api/ai-conversation/chat/key/:alias/spend` | GET | Current spend/max_budget for a chat key, by alias |
+| `/api/ai-conversation/chat/stream` | POST | SSE streaming chat (RAG or plain) |
+| `/api/ai-conversation/chat/completions` | POST | Non-streaming chat |
+| `/api/ai-conversation/threads` | GET | List the caller's persisted threads. 404 if `litellm.aiConversation.persistence.enabled` is false |
+| `/api/ai-conversation/threads/:id` | PUT | Upsert a persisted thread (title/pinned/data) |
+| `/api/ai-conversation/threads/:id` | DELETE | Delete a persisted thread |
 
 ## Config
 
@@ -77,7 +77,7 @@ litellm:
   baseUrl: http://litellm.litellm.svc.cluster.local:4000
   masterKey: ${LITELLM_MASTER_KEY}
   userIdDomain: example.com  # optional
-  chat:
+  aiConversation:
     defaultModel: claude-3-5-sonnet        # optional
     defaultVectorStoreIds: []               # optional, list of vector store ids
     maxRequestBudget:                       # optional, advisory
@@ -107,7 +107,7 @@ litellm:
 
 Scoped packages under `@acarmisc` have registry propagation lag — `npm view` 404s for ~hours after publish even though `npm access get status` shows `public`. Workaround: target Backstage uses tarball URLs in `package.json` instead of version ranges:
 ```json
-"@acarmisc/backstage-plugin-litellm-chat": "https://registry.npmjs.org/@acarmisc/backstage-plugin-litellm-chat/-/backstage-plugin-litellm-chat-0.3.0.tgz"
+"@acarmisc/backstage-plugin-ai-conversation": "https://registry.npmjs.org/@acarmisc/backstage-plugin-ai-conversation/-/backstage-plugin-ai-conversation-0.3.0.tgz"
 ```
 Once propagation completes, switch to `"^0.3.0"`.
 
@@ -124,10 +124,10 @@ GitLab CI (`.gitlab-ci.yml`) on push to `main`:
 
 - [x] LiteLLM pod running, `/v1/vector_store/list` returns 2 stores
 - [x] `/v1/chat/completions` + `vector_store_ids` streaming works (SSE deltas)
-- [x] Backstage pod running with `litellm-chat` plugin loaded (init log confirms)
-- [x] `/api/litellm-chat/health` → `{"status":"ok"}`
-- [x] `/api/litellm-chat/vector_stores` → 2 pgvector stores
-- [x] `/api/litellm-chat/config` → chat defaults
+- [x] Backstage pod running with `ai-conversation` plugin loaded (init log confirms)
+- [x] `/api/ai-conversation/health` → `{"status":"ok"}`
+- [x] `/api/ai-conversation/vector_stores` → 2 pgvector stores
+- [x] `/api/ai-conversation/config` → chat defaults
 - [x] Auth enforced (401 without OIDC token)
 - [x] Ingress serves both `abssrv.it` + `abstractstaging.it`
 - [x] Keycloak OIDC redirect + CORS accepts `abstractstaging.it`
@@ -146,13 +146,13 @@ GitLab CI (`.gitlab-ci.yml`) on push to `main`:
 
 1. **`PG_VECTOR_API_BASE` env var** not set on LiteLLM pod → `/v1/rag/query` 500s. Ops fix: add env var to LiteLLM deployment. Fallback path works regardless.
 
-2. **npm registry propagation**: scoped packages not visible via `npm view` for hours. Using tarball URLs as workaround. Check `npm view @acarmisc/backstage-plugin-litellm-chat version` periodically — once it resolves, switch `package.json` to `^0.3.0`.
+2. **npm registry propagation**: scoped packages not visible via `npm view` for hours. Using tarball URLs as workaround. Check `npm view @acarmisc/backstage-plugin-ai-conversation version` periodically — once it resolves, switch `package.json` to `^0.3.0`.
 
 3. **No markdown sanitization**: `react-markdown` + `remark-gfm` render assistant content. No `rehype-raw` (good — no raw HTML). But no DOMPurify either. Low risk since content is LLM-generated, not user-injected.
 
-4. **Thread persistence is localStorage-only by default**: threads lost on browser data clear unless the operator opts into `litellm.chat.persistence.enabled` (see Config above). Key stored in thread too — if localStorage cleared, orphaned `sk-` keys remain in LiteLLM (24h expiry mitigates); this is unaffected by server-side thread persistence, since `keyToken`/`keyAlias` are deliberately never persisted server-side either.
+4. **Thread persistence is localStorage-only by default**: threads lost on browser data clear unless the operator opts into `litellm.aiConversation.persistence.enabled` (see Config above). Key stored in thread too — if localStorage cleared, orphaned `sk-` keys remain in LiteLLM (24h expiry mitigates); this is unaffected by server-side thread persistence, since `keyToken`/`keyAlias` are deliberately never persisted server-side either.
 
-5. **DB-backed threads are opt-in (phase16)**: `chat_threads` table (`plugin-litellm-chat-backend/migrations/20260819130000_chat_threads.js`), gated behind `litellm.chat.persistence.enabled` (default `false`). When on, `useChat` treats the backend as authoritative and syncs to/from it; when off, behavior is unchanged from the original client-side-only design. A background task (`coreServices.scheduler`) auto-deletes threads after `ttlDays` (default 30, `0` = unlimited). Message thumbs-up/down feedback remains a separate `chat_message_feedback` table, storing a snapshot of the Q&A rather than the full thread.
+5. **DB-backed threads are opt-in (phase16)**: `chat_threads` table (`plugin-ai-conversation-backend/migrations/20260819130000_chat_threads.js`), gated behind `litellm.aiConversation.persistence.enabled` (default `false`). When on, `useChat` treats the backend as authoritative and syncs to/from it; when off, behavior is unchanged from the original client-side-only design. A background task (`coreServices.scheduler`) auto-deletes threads after `ttlDays` (default 30, `0` = unlimited). Message thumbs-up/down feedback remains a separate `chat_message_feedback` table, storing a snapshot of the Q&A rather than the full thread.
 
 6. **CSP still references `abssrv.it`**: `connect-src` has both domains now, but Keycloak auth endpoint is `auth.ces.abssrv.it`. If Keycloak moves to `abstractstaging.it`, CSP needs update.
 
@@ -169,11 +169,11 @@ GitLab CI (`.gitlab-ci.yml`) on push to `main`:
 
 | File | Change |
 |---|---|
-| `packages/app/package.json` | Added `@acarmisc/backstage-plugin-litellm-chat` dep (tarball URL) |
-| `packages/app/src/App.tsx` | Import + add `litellmChatPlugin` to features |
+| `packages/app/package.json` | Added `@acarmisc/backstage-plugin-ai-conversation` dep (tarball URL) |
+| `packages/app/src/App.tsx` | Import + add `aiConversationPlugin` to features |
 | `packages/app/src/modules/nav/Sidebar.tsx` | Added "AI Chat" sidebar item with ChatIcon |
-| `packages/backend/package.json` | Added `@acarmisc/backstage-plugin-litellm-chat-backend` dep, bumped govai to `^0.3.4` |
-| `packages/backend/src/index.ts` | `backend.add(import('@acarmisc/backstage-plugin-litellm-chat-backend'))` |
+| `packages/backend/package.json` | Added `@acarmisc/backstage-plugin-ai-conversation-backend` dep, bumped govai to `^0.3.4` |
+| `packages/backend/src/index.ts` | `backend.add(import('@acarmisc/backstage-plugin-ai-conversation-backend'))` |
 | `app-config.production.yaml` | Added `*.ces.abstractstaging.it` to CSP `connect-src` |
 | `k8s/base/22-backstage-deployment.yaml` | `APP_BASE_URL` → `https://backstage.ces.abstractstaging.it` |
 | `k8s/base/26-backstage-ingress.yaml` | Added second host `backstage.ces.abstractstaging.it` + `backstage-staging-tls` secret |
@@ -187,7 +187,7 @@ GitLab CI (`.gitlab-ci.yml`) on push to `main`:
 
 ## Next steps
 
-1. **Browser test**: login at https://backstage.ces.abstractstaging.it/ai-chat, generate key, send message, verify streaming + citations.
+1. **Browser test**: login at https://backstage.ces.abstractstaging.it/ai-conversation, generate key, send message, verify streaming + citations.
 2. **Fix `PG_VECTOR_API_BASE`** on LiteLLM pod to enable `/v1/rag/query` primary path.
 3. **Switch tarball URLs → version ranges** once npm propagation completes.
 4. **Run review-2** sub-agent after browser testing.

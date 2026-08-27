@@ -5,24 +5,9 @@ __metadata:
   version: 8
   cacheKey: 10c0
 
-"@acarmisc/backstage-plugin-litellm-backend@npm:^0.3.4":
-  version: 0.3.5
-  resolution: "@acarmisc/backstage-plugin-litellm-backend@npm:0.3.5"
-  dependencies:
-    "@backstage/backend-plugin-api": "npm:^1.9.1"
-    "@backstage/catalog-client": "npm:^1.9.0"
-    "@backstage/catalog-model": "npm:^1.7.0"
-    "@backstage/config": "npm:^1.3.0"
-    "@backstage/types": "npm:^1.2.0"
-    express: "npm:^4.18.2"
-    jose: "npm:^5.9.6"
-  checksum: 10c0/766e7f0141edb06f6b3e4ebe294e5c0f0cf0cb29ac351a2cd1d552ab55d4ea69156bcc2dc4771a10067c7cceffc24bc63dedbe3e2586793eb406f9973d436dda
-  languageName: node
-  linkType: hard
-
-"@acarmisc/backstage-plugin-litellm-chat-backend@workspace:packages/plugin-litellm-chat-backend":
+"@acarmisc/backstage-plugin-ai-conversation-backend@workspace:packages/plugin-ai-conversation-backend":
   version: 0.0.0-use.local
-  resolution: "@acarmisc/backstage-plugin-litellm-chat-backend@workspace:packages/plugin-litellm-chat-backend"
+  resolution: "@acarmisc/backstage-plugin-ai-conversation-backend@workspace:packages/plugin-ai-conversation-backend"
   dependencies:
     "@acarmisc/backstage-plugin-litellm-backend": "npm:^0.3.4"
     "@backstage/backend-plugin-api": "npm:^1.9.1"
@@ -45,17 +30,17 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@acarmisc/backstage-plugin-litellm-chat-monorepo@workspace:.":
+"@acarmisc/backstage-plugin-ai-conversation-monorepo@workspace:.":
   version: 0.0.0-use.local
-  resolution: "@acarmisc/backstage-plugin-litellm-chat-monorepo@workspace:."
+  resolution: "@acarmisc/backstage-plugin-ai-conversation-monorepo@workspace:."
   dependencies:
     typescript: "npm:^5.0.0"
   languageName: unknown
   linkType: soft
 
-"@acarmisc/backstage-plugin-litellm-chat@workspace:packages/plugin-litellm-chat":
+"@acarmisc/backstage-plugin-ai-conversation@workspace:packages/plugin-ai-conversation":
   version: 0.0.0-use.local
-  resolution: "@acarmisc/backstage-plugin-litellm-chat@workspace:packages/plugin-litellm-chat"
+  resolution: "@acarmisc/backstage-plugin-ai-conversation@workspace:packages/plugin-ai-conversation"
   dependencies:
     "@acarmisc/backstage-plugin-litellm": "npm:^0.4.0"
     "@backstage/cli": "npm:^0.36.2"
@@ -90,6 +75,21 @@ __metadata:
     react-router-dom: ^6.20.0
   languageName: unknown
   linkType: soft
+
+"@acarmisc/backstage-plugin-litellm-backend@npm:^0.3.4":
+  version: 0.3.5
+  resolution: "@acarmisc/backstage-plugin-litellm-backend@npm:0.3.5"
+  dependencies:
+    "@backstage/backend-plugin-api": "npm:^1.9.1"
+    "@backstage/catalog-client": "npm:^1.9.0"
+    "@backstage/catalog-model": "npm:^1.7.0"
+    "@backstage/config": "npm:^1.3.0"
+    "@backstage/types": "npm:^1.2.0"
+    express: "npm:^4.18.2"
+    jose: "npm:^5.9.6"
+  checksum: 10c0/766e7f0141edb06f6b3e4ebe294e5c0f0cf0cb29ac351a2cd1d552ab55d4ea69156bcc2dc4771a10067c7cceffc24bc63dedbe3e2586793eb406f9973d436dda
+  languageName: node
+  linkType: hard
 
 "@acarmisc/backstage-plugin-litellm@npm:^0.4.0":
   version: 0.4.0

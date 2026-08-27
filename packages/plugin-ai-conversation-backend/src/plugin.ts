@@ -1,0 +1,45 @@
+import { coreServices, createBackendPlugin } from '@backstage/backend-plugin-api';
+import { catalogServiceRef } from '@backstage/plugin-catalog-node';
+import { createRouter } from './router';
+
+export const aiConversationPlugin = createBackendPlugin({
+  pluginId: 'ai-conversation',
+  register(reg) {
+    reg.registerInit({
+      deps: {
+        httpRouter: coreServices.httpRouter,
+        config: coreServices.rootConfig,
+        logger: coreServices.logger,
+        auth: coreServices.auth,
+        discovery: coreServices.discovery,
+        catalog: catalogServiceRef,
+        database: coreServices.database,
+        urlReader: coreServices.urlReader,
+        scheduler: coreServices.scheduler,
+      },
+      async init({
+        httpRouter,
+        config,
+        logger,
+        auth,
+        discovery,
+        catalog,
+        database,
+        urlReader,
+        scheduler,
+      }) {
+        const router = await createRouter({
+          config,
+          logger,
+          auth,
+          discovery,
+          catalog,
+          database,
+          urlReader,
+          scheduler,
+        });
+        httpRouter.use(router);
+      },
+    });
+  },
+});

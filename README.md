@@ -1,13 +1,13 @@
-# LiteLLM RAG Chat Plugin
+# AI Conversation Plugin
 
-This repository contains the Backstage plugins for LiteLLM RAG capabilities.
+This repository contains the Backstage plugins for AI conversation, powered by LiteLLM RAG capabilities.
 
 ## Packages
 
-### [@acarmisc/backstage-plugin-litellm-chat](packages/plugin-litellm-chat)
+### [@acarmisc/backstage-plugin-ai-conversation](packages/plugin-ai-conversation)
 The frontend plugin that provides a streaming chat interface, including model selection, vector store (knowledge base) selection, and API key management.
 
-### [@acarmisc/backstage-plugin-litellm-chat-backend](packages/plugin-litellm-chat-backend)
+### [@acarmisc/backstage-plugin-ai-conversation-backend](packages/plugin-ai-conversation-backend)
 The backend plugin that acts as a streaming proxy to the LiteLLM proxy, handling RAG queries and vector store retrieval.
 
 ## Installation
@@ -15,8 +15,8 @@ The backend plugin that acts as a streaming proxy to the LiteLLM proxy, handling
 To use these plugins in your Backstage instance, add them to your `packages/app/package.json` and `packages/backend/package.json` respectively.
 
 ```bash
-yarn workspace app add @acarmisc/backstage-plugin-litellm-chat
-yarn workspace backend add @acarmisc/backstage-plugin-litellm-chat-backend
+yarn workspace app add @acarmisc/backstage-plugin-ai-conversation
+yarn workspace backend add @acarmisc/backstage-plugin-ai-conversation-backend
 ```
 
 ## Usage
@@ -29,7 +29,7 @@ Add the following to your `app-config.yaml`:
 litellm:
   baseUrl: http://your-litellm-proxy:4000
   masterKey: ${LITELLM_MASTER_KEY}
-  chat:
+  aiConversation:
     defaultModel: claude-3-5-sonnet
     persistence:
       enabled: false   # opt-in: persist chat threads server-side instead of browser-only
@@ -44,7 +44,7 @@ litellm:
 - **Conversation customization**: Independent Tone, Focus, and Verbosity pickers layer short prompt fragments on top of the persona/custom prompt, plus a Reasoning effort picker (`low`/`medium`/`high`) forwarded natively to models that support it — mix and match without needing a dedicated persona per combination.
 - **Governance Integrated**: Inherits all user authentication, budget, and rate limiting from the existing LiteLLM Governance plugin.
 - **Per-user Keys**: Allow users to select their own LiteLLM keys for spend attribution.
-- **Threads**: Search, pin, export/import as portable JSON. Client-side by default (localStorage); optionally persisted server-side via `litellm.chat.persistence.enabled`, with a configurable retention period (`ttlDays`, default 30, `0` = unlimited) enforced by a background cleanup job.
+- **Threads**: Search, pin, export/import as portable JSON. Client-side by default (localStorage); optionally persisted server-side via `litellm.aiConversation.persistence.enabled`, with a configurable retention period (`ttlDays`, default 30, `0` = unlimited) enforced by a background cleanup job.
 - **Compare mode**: Send the same prompt to several models in parallel and compare replies side by side.
 - **LaTeX rendering** in assistant messages.
-- **Analytics**: A lightweight `/ai-chat/analytics` page for usage-by-persona/model and feedback totals.
+- **Analytics**: A lightweight `/ai-conversation/analytics` page for usage-by-persona/model and feedback totals.

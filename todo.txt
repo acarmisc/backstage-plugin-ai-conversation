@@ -1,20 +1,20 @@
 (A) 2026-06-30 +phase1-scaffold Create monorepo root package.json @backend
-(A) 2026-06-30 +phase1-scaffold Create packages/plugin-litellm-chat-backend package.json @backend
-(A) 2026-06-30 +phase1-scaffold Create packages/plugin-litellm-chat-backend tsconfig.json @backend
-(A) 2026-06-30 +phase1-scaffold Create packages/plugin-litellm-chat-backend build.js @backend
-(A) 2026-06-30 +phase1-scaffold Create packages/plugin-litellm-chat-backend config.d.ts @backend
-(A) 2026-06-30 +phase1-scaffold Create packages/plugin-litellm-chat-backend src/index.ts stub @backend
-(A) 2026-06-30 +phase1-scaffold Create packages/plugin-litellm-chat-backend src/plugin.ts stub @backend
-(A) 2026-06-30 +phase1-scaffold Create packages/plugin-litellm-chat-backend src/router.ts stub @backend
-(A) 2026-06-30 +phase1-scaffold Create packages/plugin-litellm-chat-backend src/stream.ts stub @backend
-(A) 2026-06-30 +phase1-scaffold Create packages/plugin-litellm-chat-backend src/types.ts stub @backend
-(A) 2026-06-30 +phase1-scaffold Create packages/plugin-litellm-chat package.json @frontend
-(A) 2026-06-30 +phase1-scaffold Create packages/plugin-litellm-chat tsconfig.json @frontend
-(A) 2026-06-30 +phase1-scaffold Create packages/plugin-litellm-chat build.js @frontend
-(A) 2026-06-30 +phase1-scaffold Create packages/plugin-litellm-chat src/index.ts stub @frontend
-(A) 2026-06-30 +phase1-scaffold Create packages/plugin-litellm-chat src/plugin.tsx stub @frontend
-(A) 2026-06-30 +phase1-scaffold Create packages/plugin-litellm-chat src/api.ts stub @frontend
-(A) 2026-06-30 +phase1-scaffold Create packages/plugin-litellm-chat src/types.ts stub @frontend
+(A) 2026-06-30 +phase1-scaffold Create packages/plugin-ai-conversation-backend package.json @backend
+(A) 2026-06-30 +phase1-scaffold Create packages/plugin-ai-conversation-backend tsconfig.json @backend
+(A) 2026-06-30 +phase1-scaffold Create packages/plugin-ai-conversation-backend build.js @backend
+(A) 2026-06-30 +phase1-scaffold Create packages/plugin-ai-conversation-backend config.d.ts @backend
+(A) 2026-06-30 +phase1-scaffold Create packages/plugin-ai-conversation-backend src/index.ts stub @backend
+(A) 2026-06-30 +phase1-scaffold Create packages/plugin-ai-conversation-backend src/plugin.ts stub @backend
+(A) 2026-06-30 +phase1-scaffold Create packages/plugin-ai-conversation-backend src/router.ts stub @backend
+(A) 2026-06-30 +phase1-scaffold Create packages/plugin-ai-conversation-backend src/stream.ts stub @backend
+(A) 2026-06-30 +phase1-scaffold Create packages/plugin-ai-conversation-backend src/types.ts stub @backend
+(A) 2026-06-30 +phase1-scaffold Create packages/plugin-ai-conversation package.json @frontend
+(A) 2026-06-30 +phase1-scaffold Create packages/plugin-ai-conversation tsconfig.json @frontend
+(A) 2026-06-30 +phase1-scaffold Create packages/plugin-ai-conversation build.js @frontend
+(A) 2026-06-30 +phase1-scaffold Create packages/plugin-ai-conversation src/index.ts stub @frontend
+(A) 2026-06-30 +phase1-scaffold Create packages/plugin-ai-conversation src/plugin.tsx stub @frontend
+(A) 2026-06-30 +phase1-scaffold Create packages/plugin-ai-conversation src/api.ts stub @frontend
+(A) 2026-06-30 +phase1-scaffold Create packages/plugin-ai-conversation src/types.ts stub @frontend
 (A) 2026-06-30 +phase1-scaffold Create README.md @docs
 (B) 2026-06-30 +phase1-scaffold yarn install inside target Backstage monorepo to link both packages @backend
 (A) 2026-06-30 +phase2-verify-llm Confirm /v1/rag/query endpoint exists on LiteLLM v1.90.0 @research
@@ -41,12 +41,12 @@
 (A) 2026-06-30 +phase4-backend-router Use user_key from request body as upstream Authorization Bearer @backend
 (A) 2026-06-30 +phase4-backend-router Implement POST /chat/completions non-streaming variant @backend
 (B) 2026-06-30 +phase4-backend-router Write router tests with injected mock LiteLLMClient @backend
-(A) 2026-06-30 +phase4-backend-router Implement plugin.ts createBackendPlugin litellm-chat @backend
+(A) 2026-06-30 +phase4-backend-router Implement plugin.ts createBackendPlugin ai-conversation @backend
 (A) 2026-06-30 +phase4-backend-router Wire httpRouter.use(router) in init @backend
-(A) 2026-06-30 +phase4-backend-router Export litellmChatPlugin default from index.ts @backend
-(A) 2026-06-30 +phase4-backend-router Define config.d.ts for optional litellm.chat config keys @backend
+(A) 2026-06-30 +phase4-backend-router Export aiConversationPlugin default from index.ts @backend
+(A) 2026-06-30 +phase4-backend-router Define config.d.ts for optional litellm.aiConversation config keys @backend
 (A) 2026-06-30 +phase5-frontend-api Define types VectorStore ChatRequest ChatStreamChunk SearchResult Citation @frontend
-(A) 2026-06-30 +phase5-frontend-api Implement listVectorStores GET /api/litellm-chat/vector_stores @frontend
+(A) 2026-06-30 +phase5-frontend-api Implement listVectorStores GET /api/ai-conversation/vector_stores @frontend
 (A) 2026-06-30 +phase5-frontend-api Implement chatStream SSE reader via ReadableStream @frontend
 (A) 2026-06-30 +phase5-frontend-api Parse data lines in chatStream @frontend
 (A) 2026-06-30 +phase5-frontend-api Call onToken on each chunk in chatStream @frontend
@@ -54,7 +54,7 @@
 (A) 2026-06-30 +phase5-frontend-api Call onError on HTTP or parse failure in chatStream @frontend
 (A) 2026-06-30 +phase5-frontend-api Return AbortController from chatStream for stop generation @frontend
 (A) 2026-06-30 +phase5-frontend-api Implement chatCompletions non-streaming variant @frontend
-(A) 2026-06-30 +phase5-frontend-api Create liteLlmChatApiRef and LiteLlmChatApi class @frontend
+(A) 2026-06-30 +phase5-frontend-api Create aiConversationApiRef and AiConversationApi class @frontend
 (A) 2026-06-30 +phase6-frontend-hooks Implement useChat hook thread state management @frontend
 (A) 2026-06-30 +phase6-frontend-hooks Implement threads array in useState @frontend
 (A) 2026-06-30 +phase6-frontend-hooks Persist threads to localStorage keyed by userId @frontend
@@ -81,13 +81,13 @@
 (A) 2026-06-30 +phase7-frontend-ui Implement KeyPicker dropdown from liteLlmApiRef listKeys @frontend
 (A) 2026-06-30 +phase7-frontend-ui Show key_alias fallback to masked key_name in KeyPicker @frontend
 (A) 2026-06-30 +phase7-frontend-ui Empty state no keys yet link to /litellm governance page @frontend
-(A) 2026-06-30 +phase7-frontend-ui Register litellmChatPlugin createFrontendPlugin in plugin.tsx @frontend
+(A) 2026-06-30 +phase7-frontend-ui Register aiConversationPlugin createFrontendPlugin in plugin.tsx @frontend
 (A) 2026-06-30 +phase7-frontend-ui Register ApiBlueprint for liteLlmChatApi @frontend
-(A) 2026-06-30 +phase7-frontend-ui Register PageBlueprint path /ai-chat title AI Chat @frontend
-(A) 2026-06-30 +phase7-frontend-ui Export litellmChatPlugin ChatPage from index.ts @frontend
-(A) 2026-06-30 +phase8-integration Add backend.add import litellmChatPlugin to target Backstage backend @integration
-(A) 2026-06-30 +phase8-integration Add litellmChatPlugin extension to target Backstage App.tsx @integration
-(A) 2026-06-30 +phase8-integration Add route /ai-chat to target Backstage frontend @integration
+(A) 2026-06-30 +phase7-frontend-ui Register PageBlueprint path /ai-conversation title AI Chat @frontend
+(A) 2026-06-30 +phase7-frontend-ui Export aiConversationPlugin ChatPage from index.ts @frontend
+(A) 2026-06-30 +phase8-integration Add backend.add import aiConversationPlugin to target Backstage backend @integration
+(A) 2026-06-30 +phase8-integration Add aiConversationPlugin extension to target Backstage App.tsx @integration
+(A) 2026-06-30 +phase8-integration Add route /ai-conversation to target Backstage frontend @integration
 (A) 2026-06-30 +phase8-integration Bump backstage image and deploy to backstage namespace GKE @integration
 (A) 2026-06-30 +phase8-integration Verify chat works against live litellm-pgvector service @integration
 (A) 2026-06-30 +phase8-integration Verify streaming SSE renders tokens incrementally @integration
@@ -140,5 +140,5 @@
 (B) 2026-08-11 +phase14-web-search Verify target LiteLLM deployment has native web-search-capable model before enabling in production @research
 (A) 2026-08-11 +phase15-analytics Add chat_events migration and best-effort per-turn logging @backend
 (A) 2026-08-11 +phase15-analytics Implement GET feedback-summary and GET usage-summary endpoints @backend
-(A) 2026-08-11 +phase15-analytics Add ai-chat-analytics page with hand-rolled BarList charts @frontend
-(B) 2026-08-11 +phase15-analytics Wire real admin-only RBAC gate for ai-chat-analytics in target Backstage app @integration
+(A) 2026-08-11 +phase15-analytics Add ai-conversation-analytics page with hand-rolled BarList charts @frontend
+(B) 2026-08-11 +phase15-analytics Wire real admin-only RBAC gate for ai-conversation-analytics in target Backstage app @integration
