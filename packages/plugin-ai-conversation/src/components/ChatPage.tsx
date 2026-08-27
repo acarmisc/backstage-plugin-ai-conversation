@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Box,
   Button,
+  Collapse,
   List,
   ListItem,
   ListItemButton,
@@ -33,6 +34,8 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import LinkIcon from '@mui/icons-material/Link';
 import CloseIcon from '@mui/icons-material/Close';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import HistoryIcon from '@mui/icons-material/History';
 import { convertFileListToFileUIParts } from 'ai';
 import type { FileUIPart } from 'ai';
 import { useApi, identityApiRef } from '@backstage/core-plugin-api';
@@ -87,8 +90,6 @@ export const ChatPage: React.FC = () => {
   });
 
   const [model, setModel] = useState('');
-  const [compareMode, setCompareModeUi] = useState(false);
-  const [compareModelsSel, setCompareModelsSel] = useState<string[]>([]);
   const [vectorStoreIds, setVectorStoreIds] = useState<string[]>([]);
   const [webSearch, setWebSearch] = useState(false);
   const [personaId, setPersonaId] = useState('');
@@ -108,6 +109,7 @@ export const ChatPage: React.FC = () => {
   const [personasLoading, setPersonasLoading] = useState(true);
   const [personasError, setPersonasError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
   const [threadMenuAnchor, setThreadMenuAnchor] = useState<HTMLElement | null>(null);
@@ -140,7 +142,13 @@ export const ChatPage: React.FC = () => {
       .finally(() => setPersonasLoading(false));
     chatApi
       .getChatTraits()
-      .then(setTraits)
+      .then(t => {
+        setTraits(t);
+        // Pre-select the first option for each trait when empty.
+        setToneId(prev => prev || t.tones[0]?.id || '');
+        setFocusId(prev => prev || t.focuses[0]?.id || '');
+        setVerbosityId(prev => prev || t.verbosities[0]?.id || '');
+      })
       .catch(() => {})
       .finally(() => setTraitsLoading(false));
     identityApi
@@ -182,8 +190,6 @@ export const ChatPage: React.FC = () => {
     setVerbosityId(chat.activeThread.verbosityId ?? '');
     setReasoningEffort(chat.activeThread.reasoningEffort ?? '');
     setKeyVal({ alias: chat.activeThread.keyAlias, token: chat.activeThread.keyToken });
-    setCompareModeUi(chat.activeThread.mode === 'compare');
-    setCompareModelsSel(chat.activeThread.compareModels ?? []);
     setWebSearch(!!chat.activeThread.webSearch);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeThreadId]);
@@ -243,24 +249,31 @@ export const ChatPage: React.FC = () => {
     }
   };
 
-  const handleSend = () => {
-    if (!input.trim() || !keyVal.token || isStreaming) return;
-    if (compareMode && compareModelsSel.length === 0) return;
+  const handleSend = async () => {
+    if (!input.trim() || isStreaming) return;
+    let currentKey = keyVal;
+    // Auto-mint a chat key on first message if none exists yet.
+    if (!currentKey.token) {
+      try {
+        const keyInfo = await chatApi.mintChatKey();
+        currentKey = { alias: keyInfo.key_alias, token: keyInfo.key };
+        setKeyVal(currentKey);
+      } catch {
+        return; // key mint failed — silently abort
+      }
+    }
     const text = input.trim();
     const activeUrlMatch = text.match(URL_TOKEN_RE)?.[1];
     const attachedUrl =
       activeUrlMatch && urlPreview?.url === activeUrlMatch && activeUrlMatch !== dismissedUrl
         ? { url: urlPreview.url, title: urlPreview.title }
         : undefined;
-    const compareModelsOverride = compareMode ? compareModelsSel : undefined;
     const files = stagedFiles.length > 0 ? stagedFiles : undefined;
     if (!chat.activeThread) {
       chat.newThread();
-      // newThread() setState is async; defer sendMessage to the next tick
-      // so it sees the freshly created active thread.
-      requestAnimationFrame(() => chat.sendMessage(text, attachedUrl, compareModelsOverride, files));
+      requestAnimationFrame(() => chat.sendMessage(text, attachedUrl, undefined, files));
     } else {
-      chat.sendMessage(text, attachedUrl, compareModelsOverride, files);
+      chat.sendMessage(text, attachedUrl, undefined, files);
     }
     setInput('');
     setUrlPreview(null);
@@ -428,7 +441,6 @@ export const ChatPage: React.FC = () => {
           <>
             {/* Settings panel (collapsible, pinned to top) */}
             <ChatSettingsPanel
-              chatApi={chatApi}
               showSettings={showSettings}
               onToggleShowSettings={() => setShowSettings(v => !v)}
               configError={configError}
@@ -446,23 +458,14 @@ export const ChatPage: React.FC = () => {
               onFocusChange={setFocusId}
               customSystemPrompt={customSystemPrompt}
               onCustomSystemPromptChange={setCustomSystemPrompt}
-              compareMode={compareMode}
-              onCompareModeChange={setCompareModeUi}
-              compareModelsSel={compareModelsSel}
-              onCompareModelsChange={setCompareModelsSel}
               model={model}
               onModelChange={setModel}
               vectorStoreIds={vectorStoreIds}
               onVectorStoreIdsChange={setVectorStoreIds}
-              webSearch={webSearch}
-              onWebSearchChange={setWebSearch}
               verbosityId={verbosityId}
               onVerbosityChange={setVerbosityId}
               reasoningEffort={reasoningEffort}
               onReasoningEffortChange={setReasoningEffort}
-              keyVal={keyVal}
-              onKeyChange={setKeyVal}
-              activeThreadKeyToken={chat.activeThread?.keyToken}
             />
 
             <Divider />
@@ -499,71 +502,94 @@ export const ChatPage: React.FC = () => {
               </Box>
             )}
 
-            {/* Persistence status — transparency for where thread history
-                actually lives, driven by litellm.aiConversation.persistence config. */}
-            <Box sx={{ px: 1.5, pb: 1 }}>
-              <Tooltip title={persistenceTooltip}>
-                <Typography variant="caption" color="text.secondary">
-                  {config.persistence.enabled
-                    ? `History saved to your account${config.persistence.ttlDays > 0 ? ` · ${config.persistence.ttlDays}d retention` : ''}`
-                    : 'History stored only in this browser'}
-                </Typography>
-              </Tooltip>
-            </Box>
-
-            {/* Search */}
-            <Box sx={{ px: 1.5, pb: 1 }}>
-              <InputBase
-                fullWidth
-                placeholder="Search threads…"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                startAdornment={<SearchIcon fontSize="small" sx={{ mr: 0.75, color: 'text.secondary' }} />}
+            {/* ── History (collapsible, default collapsed) ── */}
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                cursor: 'pointer',
+                px: 1.5,
+                py: 1,
+                bgcolor: 'action.hover',
+              }}
+              onClick={() => setHistoryOpen(v => !v)}
+            >
+              <HistoryIcon fontSize="small" sx={{ mr: 1 }} />
+              <Typography variant="overline" sx={{ flex: 1 }}>
+                History
+              </Typography>
+              {config.persistence.enabled && (
+                <Tooltip title={persistenceTooltip}>
+                  <Typography variant="caption" color="text.secondary" sx={{ mr: 0.5 }}>
+                    {config.persistence.ttlDays > 0 ? `${config.persistence.ttlDays}d` : 'saved'}
+                  </Typography>
+                </Tooltip>
+              )}
+              <ExpandMoreIcon
+                fontSize="small"
                 sx={{
-                  border: 1,
-                  borderColor: 'divider',
-                  borderRadius: 2,
-                  px: 1,
-                  py: 0.5,
-                  fontSize: '0.85rem',
+                  transform: historyOpen ? 'rotate(180deg)' : 'none',
+                  transition: 'transform 0.2s',
                 }}
               />
             </Box>
+            <Collapse in={historyOpen}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                {/* Search */}
+                <Box sx={{ px: 1.5, pb: 1 }}>
+                  <InputBase
+                    fullWidth
+                    placeholder="Search threads…"
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    startAdornment={<SearchIcon fontSize="small" sx={{ mr: 0.75, color: 'text.secondary' }} />}
+                    sx={{
+                      border: 1,
+                      borderColor: 'divider',
+                      borderRadius: 2,
+                      px: 1,
+                      py: 0.5,
+                      fontSize: '0.85rem',
+                    }}
+                  />
+                </Box>
 
-            {/* Thread list */}
-            <Box sx={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-              <List dense>
-                {visibleThreads.map(t => (
-                  <ListItem
-                    key={t.id}
-                    disablePadding
-                    secondaryAction={
-                      <IconButton edge="end" size="small" onClick={e => openThreadMenu(e, t.id)}>
-                        <MoreVertIcon fontSize="small" />
-                      </IconButton>
-                    }
-                  >
-                    <ListItemButton
-                      selected={chat.activeThread?.id === t.id}
-                      onClick={() => chat.selectThread(t.id)}
-                      sx={{ pr: 6 }}
-                    >
-                      {t.pinned && <PushPinIcon fontSize="small" sx={{ mr: 0.75, color: 'text.secondary' }} />}
-                      <ListItemText
-                        primary={t.title}
-                        primaryTypographyProps={{ noWrap: true, variant: 'body2' }}
-                        secondaryTypographyProps={{ noWrap: true, variant: 'caption' }}
-                      />
-                    </ListItemButton>
-                  </ListItem>
-                ))}
-                {visibleThreads.length === 0 && (
-                  <Typography variant="caption" color="text.secondary" sx={{ px: 2, py: 1, display: 'block' }}>
-                    {searchQuery ? 'No threads match your search.' : 'No threads yet.'}
-                  </Typography>
-                )}
-              </List>
-            </Box>
+                {/* Thread list */}
+                <Box sx={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+                  <List dense>
+                    {visibleThreads.map(t => (
+                      <ListItem
+                        key={t.id}
+                        disablePadding
+                        secondaryAction={
+                          <IconButton edge="end" size="small" onClick={e => openThreadMenu(e, t.id)}>
+                            <MoreVertIcon fontSize="small" />
+                          </IconButton>
+                        }
+                      >
+                        <ListItemButton
+                          selected={chat.activeThread?.id === t.id}
+                          onClick={() => chat.selectThread(t.id)}
+                          sx={{ pr: 6 }}
+                        >
+                          {t.pinned && <PushPinIcon fontSize="small" sx={{ mr: 0.75, color: 'text.secondary' }} />}
+                          <ListItemText
+                            primary={t.title}
+                            primaryTypographyProps={{ noWrap: true, variant: 'body2' }}
+                            secondaryTypographyProps={{ noWrap: true, variant: 'caption' }}
+                          />
+                        </ListItemButton>
+                      </ListItem>
+                    ))}
+                    {visibleThreads.length === 0 && (
+                      <Typography variant="caption" color="text.secondary" sx={{ px: 2, py: 1, display: 'block' }}>
+                        {searchQuery ? 'No threads match your search.' : 'No threads yet.'}
+                      </Typography>
+                    )}
+                  </List>
+                </Box>
+              </Box>
+            </Collapse>
 
             <Menu anchorEl={threadMenuAnchor} open={!!threadMenuAnchor} onClose={closeThreadMenu}>
               <MenuItem
@@ -734,7 +760,7 @@ export const ChatPage: React.FC = () => {
             }}
           >
             <Tooltip title="Attach image">
-              <IconButton size="small" onClick={() => attachInputRef.current?.click()} disabled={!keyVal.token}>
+              <IconButton size="small" onClick={() => attachInputRef.current?.click()}>
                 <AttachFileIcon fontSize="small" />
               </IconButton>
             </Tooltip>
@@ -751,15 +777,10 @@ export const ChatPage: React.FC = () => {
               minRows={1}
               maxRows={5}
               fullWidth
-              placeholder={
-                keyVal.token
-                  ? 'Send a message…  (Enter to send, Shift+Enter for newline)'
-                  : 'Generate a chat key in Settings to start…'
-              }
+              placeholder="Send a message…  (Enter to send, Shift+Enter for newline)"
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              disabled={!keyVal.token}
               sx={{
                 border: 1,
                 borderColor: 'divider',
@@ -780,9 +801,7 @@ export const ChatPage: React.FC = () => {
                 <IconButton
                   color="primary"
                   onClick={handleSend}
-                  disabled={
-                    !input.trim() || !keyVal.token || (compareMode && compareModelsSel.length === 0)
-                  }
+                  disabled={!input.trim()}
                 >
                   <SendIcon />
                 </IconButton>
