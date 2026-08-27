@@ -1,57 +1,43 @@
 # Rebrand follow-up — litellm-chat → ai-conversation
 
-This repo's rename is committed (`3cfeacba4`). What's still outstanding, in the
-order it'll bite you.
+**Status: done.** This repo's rename (`3cfeacba4`) is fully rolled out — new
+npm packages published, old ones deprecated, target Backstage app updated and
+deployed. Kept below for reference; nothing here is still outstanding.
 
-## 1. Publish the renamed npm packages
+## 1. Publish the renamed npm packages — done
 
-Nothing has been published under the new names yet. The old packages
-(`@acarmisc/backstage-plugin-litellm-chat` v0.9.1, `-backend` v0.8.1, plus 16/17
-older versions each) are still live on npm and untouched.
+`@acarmisc/backstage-plugin-ai-conversation@0.10.0` and
+`@acarmisc/backstage-plugin-ai-conversation-backend@0.10.0` published via
+`ai-conversation@0.10.0` / `ai-conversation-backend@0.10.0` tags (this bump also
+carried the attachment-picker/`ChatSettingsPanel` work, not just the rename).
+The old `@acarmisc/backstage-plugin-litellm-chat(-backend)` packages (17/18
+published versions) are deprecated on npm pointing at the new names.
 
-- Tag and push to trigger `.github/workflows/publish.yml` (now watches
-  `ai-conversation@*` / `ai-conversation-backend@*` tags):
-  ```
-  git tag ai-conversation@0.9.1
-  git tag ai-conversation-backend@0.8.1
-  git push origin ai-conversation@0.9.1 ai-conversation-backend@0.8.1
-  ```
-  (Or bump versions first if you want the rename itself to be a visible release —
-  your call, nothing about the rename requires a version bump.)
-- Once the new names are live and you've verified consumers can pull them,
-  consider `npm deprecate @acarmisc/backstage-plugin-litellm-chat "renamed to
-  @acarmisc/backstage-plugin-ai-conversation"` (and `-backend`) so anyone still
-  depending on the old name gets a clear pointer instead of silent staleness.
+## 2. Update the live Backstage deployment — done
 
-## 2. Update the live Backstage deployment
+`backstage-abstract-ces` (`gitlab.az.abssrv.it:innovation/playground/backstage-abstract-ces`,
+commit `0002c3b`) now depends on the new package names, imports
+`aiConversationPlugin`, registers the `ai-conversation-backend` module, and
+its sidebar/quicklinks/nav-takes point at `/ai-conversation` and
+`page:ai-conversation(/analytics)`. Deployed to production via GitLab CI
+pipeline 155599 (`deploy:production` succeeded).
 
-The instance at `backstage.ces.abstractstaging.it` (a *different* repo — the
-Backstage host app) still references the old package names, `litellmChatPlugin`
-export, and `/ai-chat` route. It will break on next deploy/dependency bump
-until updated. Per `HANDOFF.md`'s "Files changed in target Backstage" table,
-touch:
+Not touched, deliberately: the `litellm-chat` catalog `System` entity in that
+repo's `catalog-info.yaml` is referenced by the separate `ces-ai-personas`
+repo and needs cross-repo coordination to rename — out of scope for this
+plugin repo's rebrand.
 
-| File | Change needed |
-|---|---|
-| `packages/app/package.json` | `@acarmisc/backstage-plugin-litellm-chat` → `@acarmisc/backstage-plugin-ai-conversation` |
-| `packages/app/src/App.tsx` | `litellmChatPlugin` import/usage → `aiConversationPlugin` |
-| `packages/backend/package.json` | `@acarmisc/backstage-plugin-litellm-chat-backend` → `@acarmisc/backstage-plugin-ai-conversation-backend` |
-| `packages/backend/src/index.ts` | `backend.add(import('@acarmisc/backstage-plugin-litellm-chat-backend'))` → `-ai-conversation-backend` |
-| `app-config.yaml` | `litellm.chat.*` → `litellm.aiConversation.*` (the `litellm.baseUrl`/`masterKey`/`userIdDomain` keys are unchanged — shared with govai) |
-| any sidebar nav / bookmarks | `/ai-chat` → `/ai-conversation` |
+## 3. Verify end-to-end after deploy — done
 
-Do steps 1 and 2 together — bumping the host app's dependency to the new
-package name is what actually needs the npm publish to have landed first.
-
-## 3. Verify end-to-end after deploy
-
-- `GET /api/ai-conversation/health` → `{"status":"ok"}`
-- Browser: log in, load `/ai-conversation`, confirm streaming + citations still
-  work (same check `HANDOFF.md` used for the original ship).
-- If `litellm.aiConversation.persistence.enabled` is set in the live config,
-  confirm existing persisted threads still load — the DB table itself
-  (`chat_threads`) and its schema are untouched, only the config key that
-  gates the feature moved.
+- `GET /api/ai-conversation/health` → `401` (auth enforced, route resolves —
+  matches `HANDOFF.md`'s original "Auth enforced" check).
+- `GET /ai-conversation` → `200` (SPA shell serves under the new route).
+- `litellm.aiConversation.persistence.enabled` is not currently set in the
+  live app-config (nothing to migrate); the `chat_threads` table and its
+  gating logic are otherwise unaffected by the rename.
+- Full interactive browser test (login, send a message, confirm
+  streaming/citations/attachments) not done in this pass — no browser
+  session available here. See `HANDOFF.md`'s "Not yet verified" list.
 
 ## Not touched, and why
 
@@ -61,4 +47,5 @@ package name is what actually needs the npm publish to have landed first.
 - **`litellm.baseUrl` / `litellm.masterKey` / `litellm.userIdDomain`** — these
   belong to the govai plugin's shared config surface, not this plugin's own
   branding. Only `litellm.chat.*` (this plugin's own optional subtree) moved
-  to `litellm.aiConversation.*`.
+  to `litellm.aiConversation.*` — and that subtree isn't even set in the live
+  app-config today, so there was nothing to migrate there either.
