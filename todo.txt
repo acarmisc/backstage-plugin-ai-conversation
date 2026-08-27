@@ -142,3 +142,11 @@
 (A) 2026-08-11 +phase15-analytics Implement GET feedback-summary and GET usage-summary endpoints @backend
 (A) 2026-08-11 +phase15-analytics Add ai-conversation-analytics page with hand-rolled BarList charts @frontend
 (B) 2026-08-11 +phase15-analytics Wire real admin-only RBAC gate for ai-conversation-analytics in target Backstage app @integration
+(A) 2026-08-27 +phase16-ai-sdk-spike Add ai and @ai-sdk/react deps verify esbuild build.js and tsc compile @frontend
+(A) 2026-08-27 +phase16-ai-sdk-spike Verify AI SDK major version React 18 peer-dep compatibility @research
+(A) 2026-08-27 +phase16-ai-sdk-spike Spike feature-flagged chat-stream-v2 route emitting UI Message Stream Protocol @backend
+(B) 2026-08-27 +phase16-ai-sdk-spike Verify throwaway useChat test page consumes spiked protocol end-to-end @research
+(A) 2026-08-27 +phase17-protocol-adapter Move normalizeChunk parsing logic server-side into uiMessageStream.ts adapter @backend
+(A) 2026-08-27 +phase17-protocol-adapter Emit text-delta finish and error parts per UI Message Stream Protocol @backend
+(A) 2026-08-27 +phase17-protocol-adapter Emit search_results as data-citations and usage as data-usage custom parts @backend
+(B) 2026-08-27 +phase17-protocol-adapter Unit test adapter against captured LiteLLM SSE fixtures @backend

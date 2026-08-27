@@ -39,6 +39,7 @@ const backend_plugin_api_1 = require("@backstage/backend-plugin-api");
 const integration_1 = require("@backstage/integration");
 const backstage_plugin_litellm_backend_1 = require("@acarmisc/backstage-plugin-litellm-backend");
 const stream_1 = require("./stream");
+const uiMessageStream_1 = require("./uiMessageStream");
 const persona_1 = require("./persona");
 const urlContext_1 = require("./urlContext");
 const traits_1 = require("./traits");
@@ -725,6 +726,65 @@ async function createRouter(options) {
         }
         catch (err) {
             logger.error('chat/stream failed', err);
+            if (!res.headersSent) {
+                res.status(err.status ?? 500).json({ error: err.message });
+            }
+        }
+    });
+    // New opt-in AI SDK UI Message Stream Protocol response (HANDOFF-ai-sdk-migration.md
+    // Phase 17). Deliberately a parallel route, not a rewrite of /chat/stream above:
+    // nothing existing calls this yet, so it ships with zero regression risk and the
+    // frontend migrates to it on its own schedule (Phase 19).
+    router.post('/chat/stream/v2', async (req, res) => {
+        try {
+            const body = req.body;
+            if (!body?.model || !body?.messages || !body?.user_key) {
+                res.status(400).json({
+                    error: 'model, messages, user_key required',
+                });
+                return;
+            }
+            const tokenEntityRef = await (0, backstage_plugin_litellm_backend_1.resolveUserId)(req, auth);
+            if (!tokenEntityRef) {
+                res.status(401).json({ error: 'unauthenticated' });
+                return;
+            }
+            (0, backstage_plugin_litellm_backend_1.toLiteLLMUserId)(tokenEntityRef, userIdDomain);
+            recordChatEvent({
+                threadId: body.thread_id ?? '',
+                userRef: tokenEntityRef,
+                model: body.model,
+                personaId: body.persona_id,
+                grounded: !!body.vector_store_ids?.length,
+            });
+            let messages = await composeSystemPrompt(body.persona_id, body.tone_id, body.focus_id, body.verbosity_id, body.custom_system_prompt, body.messages);
+            messages = await applyUrlContext(body.context_url, messages);
+            const base = chatConfig.baseUrl;
+            const chatBody = {
+                model: body.model,
+                messages,
+                stream: true,
+                stream_options: { include_usage: true },
+            };
+            if (body.vector_store_ids?.length) {
+                chatBody.vector_store_ids = body.vector_store_ids;
+            }
+            if (body.web_search) {
+                chatBody.web_search_options = {};
+            }
+            if (body.reasoning_effort) {
+                chatBody.reasoning_effort = body.reasoning_effort;
+            }
+            await (0, uiMessageStream_1.proxyUIMessageStream)({
+                upstreamUrl: `${base}/v1/chat/completions`,
+                upstreamBody: chatBody,
+                userKey: body.user_key,
+                res,
+                logger,
+            });
+        }
+        catch (err) {
+            logger.error('chat/stream/v2 failed', err);
             if (!res.headersSent) {
                 res.status(err.status ?? 500).json({ error: err.message });
             }

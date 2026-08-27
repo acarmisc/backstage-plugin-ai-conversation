@@ -213,6 +213,8 @@ Goal: de-risk the two unknowns that could blow up the plan before touching `useC
 Exit criteria: a throwaway page in this repo streams real LiteLLM output through the new
 protocol into a stock `useChat` render. Nothing user-facing changes yet.
 
+**Status: partially done.** Dependencies added and verified compatible with React 18 peer dep (`yarn install` resolves cleanly); `pipeUIMessageStreamToResponse` confirmed via installed `.d.ts` to accept Express's `res` directly (simpler than originally scoped — no hand-rolled SSE framing needed). **Not done:** the exit criteria's live browser check — a throwaway page streaming real LiteLLM output through a stock `useChat` render — since this environment has no live LiteLLM proxy or host Backstage app to test against. Verification here is type-level (tsc) and fixture-level (Phase 17's unit tests) only; the actual `useChat`-consumes-`/chat/stream/v2`-end-to-end check is still open and should happen against a real deployment before Phase 19 (frontend migration) proceeds.
+
 ### Phase 17 — Backend protocol adapter
 
 - Replace `stream.ts`'s `proxySSE` raw passthrough with an adapter step that:
@@ -228,6 +230,8 @@ protocol into a stock `useChat` render. Nothing user-facing changes yet.
   output) — this is the one piece of new backend logic in the whole plan and the easiest to get
   subtly wrong (chunk boundaries, partial JSON, `[DONE]` handling all have existing hand-rolled
   edge-case handling in `api.ts` today that must not regress).
+
+**Status: landed** (`uiMessageStream.ts` + new `/chat/stream/v2` route, additive/parallel to `/chat/stream` — not yet wired to any frontend consumer).
 
 ### Phase 18 — Attachments (backend)
 
