@@ -1,3 +1,4 @@
+import type { FileUIPart } from 'ai';
 import type { Thread, Citation, KeySpend, ReasoningEffort } from '../types';
 export interface UseChatOptions {
     userId: string;
@@ -24,7 +25,7 @@ export interface UseChatResult {
     sendMessage: (text: string, attachedUrl?: {
         url: string;
         title: string;
-    }, compareModelsOverride?: string[]) => void;
+    }, compareModelsOverride?: string[], files?: FileUIPart[]) => void;
     regenerateFrom: (messageId: string) => void;
     editAndResend: (messageId: string, newContent: string) => void;
     stopGeneration: () => void;

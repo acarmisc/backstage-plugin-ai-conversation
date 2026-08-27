@@ -9,24 +9,16 @@ import {
   IconButton,
   Divider,
   Typography,
-  Collapse,
   Tooltip,
   InputBase,
-  TextField,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
   Menu,
   MenuItem,
   ListItemIcon,
   Chip,
-  Switch,
-  FormControlLabel,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SettingsIcon from '@mui/icons-material/Settings';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ChatIcon from '@mui/icons-material/Chat';
 import SendIcon from '@mui/icons-material/Send';
 import StopIcon from '@mui/icons-material/Stop';
@@ -45,13 +37,8 @@ import { aiConversationApiRef } from '../api';
 import { useThreads } from '../hooks/useThreads';
 import { extractText } from '../hooks/messageShape';
 import { injectDesignSystemAssets } from '../theme';
-import { ModelPicker } from './ModelPicker';
-import { CompareModelPicker } from './CompareModelPicker';
-import { VectorStorePicker } from './VectorStorePicker';
-import { PersonaPicker } from './PersonaPicker';
+import { ChatSettingsPanel } from './ChatSettingsPanel';
 import { PersonaHomepage } from './PersonaHomepage';
-import { KeyPicker } from './KeyPicker';
-import { OptionPicker } from './OptionPicker';
 import { MessageList } from './MessageList';
 import { ErrorBanner } from './ErrorBanner';
 import { SourcesPanel } from './SourcesPanel';
@@ -64,15 +51,6 @@ const RIGHT_RAIL_WIDTH = 300;
 const CHAT_MAX_WIDTH = 900;
 const URL_TOKEN_RE = /#(https:\/\/\S+)/;
 const URL_PREVIEW_DEBOUNCE_MS = 500;
-
-// Fixed, provider-agnostic enum — no prompt text attached (see
-// ReasoningEffort in types.ts), so unlike tone/focus/verbosity it doesn't
-// need a backend round-trip.
-const REASONING_EFFORT_OPTIONS: { id: ReasoningEffort; label: string }[] = [
-  { id: 'low', label: 'Low' },
-  { id: 'medium', label: 'Medium' },
-  { id: 'high', label: 'High' },
-];
 
 function threadMatchesQuery(thread: Thread, query: string): boolean {
   const q = query.trim().toLowerCase();
@@ -415,148 +393,43 @@ export const ChatPage: React.FC = () => {
         ) : (
           <>
             {/* Settings panel (collapsible, pinned to top) */}
-            <Box sx={{ flexShrink: 0 }}>
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                  px: 1.5,
-                  py: 1,
-                  bgcolor: 'action.hover',
-                }}
-                onClick={() => setShowSettings(v => !v)}
-              >
-                <SettingsIcon fontSize="small" sx={{ mr: 1 }} />
-                <Typography variant="overline" sx={{ flex: 1 }}>
-                  Settings
-                </Typography>
-                <ExpandMoreIcon
-                  fontSize="small"
-                  sx={{
-                    transform: showSettings ? 'rotate(180deg)' : 'none',
-                    transition: 'transform 0.2s',
-                  }}
-                />
-              </Box>
-              <Collapse in={showSettings}>
-                <Box sx={{ p: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                  {configError && (
-                    <Typography variant="caption" color="error">
-                      Couldn't load chat defaults: {configError}
-                    </Typography>
-                  )}
-                  <PersonaPicker
-                    value={personaId}
-                    personas={personas}
-                    loading={personasLoading}
-                    error={personasError}
-                    onChange={handlePersonaChange}
-                  />
-                  <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-                    <OptionPicker
-                      label="Tone"
-                      value={toneId}
-                      options={traits.tones}
-                      onChange={setToneId}
-                      loading={traitsLoading}
-                    />
-                    <OptionPicker
-                      label="Focus"
-                      value={focusId}
-                      options={traits.focuses}
-                      onChange={setFocusId}
-                      loading={traitsLoading}
-                    />
-                  </Box>
-                  <TextField
-                    label="Custom system prompt"
-                    placeholder={
-                      personaId
-                        ? 'Appended after the persona system prompt…'
-                        : 'Used as the system prompt (no persona selected)…'
-                    }
-                    value={customSystemPrompt}
-                    onChange={e => setCustomSystemPrompt(e.target.value)}
-                    multiline
-                    minRows={2}
-                    maxRows={6}
-                    size="small"
-                    fullWidth
-                  />
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        size="small"
-                        checked={compareMode}
-                        onChange={e => setCompareModeUi(e.target.checked)}
-                      />
-                    }
-                    label={
-                      <Typography variant="body2">Compare models side-by-side</Typography>
-                    }
-                  />
-                  {compareMode ? (
-                    <CompareModelPicker value={compareModelsSel} onChange={setCompareModelsSel} />
-                  ) : (
-                    <ModelPicker value={model} onChange={setModel} defaultModel={config.defaultModel} />
-                  )}
-                  <Accordion
-                    disableGutters
-                    variant="outlined"
-                    sx={{ '&:before': { display: 'none' } }}
-                  >
-                    <AccordionSummary expandIcon={<ExpandMoreIcon fontSize="small" />}>
-                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                        Advanced
-                      </Typography>
-                    </AccordionSummary>
-                    <AccordionDetails sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                      <VectorStorePicker
-                        value={vectorStoreIds}
-                        onChange={setVectorStoreIds}
-                        defaultVectorStoreIds={config.defaultVectorStoreIds}
-                      />
-                      <FormControlLabel
-                        control={
-                          <Switch
-                            size="small"
-                            checked={webSearch}
-                            onChange={e => setWebSearch(e.target.checked)}
-                          />
-                        }
-                        label={<Typography variant="body2">Include web search</Typography>}
-                      />
-                      <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-                        <OptionPicker
-                          label="Verbosity"
-                          value={verbosityId}
-                          options={traits.verbosities}
-                          onChange={setVerbosityId}
-                          loading={traitsLoading}
-                        />
-                        <OptionPicker
-                          label="Reasoning effort"
-                          value={reasoningEffort}
-                          options={REASONING_EFFORT_OPTIONS}
-                          onChange={id => setReasoningEffort(id as ReasoningEffort | '')}
-                          noneLabel="Model default"
-                        />
-                      </Box>
-                      <KeyPicker
-                        value={keyVal}
-                        onChange={setKeyVal}
-                        onDelete={() => {
-                          if (chat.activeThread?.keyToken) {
-                            chatApi.deleteChatKey(chat.activeThread.keyToken).catch(() => {});
-                          }
-                        }}
-                      />
-                    </AccordionDetails>
-                  </Accordion>
-                </Box>
-              </Collapse>
-            </Box>
+            <ChatSettingsPanel
+              chatApi={chatApi}
+              showSettings={showSettings}
+              onToggleShowSettings={() => setShowSettings(v => !v)}
+              configError={configError}
+              config={config}
+              personas={personas}
+              personasLoading={personasLoading}
+              personasError={personasError}
+              personaId={personaId}
+              onPersonaChange={handlePersonaChange}
+              traits={traits}
+              traitsLoading={traitsLoading}
+              toneId={toneId}
+              onToneChange={setToneId}
+              focusId={focusId}
+              onFocusChange={setFocusId}
+              customSystemPrompt={customSystemPrompt}
+              onCustomSystemPromptChange={setCustomSystemPrompt}
+              compareMode={compareMode}
+              onCompareModeChange={setCompareModeUi}
+              compareModelsSel={compareModelsSel}
+              onCompareModelsChange={setCompareModelsSel}
+              model={model}
+              onModelChange={setModel}
+              vectorStoreIds={vectorStoreIds}
+              onVectorStoreIdsChange={setVectorStoreIds}
+              webSearch={webSearch}
+              onWebSearchChange={setWebSearch}
+              verbosityId={verbosityId}
+              onVerbosityChange={setVerbosityId}
+              reasoningEffort={reasoningEffort}
+              onReasoningEffortChange={setReasoningEffort}
+              keyVal={keyVal}
+              onKeyChange={setKeyVal}
+              activeThreadKeyToken={chat.activeThread?.keyToken}
+            />
 
             <Divider />
 

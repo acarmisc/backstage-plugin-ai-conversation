@@ -3,6 +3,7 @@ import { useApi } from '@backstage/core-plugin-api';
 import type { FetchApi } from '@backstage/core-plugin-api';
 import { fetchApiRef } from '@backstage/core-plugin-api';
 import { useChat as useAiSdkChat } from '@ai-sdk/react';
+import type { FileUIPart } from 'ai';
 import { aiConversationApiRef, AiConversationApi } from '../api';
 import { computeRegenerateTarget, computeEditTarget } from './chatTruncation';
 import { fromPersisted, migrateThreadMessages } from './threadPersistence';
@@ -118,6 +119,7 @@ export interface UseChatResult {
     text: string,
     attachedUrl?: { url: string; title: string },
     compareModelsOverride?: string[],
+    files?: FileUIPart[],
   ) => void;
   regenerateFrom: (messageId: string) => void;
   editAndResend: (messageId: string, newContent: string) => void;
@@ -462,6 +464,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
       text: string,
       baseMessages: AiConversationUIMessage[],
       attachedUrl?: { url: string; title: string },
+      files?: FileUIPart[],
     ) => {
       if (!text.trim() || !activeThread || !keyToken) return;
 
@@ -496,7 +499,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
       chat.setMessages(baseMessages);
       chat
         .sendMessage(
-          { text, metadata: { attachedUrl } },
+          { text, files, metadata: { attachedUrl } },
           { body: attachedUrl ? { context_url: attachedUrl.url } : undefined },
         )
         .catch(() => {});
@@ -524,6 +527,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
       baseMessages: AiConversationUIMessage[],
       models: string[],
       attachedUrl?: { url: string; title: string },
+      files?: FileUIPart[],
     ) => {
       if (!text.trim() || !activeThread || !keyToken || models.length === 0) return;
 
@@ -535,7 +539,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
         id: genId(),
         role: 'user',
         metadata: { attachedUrl, turnId },
-        parts: [{ type: 'text', text }],
+        parts: [{ type: 'text', text }, ...(files ?? [])],
       };
       const threadId = activeThread.id;
 
@@ -585,15 +589,20 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
   );
 
   const sendMessage = useCallback(
-    (text: string, attachedUrl?: { url: string; title: string }, compareModelsOverride?: string[]) => {
+    (
+      text: string,
+      attachedUrl?: { url: string; title: string },
+      compareModelsOverride?: string[],
+      files?: FileUIPart[],
+    ) => {
       if (!activeThread) return;
       const models =
         compareModelsOverride ??
         (activeThread.mode === 'compare' ? activeThread.compareModels : undefined);
       if (models?.length) {
-        runCompareSend(text, activeThread.messages, models, attachedUrl);
+        runCompareSend(text, activeThread.messages, models, attachedUrl, files);
       } else {
-        runSend(text, activeThread.messages, attachedUrl);
+        runSend(text, activeThread.messages, attachedUrl, files);
       }
     },
     [activeThread, runSend, runCompareSend],
