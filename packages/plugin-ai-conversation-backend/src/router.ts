@@ -17,6 +17,13 @@ import {
 } from '@acarmisc/backstage-plugin-litellm-backend';
 import { proxySSE } from './stream';
 import { proxyUIMessageStream } from './uiMessageStream';
+import {
+  validateAttachments,
+  isLikelyMultimodal,
+  extractText,
+  toOpenAIMessageContent,
+  AttachmentValidationError,
+} from './attachments';
 import { entityToPersonaSummary, resolveSystemPrompt } from './persona';
 import { fetchUrlContext, FetchedUrlContext } from './urlContext';
 import { TONE_OPTIONS, FOCUS_OPTIONS, VERBOSITY_OPTIONS, resolveTrait } from './traits';
@@ -29,6 +36,7 @@ import {
 import type {
   VectorStore,
   ChatStreamRequest,
+  ChatStreamRequestV2,
   ChatCompletionsRequest,
   ChatFeedbackRequest,
   ChatMessage,
@@ -75,6 +83,7 @@ function readChatConfig(config: Config): AiConversationConfig {
         config.getOptionalNumber('litellm.aiConversation.persistence.ttlDays') ??
         DEFAULT_PERSISTENCE_TTL_DAYS,
     },
+    multimodalModels: config.getOptionalStringArray('litellm.aiConversation.multimodalModels'),
   };
 }
 
@@ -813,7 +822,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
   // frontend migrates to it on its own schedule (Phase 19).
   router.post('/chat/stream/v2', async (req: Request, res: Response) => {
     try {
-      const body = req.body as ChatStreamRequest;
+      const body = req.body as ChatStreamRequestV2;
       if (!body?.model || !body?.messages || !body?.user_key) {
         res.status(400).json({
           error: 'model, messages, user_key required',
@@ -827,6 +836,24 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
         return;
       }
       toLiteLLMUserId(tokenEntityRef, userIdDomain);
+
+      try {
+        validateAttachments(body.messages);
+      } catch (err: any) {
+        if (err instanceof AttachmentValidationError) {
+          res.status(400).json({ error: err.message });
+          return;
+        }
+        throw err;
+      }
+      const hasAttachments = body.messages.some(m => m.parts.some(p => p.type === 'file'));
+      if (hasAttachments && !isLikelyMultimodal(body.model, chatConfig.multimodalModels)) {
+        res.status(400).json({
+          error: `model "${body.model}" is not known to accept image attachments`,
+        });
+        return;
+      }
+
       recordChatEvent({
         threadId: body.thread_id ?? '',
         userRef: tokenEntityRef,
@@ -835,20 +862,41 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
         grounded: !!body.vector_store_ids?.length,
       });
 
-      let messages = await composeSystemPrompt(
+      // composeSystemPrompt/applyUrlContext only insert/prepend system
+      // messages ahead of the existing array — they never touch entries
+      // already there. Feeding them a flattened text-only view of the
+      // conversation and then diffing the tail back off recovers exactly
+      // the system-prompt layer they'd add, without needing those shared
+      // functions (used by the proven /chat/stream route too) to know
+      // anything about UIMessage or attachments.
+      const textOnlyMessages: ChatMessage[] = body.messages.map(m => ({
+        id: m.id,
+        role: m.role,
+        content: extractText(m),
+      }));
+      let withSystemPrompt = await composeSystemPrompt(
         body.persona_id,
         body.tone_id,
         body.focus_id,
         body.verbosity_id,
         body.custom_system_prompt,
-        body.messages,
+        textOnlyMessages,
       );
-      messages = await applyUrlContext(body.context_url, messages);
+      withSystemPrompt = await applyUrlContext(body.context_url, withSystemPrompt);
+      const systemPrefix = withSystemPrompt.slice(
+        0,
+        withSystemPrompt.length - textOnlyMessages.length,
+      );
+
+      const upstreamMessages: Array<{ role: string; content: unknown }> = [
+        ...systemPrefix.map(m => ({ role: m.role, content: m.content })),
+        ...body.messages.map(m => ({ role: m.role, content: toOpenAIMessageContent(m) })),
+      ];
 
       const base = chatConfig.baseUrl;
       const chatBody: Record<string, unknown> = {
         model: body.model,
-        messages,
+        messages: upstreamMessages,
         stream: true,
         stream_options: { include_usage: true },
       };

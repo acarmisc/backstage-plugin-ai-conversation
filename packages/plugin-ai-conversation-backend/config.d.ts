@@ -62,6 +62,16 @@ export interface Config {
          */
         ttlDays?: number;
       };
+
+      /**
+       * Model ids known to accept image attachments (Phase 18). Overrides
+       * the built-in naming-pattern heuristic — LiteLLM's own model
+       * registry carries no vision/multimodal capability metadata, so
+       * there's no authoritative source to check against automatically.
+       * Set this once real registered models are known.
+       * @visibility backend
+       */
+      multimodalModels?: string[];
     };
   };
 }

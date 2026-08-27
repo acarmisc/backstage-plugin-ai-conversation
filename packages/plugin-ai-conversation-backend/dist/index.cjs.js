@@ -90970,6 +90970,72 @@ async function proxyUIMessageStream(opts) {
   await pipeUIMessageStreamToResponse({ response: res, stream });
 }
 
+// src/attachments.ts
+var AttachmentValidationError = class extends Error {
+};
+var ALLOWED_ATTACHMENT_MEDIA_TYPES = /* @__PURE__ */ new Set([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif"
+]);
+var MAX_ATTACHMENT_DATA_URL_LENGTH = 6e6;
+var MAX_ATTACHMENTS_PER_MESSAGE = 4;
+var DEFAULT_MULTIMODAL_MODEL_PATTERNS = [
+  /^claude-/i,
+  /^gpt-4/i,
+  /^gpt-5/i,
+  /gemini/i,
+  /-vl(\b|[-:])/i,
+  /vision/i
+];
+function isLikelyMultimodal(model, configuredModels) {
+  if (configuredModels?.length) {
+    return configuredModels.some((m) => m.toLowerCase() === model.toLowerCase());
+  }
+  return DEFAULT_MULTIMODAL_MODEL_PATTERNS.some((re) => re.test(model));
+}
+function isHttpOrDataUrl(url) {
+  return /^https?:\/\//i.test(url) || /^data:/i.test(url);
+}
+function validateAttachments(messages) {
+  for (const message of messages) {
+    const fileParts = message.parts.filter((p) => p.type === "file");
+    if (fileParts.length > MAX_ATTACHMENTS_PER_MESSAGE) {
+      throw new AttachmentValidationError(
+        `too many attachments on one message (max ${MAX_ATTACHMENTS_PER_MESSAGE})`
+      );
+    }
+    for (const part of fileParts) {
+      if (!part.mediaType || !ALLOWED_ATTACHMENT_MEDIA_TYPES.has(part.mediaType)) {
+        throw new AttachmentValidationError(
+          `unsupported attachment type: ${part.mediaType ?? "unknown"}`
+        );
+      }
+      if (!part.url || !isHttpOrDataUrl(part.url)) {
+        throw new AttachmentValidationError("attachment url must be http(s) or a data URL");
+      }
+      if (part.url.length > MAX_ATTACHMENT_DATA_URL_LENGTH) {
+        throw new AttachmentValidationError("attachment too large");
+      }
+    }
+  }
+}
+function extractText(message) {
+  return message.parts.filter((p) => p.type === "text").map((p) => p.text ?? "").join("");
+}
+function toOpenAIMessageContent(message) {
+  const fileParts = message.parts.filter((p) => p.type === "file");
+  const text2 = extractText(message);
+  if (fileParts.length === 0) return text2;
+  const content = [];
+  if (text2) content.push({ type: "text", text: text2 });
+  for (const part of fileParts) {
+    content.push({ type: "image_url", image_url: { url: part.url } });
+  }
+  return content;
+}
+
 // src/types.ts
 var CHAT_PERSONA_TYPE = "chat-persona";
 var CHAT_PERSONA_ANNOTATION_PREFIX = "chat-persona.acarmisc.org";
@@ -91382,7 +91448,8 @@ function readChatConfig(config2) {
     persistence: {
       enabled: config2.getOptionalBoolean("litellm.aiConversation.persistence.enabled") ?? false,
       ttlDays: config2.getOptionalNumber("litellm.aiConversation.persistence.ttlDays") ?? DEFAULT_PERSISTENCE_TTL_DAYS
-    }
+    },
+    multimodalModels: config2.getOptionalStringArray("litellm.aiConversation.multimodalModels")
   };
 }
 function rangeToCutoff(range) {
@@ -91956,6 +92023,22 @@ async function createRouter(options) {
         return;
       }
       (0, import_backstage_plugin_litellm_backend.toLiteLLMUserId)(tokenEntityRef, userIdDomain);
+      try {
+        validateAttachments(body.messages);
+      } catch (err) {
+        if (err instanceof AttachmentValidationError) {
+          res.status(400).json({ error: err.message });
+          return;
+        }
+        throw err;
+      }
+      const hasAttachments = body.messages.some((m) => m.parts.some((p) => p.type === "file"));
+      if (hasAttachments && !isLikelyMultimodal(body.model, chatConfig.multimodalModels)) {
+        res.status(400).json({
+          error: `model "${body.model}" is not known to accept image attachments`
+        });
+        return;
+      }
       recordChatEvent({
         threadId: body.thread_id ?? "",
         userRef: tokenEntityRef,
@@ -91963,19 +92046,32 @@ async function createRouter(options) {
         personaId: body.persona_id,
         grounded: !!body.vector_store_ids?.length
       });
-      let messages = await composeSystemPrompt(
+      const textOnlyMessages = body.messages.map((m) => ({
+        id: m.id,
+        role: m.role,
+        content: extractText(m)
+      }));
+      let withSystemPrompt = await composeSystemPrompt(
         body.persona_id,
         body.tone_id,
         body.focus_id,
         body.verbosity_id,
         body.custom_system_prompt,
-        body.messages
+        textOnlyMessages
       );
-      messages = await applyUrlContext(body.context_url, messages);
+      withSystemPrompt = await applyUrlContext(body.context_url, withSystemPrompt);
+      const systemPrefix = withSystemPrompt.slice(
+        0,
+        withSystemPrompt.length - textOnlyMessages.length
+      );
+      const upstreamMessages = [
+        ...systemPrefix.map((m) => ({ role: m.role, content: m.content })),
+        ...body.messages.map((m) => ({ role: m.role, content: toOpenAIMessageContent(m) }))
+      ];
       const base = chatConfig.baseUrl;
       const chatBody = {
         model: body.model,
-        messages,
+        messages: upstreamMessages,
         stream: true,
         stream_options: { include_usage: true }
       };

@@ -40,6 +40,7 @@ const integration_1 = require("@backstage/integration");
 const backstage_plugin_litellm_backend_1 = require("@acarmisc/backstage-plugin-litellm-backend");
 const stream_1 = require("./stream");
 const uiMessageStream_1 = require("./uiMessageStream");
+const attachments_1 = require("./attachments");
 const persona_1 = require("./persona");
 const urlContext_1 = require("./urlContext");
 const traits_1 = require("./traits");
@@ -65,6 +66,7 @@ function readChatConfig(config) {
             ttlDays: config.getOptionalNumber('litellm.aiConversation.persistence.ttlDays') ??
                 DEFAULT_PERSISTENCE_TTL_DAYS,
         },
+        multimodalModels: config.getOptionalStringArray('litellm.aiConversation.multimodalModels'),
     };
 }
 /** Parses a `range` query param like "24h"/"7d"/"30d"/"all" into a cutoff
@@ -750,6 +752,23 @@ async function createRouter(options) {
                 return;
             }
             (0, backstage_plugin_litellm_backend_1.toLiteLLMUserId)(tokenEntityRef, userIdDomain);
+            try {
+                (0, attachments_1.validateAttachments)(body.messages);
+            }
+            catch (err) {
+                if (err instanceof attachments_1.AttachmentValidationError) {
+                    res.status(400).json({ error: err.message });
+                    return;
+                }
+                throw err;
+            }
+            const hasAttachments = body.messages.some(m => m.parts.some(p => p.type === 'file'));
+            if (hasAttachments && !(0, attachments_1.isLikelyMultimodal)(body.model, chatConfig.multimodalModels)) {
+                res.status(400).json({
+                    error: `model "${body.model}" is not known to accept image attachments`,
+                });
+                return;
+            }
             recordChatEvent({
                 threadId: body.thread_id ?? '',
                 userRef: tokenEntityRef,
@@ -757,12 +776,29 @@ async function createRouter(options) {
                 personaId: body.persona_id,
                 grounded: !!body.vector_store_ids?.length,
             });
-            let messages = await composeSystemPrompt(body.persona_id, body.tone_id, body.focus_id, body.verbosity_id, body.custom_system_prompt, body.messages);
-            messages = await applyUrlContext(body.context_url, messages);
+            // composeSystemPrompt/applyUrlContext only insert/prepend system
+            // messages ahead of the existing array — they never touch entries
+            // already there. Feeding them a flattened text-only view of the
+            // conversation and then diffing the tail back off recovers exactly
+            // the system-prompt layer they'd add, without needing those shared
+            // functions (used by the proven /chat/stream route too) to know
+            // anything about UIMessage or attachments.
+            const textOnlyMessages = body.messages.map(m => ({
+                id: m.id,
+                role: m.role,
+                content: (0, attachments_1.extractText)(m),
+            }));
+            let withSystemPrompt = await composeSystemPrompt(body.persona_id, body.tone_id, body.focus_id, body.verbosity_id, body.custom_system_prompt, textOnlyMessages);
+            withSystemPrompt = await applyUrlContext(body.context_url, withSystemPrompt);
+            const systemPrefix = withSystemPrompt.slice(0, withSystemPrompt.length - textOnlyMessages.length);
+            const upstreamMessages = [
+                ...systemPrefix.map(m => ({ role: m.role, content: m.content })),
+                ...body.messages.map(m => ({ role: m.role, content: (0, attachments_1.toOpenAIMessageContent)(m) })),
+            ];
             const base = chatConfig.baseUrl;
             const chatBody = {
                 model: body.model,
-                messages,
+                messages: upstreamMessages,
                 stream: true,
                 stream_options: { include_usage: true },
             };

@@ -1,3 +1,4 @@
+import type { IncomingUIMessage } from './attachments';
 export interface VectorStore {
     id: string;
     name: string;
@@ -80,6 +81,13 @@ export interface ChatStreamRequest {
     /** Native passthrough — not composed into the system prompt. */
     reasoning_effort?: ReasoningEffort;
 }
+/** Request body for POST /chat/stream/v2 (HANDOFF-ai-sdk-migration.md
+ * Phase 17/18) — same fields as `ChatStreamRequest`, but `messages` is
+ * AI SDK `UIMessage[]`-shaped (text + file parts) instead of the old flat
+ * `ChatMessage[]`, since attachments arrive as file parts on a message. */
+export interface ChatStreamRequestV2 extends Omit<ChatStreamRequest, 'messages'> {
+    messages: IncomingUIMessage[];
+}
 export interface FetchContextRequest {
     url: string;
 }
@@ -136,6 +144,10 @@ export interface AiConversationConfig {
     maxRequestBudget?: number;
     fetchContextMaxChars?: number;
     persistence: ChatPersistenceConfig;
+    /** Model ids known to accept image attachments. Overrides the built-in
+     * naming-pattern heuristic (see `attachments.ts`) when set — see that
+     * file's comment on why there's no authoritative source for this. */
+    multimodalModels?: string[];
 }
 /** Body of `PUT /threads/:id`. `data` is stored and returned opaquely — the
  * backend never interprets its shape, so it doesn't need to duplicate the
