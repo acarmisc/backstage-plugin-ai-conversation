@@ -42,7 +42,6 @@
   "dependencies": {
     "@acarmisc/backstage-plugin-litellm": "^0.4.0",
     "@ai-sdk/react": "^4",
-    "@backstage/core-components": "^0.18.10",
     "@backstage/core-plugin-api": "^1.12.6",
     "@backstage/frontend-plugin-api": "^0.17.0",
     "@backstage/types": "^1.2.0",
@@ -54,7 +53,6 @@
     "katex": "^0.16.9",
     "react": "^18.0.0",
     "react-markdown": "^9.0.1",
-    "react-use": "^17.2.4",
     "rehype-katex": "^7.0.0",
     "remark-gfm": "^4.0.0",
     "remark-math": "^6.0.0",

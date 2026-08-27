@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useSyncExternalStore } from 'react';
 import { Chat } from '@ai-sdk/react';
 import type { ChatStatus, ChatTransport } from 'ai';
-import type { AiConversationUIMessage } from './messageShape';
+import type { AiConversationUIMessage } from '../types';
 
 /**
  * Compare mode: N models replying to the same prompt in parallel, side by

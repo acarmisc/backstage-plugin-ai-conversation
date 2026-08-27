@@ -5,33 +5,38 @@ import CheckIcon from '@mui/icons-material/Check';
 import EditIcon from '@mui/icons-material/Edit';
 import LinkIcon from '@mui/icons-material/Link';
 import { safeHref } from '../safeUrl';
-import type { ChatMessage } from '../types';
+import { extractText } from '../hooks/messageShape';
+import type { AiConversationUIMessage } from '../types';
 
 export interface UserMessageProps {
-  message: ChatMessage;
+  message: AiConversationUIMessage;
   onEditAndResend?: (messageId: string, newContent: string) => void;
 }
 
 export const UserMessage: React.FC<UserMessageProps> = ({ message, onEditAndResend }) => {
+  const text = extractText(message);
+  const fileParts = message.parts.filter(
+    (p): p is { type: 'file'; url: string; mediaType: string; filename?: string } => p.type === 'file',
+  );
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(message.content);
+  const [draft, setDraft] = useState(text);
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
-    navigator.clipboard?.writeText(message.content).then(() => {
+    navigator.clipboard?.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     });
   };
 
   const startEdit = () => {
-    setDraft(message.content);
+    setDraft(text);
     setEditing(true);
   };
 
   const saveEdit = () => {
     const trimmed = draft.trim();
-    if (trimmed && trimmed !== message.content) {
+    if (trimmed && trimmed !== text) {
       onEditAndResend?.(message.id, trimmed);
     }
     setEditing(false);
@@ -69,20 +74,20 @@ export const UserMessage: React.FC<UserMessageProps> = ({ message, onEditAndRese
         '&:hover .litellm-actions': { opacity: 1 },
       }}
     >
-      {message.attachedUrl && (
+      {message.metadata?.attachedUrl && (
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 0.5 }}>
-          <Tooltip title={message.attachedUrl.url}>
+          <Tooltip title={message.metadata.attachedUrl.url}>
             {/* An imported thread can carry any string here, so only link out
                 when it is a real http(s) URL — otherwise show a plain chip. */}
             <Chip
               size="small"
               icon={<LinkIcon fontSize="small" />}
-              label={message.attachedUrl.title}
+              label={message.metadata.attachedUrl.title}
               variant="outlined"
-              {...(safeHref(message.attachedUrl.url)
+              {...(safeHref(message.metadata.attachedUrl.url)
                 ? {
                     component: 'a' as const,
-                    href: safeHref(message.attachedUrl.url),
+                    href: safeHref(message.metadata.attachedUrl.url),
                     target: '_blank',
                     rel: 'noopener noreferrer',
                     clickable: true,
@@ -92,19 +97,38 @@ export const UserMessage: React.FC<UserMessageProps> = ({ message, onEditAndRese
           </Tooltip>
         </Box>
       )}
-      <Box
-        sx={{
-          bgcolor: 'action.hover',
-          borderRadius: '12px',
-          px: 1.5,
-          py: 1,
-          whiteSpace: 'pre-wrap',
-          wordBreak: 'break-word',
-          textAlign: 'right',
-        }}
-      >
-        {message.content}
-      </Box>
+      {fileParts.length > 0 && (
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, justifyContent: 'flex-end', mb: 0.5 }}>
+          {fileParts.map((p, i) =>
+            p.mediaType.startsWith('image/') ? (
+              <Box
+                key={i}
+                component="img"
+                src={p.url}
+                alt={p.filename ?? 'attachment'}
+                sx={{ maxWidth: 160, maxHeight: 160, borderRadius: 1 }}
+              />
+            ) : (
+              <Chip key={i} size="small" label={p.filename ?? p.mediaType} variant="outlined" />
+            ),
+          )}
+        </Box>
+      )}
+      {text && (
+        <Box
+          sx={{
+            bgcolor: 'action.hover',
+            borderRadius: '12px',
+            px: 1.5,
+            py: 1,
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+            textAlign: 'right',
+          }}
+        >
+          {text}
+        </Box>
+      )}
       <Box
         className="litellm-actions"
         sx={{ display: 'flex', gap: 0.25, mt: 0.25, justifyContent: 'flex-end', opacity: 0, transition: 'opacity 0.15s' }}

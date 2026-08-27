@@ -13,7 +13,41 @@ var __export = (target, all) => {
     __defProp(target, name, { get: all[name], enumerable: true });
 };
 
+// src/hooks/messageShape.ts
+function chatMessageToUIMessage(m) {
+  return {
+    id: m.id,
+    role: m.role,
+    metadata: {
+      feedback: m.feedback,
+      attachedUrl: m.attachedUrl,
+      turnId: m.turnId,
+      compareModel: m.compareModel
+    },
+    parts: [{ type: "text", text: m.content }]
+  };
+}
+function chatMessagesToUIMessages(messages) {
+  return messages.map(chatMessageToUIMessage);
+}
+function extractText(message) {
+  return message.parts.filter((p) => p.type === "text").map((p) => p.text).join("");
+}
+var init_messageShape = __esm({
+  "src/hooks/messageShape.ts"() {
+    "use strict";
+  }
+});
+
 // src/hooks/threadPersistence.ts
+function migrateThreadMessages(messages) {
+  if (!Array.isArray(messages)) return [];
+  if (messages.length === 0) return [];
+  const first = messages[0];
+  const alreadyMigrated = typeof first === "object" && first !== null && Array.isArray(first.parts);
+  if (alreadyMigrated) return messages;
+  return chatMessagesToUIMessages(messages);
+}
 function toSaveThreadBody(thread) {
   const { keyToken: _keyToken, keyAlias: _keyAlias, ...data } = thread;
   return { title: thread.title, pinned: !!thread.pinned, data };
@@ -27,7 +61,7 @@ function fromPersisted(persisted) {
     id: typeof raw.id === "string" ? raw.id : persisted.id,
     title: typeof raw.title === "string" && raw.title ? raw.title : persisted.title,
     pinned: typeof raw.pinned === "boolean" ? raw.pinned : persisted.pinned,
-    messages: Array.isArray(raw.messages) ? raw.messages : [],
+    messages: migrateThreadMessages(raw.messages),
     model: typeof raw.model === "string" ? raw.model : "",
     vectorStoreIds: Array.isArray(raw.vectorStoreIds) ? raw.vectorStoreIds : [],
     personaId: typeof raw.personaId === "string" ? raw.personaId : "",
@@ -41,40 +75,12 @@ function fromPersisted(persisted) {
 var init_threadPersistence = __esm({
   "src/hooks/threadPersistence.ts"() {
     "use strict";
+    init_messageShape();
   }
 });
 
 // src/api.ts
 import { createApiRef } from "@backstage/core-plugin-api";
-function normalizeChunk(raw) {
-  if (raw && typeof raw === "object" && ("error" in raw || "delta" in raw)) {
-    return raw;
-  }
-  const chunk = {};
-  const delta = raw?.choices?.[0]?.delta;
-  const content = delta?.content ?? delta?.reasoning_content;
-  if (typeof content === "string") chunk.delta = content;
-  if (Array.isArray(raw?.search_results)) {
-    chunk.search_results = raw.search_results.map((r) => ({
-      filename: r.filename ?? r.file_name ?? r.title ?? r.source ?? r.name ?? "",
-      score: typeof r.score === "number" ? r.score : 0,
-      text: r.text ?? r.snippet ?? r.content ?? "",
-      // LiteLLM doesn't tag result origin explicitly — a `url` field is the
-      // best available signal that this came from web search, not the KB.
-      source: r.url ? "web" : "kb",
-      url: r.url
-    }));
-  }
-  if (raw?.usage && typeof raw.usage === "object") {
-    chunk.usage = {
-      prompt_tokens: raw.usage.prompt_tokens ?? 0,
-      completion_tokens: raw.usage.completion_tokens ?? 0,
-      total_tokens: raw.usage.total_tokens ?? 0
-    };
-  }
-  if (raw?.error) chunk.error = String(raw.error);
-  return chunk;
-}
 var aiConversationApiRef, BASE_PATH, AiConversationApi;
 var init_api = __esm({
   "src/api.ts"() {
@@ -151,56 +157,6 @@ var init_api = __esm({
         const res = await this.fetchApi.fetch(`${BASE_PATH}/usage/summary?${params.toString()}`);
         if (!res.ok) throw new Error(`usage/summary ${res.status}`);
         return res.json();
-      }
-      chatStream(req, onToken, onDone, onError) {
-        const controller = new AbortController();
-        (async () => {
-          try {
-            const res = await this.fetchApi.fetch(`${BASE_PATH}/chat/stream`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(req),
-              signal: controller.signal
-            });
-            if (!res.ok || !res.body) {
-              const text = await res.text().catch(() => "");
-              onError(new Error(`${res.status}: ${text || res.statusText}`));
-              return;
-            }
-            const reader = res.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = "";
-            for (; ; ) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              buffer += decoder.decode(value, { stream: true });
-              const lines = buffer.split("\n");
-              buffer = lines.pop() ?? "";
-              for (const line of lines) {
-                const trimmed = line.trim();
-                if (!trimmed.startsWith("data:")) continue;
-                const payload = trimmed.slice(5).trim();
-                if (payload === "[DONE]") {
-                  onDone();
-                  return;
-                }
-                try {
-                  const raw = JSON.parse(payload);
-                  const chunk = normalizeChunk(raw);
-                  if (chunk.delta || chunk.error || chunk.search_results || chunk.usage) {
-                    onToken(chunk);
-                  }
-                } catch {
-                }
-              }
-            }
-            onDone();
-          } catch (err) {
-            if (err.name === "AbortError") return;
-            onError(err);
-          }
-        })();
-        return controller;
       }
       async chatCompletions(req) {
         const res = await this.fetchApi.fetch(`${BASE_PATH}/chat/completions`, {
@@ -300,18 +256,22 @@ function computeRegenerateTarget(messages, messageId) {
   if (idx === -1) return null;
   const target = messages[idx];
   if (target.role === "user") {
-    return { baseMessages: messages.slice(0, idx), text: target.content, isCompareEligible: true };
+    return {
+      baseMessages: messages.slice(0, idx),
+      text: extractText(target),
+      isCompareEligible: true
+    };
   }
-  const turnId = target.turnId;
+  const turnId = target.metadata?.turnId;
   let userIdx = idx - 1;
-  while (userIdx >= 0 && !(messages[userIdx].role === "user" && (!turnId || messages[userIdx].turnId === turnId))) {
+  while (userIdx >= 0 && !(messages[userIdx].role === "user" && (!turnId || messages[userIdx].metadata?.turnId === turnId))) {
     userIdx -= 1;
   }
   if (userIdx < 0) return null;
   return {
     baseMessages: messages.slice(0, userIdx),
-    text: messages[userIdx].content,
-    isCompareEligible: !!target.compareModel
+    text: extractText(messages[userIdx]),
+    isCompareEligible: !!target.metadata?.compareModel
   };
 }
 function computeEditTarget(messages, messageId) {
@@ -322,16 +282,151 @@ function computeEditTarget(messages, messageId) {
 var init_chatTruncation = __esm({
   "src/hooks/chatTruncation.ts"() {
     "use strict";
+    init_messageShape();
   }
 });
 
-// src/hooks/useChat.ts
-import { useState, useCallback, useRef, useEffect } from "react";
+// src/hooks/aiSdkTransport.ts
+import { DefaultChatTransport } from "ai";
+function createAiConversationTransport(fetchApi, getSettings) {
+  return new DefaultChatTransport({
+    api: `${BASE_PATH2}/chat/stream/v2`,
+    fetch: fetchApi.fetch.bind(fetchApi),
+    prepareSendMessagesRequest: ({ messages, body }) => {
+      const s = getSettings();
+      const contextUrl = body?.context_url;
+      return {
+        body: {
+          model: s.model,
+          messages,
+          thread_id: s.threadId,
+          vector_store_ids: s.vectorStoreIds.length ? s.vectorStoreIds : void 0,
+          persona_id: s.personaId || void 0,
+          custom_system_prompt: s.customSystemPrompt || void 0,
+          tone_id: s.toneId || void 0,
+          focus_id: s.focusId || void 0,
+          verbosity_id: s.verbosityId || void 0,
+          reasoning_effort: s.reasoningEffort || void 0,
+          context_url: contextUrl,
+          web_search: s.webSearch || void 0,
+          top_k: s.topK,
+          user_key: s.userKey
+        }
+      };
+    }
+  });
+}
+var BASE_PATH2;
+var init_aiSdkTransport = __esm({
+  "src/hooks/aiSdkTransport.ts"() {
+    "use strict";
+    BASE_PATH2 = "/api/ai-conversation";
+  }
+});
+
+// src/hooks/useCompareChat.ts
+import { useCallback, useMemo, useRef, useSyncExternalStore } from "react";
+import { Chat } from "@ai-sdk/react";
+function useCompareChat(options) {
+  const { createTransport, onFinishColumn } = options;
+  const columnsRef = useRef(/* @__PURE__ */ new Map());
+  const versionRef = useRef(0);
+  const listenersRef = useRef(/* @__PURE__ */ new Set());
+  const notify = useCallback(() => {
+    versionRef.current += 1;
+    listenersRef.current.forEach((l) => l());
+  }, []);
+  const subscribe = useCallback((onStoreChange) => {
+    listenersRef.current.add(onStoreChange);
+    return () => {
+      listenersRef.current.delete(onStoreChange);
+    };
+  }, []);
+  const getSnapshot = useCallback(() => versionRef.current, []);
+  useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  const teardownColumn = useCallback((entry) => {
+    entry.unsubscribe();
+  }, []);
+  const reset = useCallback(() => {
+    columnsRef.current.forEach((entry) => {
+      entry.chat.stop().catch(() => {
+      });
+      teardownColumn(entry);
+    });
+    columnsRef.current.clear();
+    notify();
+  }, [notify, teardownColumn]);
+  const sendToAll = useCallback(
+    (models, baseMessages) => {
+      columnsRef.current.forEach((entry) => {
+        entry.chat.stop().catch(() => {
+        });
+        teardownColumn(entry);
+      });
+      columnsRef.current.clear();
+      for (const model of models) {
+        const transport = createTransport(model);
+        const chat = new Chat({
+          id: `compare:${model}:${Date.now()}`,
+          transport,
+          messages: baseMessages
+        });
+        const unsubMessages = chat["~registerMessagesCallback"](notify);
+        const unsubStatus = chat["~registerStatusCallback"](notify);
+        const unsubError = chat["~registerErrorCallback"](notify);
+        const entry = {
+          model,
+          chat,
+          unsubscribe: () => {
+            unsubMessages();
+            unsubStatus();
+            unsubError();
+          }
+        };
+        columnsRef.current.set(model, entry);
+        chat.sendMessage().then(() => onFinishColumn?.(model)).catch(() => {
+        });
+      }
+      notify();
+    },
+    [createTransport, notify, onFinishColumn, teardownColumn]
+  );
+  const stopAll = useCallback(() => {
+    columnsRef.current.forEach((entry) => {
+      entry.chat.stop().catch(() => {
+      });
+    });
+  }, []);
+  const columns = useMemo(
+    () => Array.from(columnsRef.current.values()).map((entry) => ({
+      model: entry.model,
+      messages: entry.chat.messages,
+      status: entry.chat.status,
+      error: entry.chat.error
+    })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [versionRef.current]
+  );
+  const isStreaming = columns.some((c) => c.status === "submitted" || c.status === "streaming");
+  return { columns, isStreaming, sendToAll, stopAll, reset };
+}
+var init_useCompareChat = __esm({
+  "src/hooks/useCompareChat.ts"() {
+    "use strict";
+  }
+});
+
+// src/hooks/useThreads.ts
+import { useState, useCallback as useCallback2, useRef as useRef2, useEffect, useMemo as useMemo2 } from "react";
 import { useApi } from "@backstage/core-plugin-api";
+import { fetchApiRef } from "@backstage/core-plugin-api";
+import { useChat as useAiSdkChat } from "@ai-sdk/react";
 function loadThreads(userId) {
   try {
     const raw = localStorage.getItem(`${STORAGE_PREFIX}:${userId}`);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return parsed.map((t) => ({ ...t, messages: migrateThreadMessages(t.messages) }));
   } catch {
     return [];
   }
@@ -350,7 +445,7 @@ function findQuestionFor(messages, messageId) {
   if (idx <= 0) return void 0;
   return messages[idx - 1];
 }
-function useChat(opts) {
+function useThreads(opts) {
   const {
     userId,
     model,
@@ -368,22 +463,137 @@ function useChat(opts) {
     persistenceEnabled
   } = opts;
   const api = useApi(aiConversationApiRef);
+  const fetchApi = useApi(fetchApiRef);
   const [threads, setThreads] = useState(() => loadThreads(userId));
-  const [activeId, setActiveId] = useState(
-    () => threads[0]?.id ?? null
-  );
-  const [streamingIds, setStreamingIds] = useState(/* @__PURE__ */ new Set());
+  const [activeId, setActiveId] = useState(() => threads[0]?.id ?? null);
   const [error, setError] = useState(null);
   const [citations, setCitations] = useState([]);
   const [keySpend, setKeySpend] = useState(null);
-  const isStreaming = streamingIds.size > 0;
-  const abortMapRef = useRef(/* @__PURE__ */ new Map());
-  const threadsRef = useRef(threads);
+  const activeThread = threads.find((t) => t.id === activeId) ?? null;
+  const isCompareThread = activeThread?.mode === "compare";
+  const settingsRef = useRef2({
+    model,
+    vectorStoreIds,
+    personaId,
+    customSystemPrompt,
+    toneId,
+    focusId,
+    verbosityId,
+    reasoningEffort,
+    webSearch,
+    topK,
+    userKey: keyToken,
+    threadId: activeThread?.id ?? ""
+  });
+  settingsRef.current = {
+    model,
+    vectorStoreIds,
+    personaId,
+    customSystemPrompt,
+    toneId,
+    focusId,
+    verbosityId,
+    reasoningEffort,
+    webSearch,
+    topK,
+    userKey: keyToken,
+    threadId: activeThread?.id ?? ""
+  };
+  const transport = useMemo2(
+    () => createAiConversationTransport(fetchApi, () => settingsRef.current),
+    [fetchApi]
+  );
+  const chat = useAiSdkChat({
+    id: activeThread?.id ?? "no-active-thread",
+    messages: activeThread?.messages ?? [],
+    transport,
+    onData: (dataPart) => {
+      if (!activeThread) return;
+      if (dataPart.type === "data-citations") {
+        const results = dataPart.data;
+        setCitations(
+          Array.isArray(results) ? results.map((r) => ({
+            filename: r.filename,
+            score: r.score,
+            snippet: r.text ?? r.snippet,
+            source: r.source,
+            url: r.url
+          })) : []
+        );
+      }
+      if (dataPart.type === "data-usage") {
+        const usage = dataPart.data;
+        const threadId = activeThread.id;
+        setThreads(
+          (prev) => prev.map(
+            (t) => t.id === threadId ? { ...t, lastTurnUsage: usage, totalTokens: t.totalTokens + usage.total_tokens } : t
+          )
+        );
+      }
+    },
+    onError: (err) => setError(err.message),
+    onFinish: () => {
+      if (keyAlias) api.getKeySpend(keyAlias).then(setKeySpend).catch(() => {
+      });
+    }
+  });
+  const compareChat = useCompareChat({
+    createTransport: (forModel) => createAiConversationTransport(fetchApi, () => ({
+      ...settingsRef.current,
+      model: forModel
+    })),
+    onFinishColumn: () => {
+      if (keyAlias) api.getKeySpend(keyAlias).then(setKeySpend).catch(() => {
+      });
+    }
+  });
+  useEffect(() => {
+    if (!activeThread || isCompareThread) return;
+    const threadId = activeThread.id;
+    setThreads(
+      (prev) => prev.map((t) => t.id === threadId ? { ...t, messages: chat.messages, updatedAt: Date.now() } : t)
+    );
+  }, [chat.messages, isCompareThread]);
+  const compareTurnRef = useRef2(null);
+  useEffect(() => {
+    if (!activeThread || !isCompareThread) return;
+    const turn = compareTurnRef.current;
+    if (!turn || turn.threadId !== activeThread.id || compareChat.columns.length === 0) return;
+    const assistantMsgs = compareChat.columns.map((col) => {
+      const last = col.messages[col.messages.length - 1];
+      const base = last ?? {
+        id: genId(),
+        role: "assistant",
+        parts: []
+      };
+      return {
+        ...base,
+        metadata: { ...base.metadata, turnId: turn.turnId, compareModel: col.model }
+      };
+    });
+    const threadId = activeThread.id;
+    setThreads(
+      (prev) => prev.map(
+        (t) => t.id === threadId ? { ...t, messages: [...turn.prefix, ...assistantMsgs], updatedAt: Date.now() } : t
+      )
+    );
+  }, [compareChat.columns, isCompareThread]);
+  const isStreaming = isCompareThread ? compareChat.isStreaming : chat.status === "submitted" || chat.status === "streaming";
+  const streamingMessageIds = useMemo2(() => {
+    if (isCompareThread) {
+      return new Set(
+        compareChat.columns.filter((c) => c.status === "submitted" || c.status === "streaming").map((c) => c.messages[c.messages.length - 1]?.id).filter((id) => !!id)
+      );
+    }
+    const last = chat.messages[chat.messages.length - 1];
+    return isStreaming && last ? /* @__PURE__ */ new Set([last.id]) : /* @__PURE__ */ new Set();
+  }, [isCompareThread, compareChat.columns, chat.messages, isStreaming]);
+  const threadsRef = useRef2(threads);
   threadsRef.current = threads;
-  const activeIdRef = useRef(activeId);
+  const activeIdRef = useRef2(activeId);
   activeIdRef.current = activeId;
-  const saveTimeoutRef = useRef(null);
-  const syncActiveThreadToBackend = useCallback(() => {
+  const saveTimeoutRef = useRef2(null);
+  const syncActiveThreadToBackend = useCallback2(() => {
     if (!persistenceEnabled) return;
     const active = threadsRef.current.find((t) => t.id === activeIdRef.current);
     if (active) api.saveThread(active).catch(() => {
@@ -430,7 +640,6 @@ function useChat(opts) {
       cancelled = true;
     };
   }, [persistenceEnabled]);
-  const activeThread = threads.find((t) => t.id === activeId) ?? null;
   useEffect(() => {
     if (!keyToken || activeId) return;
     const thread = {
@@ -451,7 +660,7 @@ function useChat(opts) {
     setThreads((prev) => [thread, ...prev]);
     setActiveId(thread.id);
   }, [keyToken, activeId, persistenceEnabled, api]);
-  const newThread = useCallback(() => {
+  const newThread = useCallback2(() => {
     const thread = {
       id: genId(),
       title: "New chat",
@@ -472,27 +681,26 @@ function useChat(opts) {
     setError(null);
     setCitations([]);
     setKeySpend(null);
-  }, [
-    model,
-    vectorStoreIds,
-    personaId,
-    customSystemPrompt,
-    keyAlias,
-    keyToken
-  ]);
-  const selectThread = useCallback((id) => {
-    setActiveId(id);
-    setError(null);
-    setCitations([]);
-    setKeySpend(null);
-  }, []);
-  const deleteThread = useCallback(
+    compareChat.reset();
+  }, [model, vectorStoreIds, personaId, customSystemPrompt, keyAlias, keyToken, compareChat]);
+  const selectThread = useCallback2(
+    (id) => {
+      setActiveId(id);
+      setError(null);
+      setCitations([]);
+      setKeySpend(null);
+      compareChat.reset();
+    },
+    [compareChat]
+  );
+  const deleteThread = useCallback2(
     (id) => {
       const thread = threads.find((t) => t.id === id);
       const remaining = threads.filter((t) => t.id !== id);
       setThreads(remaining);
       if (activeId === id) {
         setActiveId(remaining[0]?.id ?? null);
+        compareChat.reset();
       }
       if (thread?.keyToken) {
         api.deleteChatKey(thread.keyToken).catch(() => {
@@ -501,126 +709,23 @@ function useChat(opts) {
       if (persistenceEnabled) api.deleteThread(id).catch(() => {
       });
     },
-    [activeId, threads, api, persistenceEnabled]
+    [activeId, threads, api, persistenceEnabled, compareChat]
   );
-  const stopGeneration = useCallback(() => {
-    abortMapRef.current.forEach((controller) => controller.abort());
-    abortMapRef.current.clear();
-    setStreamingIds(/* @__PURE__ */ new Set());
-  }, []);
-  const startStream = useCallback(
-    (threadId, assistantMsgId, reqMessages, reqModel, attachedUrl, onSettled) => {
-      setStreamingIds((prev) => new Set(prev).add(assistantMsgId));
-      const controller = api.chatStream(
-        {
-          model: reqModel,
-          messages: reqMessages,
-          thread_id: threadId,
-          vector_store_ids: vectorStoreIds.length ? vectorStoreIds : void 0,
-          persona_id: personaId || void 0,
-          custom_system_prompt: customSystemPrompt || void 0,
-          tone_id: toneId || void 0,
-          focus_id: focusId || void 0,
-          verbosity_id: verbosityId || void 0,
-          reasoning_effort: reasoningEffort || void 0,
-          context_url: attachedUrl?.url,
-          web_search: webSearch || void 0,
-          top_k: topK,
-          user_key: keyToken
-        },
-        (chunk) => {
-          if (chunk.error) {
-            setError(chunk.error);
-            return;
-          }
-          if (chunk.search_results) {
-            setCitations(
-              chunk.search_results.map((r) => ({
-                filename: r.filename,
-                score: r.score,
-                snippet: r.text,
-                source: r.source,
-                url: r.url
-              }))
-            );
-          }
-          if (chunk.usage) {
-            const usage = chunk.usage;
-            setThreads(
-              (prev) => prev.map(
-                (t) => t.id === threadId ? {
-                  ...t,
-                  lastTurnUsage: usage,
-                  totalTokens: t.totalTokens + usage.total_tokens
-                } : t
-              )
-            );
-          }
-          if (chunk.delta) {
-            setThreads(
-              (prev) => prev.map((t) => {
-                if (t.id !== threadId) return t;
-                const msgs = t.messages.map(
-                  (m) => m.id === assistantMsgId ? { ...m, content: m.content + chunk.delta } : m
-                );
-                return { ...t, messages: msgs, updatedAt: Date.now() };
-              })
-            );
-          }
-        },
-        () => {
-          abortMapRef.current.delete(assistantMsgId);
-          setStreamingIds((prev) => {
-            const next = new Set(prev);
-            next.delete(assistantMsgId);
-            return next;
-          });
-          onSettled();
-        },
-        (err) => {
-          setError(err.message);
-          abortMapRef.current.delete(assistantMsgId);
-          setStreamingIds((prev) => {
-            const next = new Set(prev);
-            next.delete(assistantMsgId);
-            return next;
-          });
-          onSettled();
-        }
-      );
-      abortMapRef.current.set(assistantMsgId, controller);
-    },
-    [
-      api,
-      vectorStoreIds,
-      personaId,
-      customSystemPrompt,
-      toneId,
-      focusId,
-      verbosityId,
-      reasoningEffort,
-      topK,
-      keyToken,
-      webSearch
-    ]
-  );
-  const runSend = useCallback(
+  const stopGeneration = useCallback2(() => {
+    chat.stop().catch(() => {
+    });
+    compareChat.stopAll();
+  }, [chat, compareChat]);
+  const runSend = useCallback2(
     (text, baseMessages, attachedUrl) => {
       if (!text.trim() || !activeThread || !keyToken) return;
-      stopGeneration();
       setError(null);
       setCitations([]);
-      const turnId = genId();
-      const userMsg = { id: genId(), role: "user", content: text, attachedUrl, turnId };
-      const assistantMsg = { id: genId(), role: "assistant", content: "", turnId };
       const threadId = activeThread.id;
-      const updatedMessages = [...baseMessages, userMsg, assistantMsg];
-      const currentKeyAlias = keyAlias;
       setThreads(
         (prev) => prev.map(
           (t) => t.id === threadId ? {
             ...t,
-            messages: updatedMessages,
             title: t.messages.length === 0 ? text.slice(0, 40) : t.title,
             model,
             vectorStoreIds,
@@ -638,17 +743,15 @@ function useChat(opts) {
           } : t
         )
       );
-      const reqMessages = updatedMessages.slice(0, -1);
-      startStream(threadId, assistantMsg.id, reqMessages, model, attachedUrl, () => {
-        if (currentKeyAlias) {
-          api.getKeySpend(currentKeyAlias).then(setKeySpend).catch(() => {
-          });
-        }
+      chat.setMessages(baseMessages);
+      chat.sendMessage(
+        { text, metadata: { attachedUrl } },
+        { body: attachedUrl ? { context_url: attachedUrl.url } : void 0 }
+      ).catch(() => {
       });
     },
     [
       activeThread,
-      api,
       keyToken,
       model,
       vectorStoreIds,
@@ -660,34 +763,28 @@ function useChat(opts) {
       reasoningEffort,
       keyAlias,
       webSearch,
-      startStream,
-      stopGeneration
+      chat
     ]
   );
-  const runCompareSend = useCallback(
+  const runCompareSend = useCallback2(
     (text, baseMessages, models, attachedUrl) => {
       if (!text.trim() || !activeThread || !keyToken || models.length === 0) return;
-      stopGeneration();
       setError(null);
       setCitations([]);
       const turnId = genId();
-      const userMsg = { id: genId(), role: "user", content: text, attachedUrl, turnId };
-      const assistantMsgs = models.map((m) => ({
+      const userMsg = {
         id: genId(),
-        role: "assistant",
-        content: "",
-        turnId,
-        compareModel: m
-      }));
+        role: "user",
+        metadata: { attachedUrl, turnId },
+        parts: [{ type: "text", text }]
+      };
       const threadId = activeThread.id;
-      const updatedMessages = [...baseMessages, userMsg, ...assistantMsgs];
-      const currentKeyAlias = keyAlias;
-      const reqMessagesBase = [...baseMessages, userMsg];
+      compareTurnRef.current = { threadId, turnId, prefix: [...baseMessages, userMsg] };
       setThreads(
         (prev) => prev.map(
           (t) => t.id === threadId ? {
             ...t,
-            messages: updatedMessages,
+            messages: [...baseMessages, userMsg],
             title: t.messages.length === 0 ? text.slice(0, 40) : t.title,
             vectorStoreIds,
             personaId,
@@ -705,18 +802,10 @@ function useChat(opts) {
           } : t
         )
       );
-      assistantMsgs.forEach((am) => {
-        startStream(threadId, am.id, reqMessagesBase, am.compareModel, attachedUrl, () => {
-          if (currentKeyAlias) {
-            api.getKeySpend(currentKeyAlias).then(setKeySpend).catch(() => {
-            });
-          }
-        });
-      });
+      compareChat.sendToAll(models, [...baseMessages, userMsg]);
     },
     [
       activeThread,
-      api,
       keyToken,
       vectorStoreIds,
       personaId,
@@ -727,11 +816,10 @@ function useChat(opts) {
       reasoningEffort,
       keyAlias,
       webSearch,
-      startStream,
-      stopGeneration
+      compareChat
     ]
   );
-  const sendMessage = useCallback(
+  const sendMessage = useCallback2(
     (text, attachedUrl, compareModelsOverride) => {
       if (!activeThread) return;
       const models = compareModelsOverride ?? (activeThread.mode === "compare" ? activeThread.compareModels : void 0);
@@ -743,7 +831,7 @@ function useChat(opts) {
     },
     [activeThread, runSend, runCompareSend]
   );
-  const regenerateFrom = useCallback(
+  const regenerateFrom = useCallback2(
     (messageId) => {
       if (!activeThread) return;
       const target = computeRegenerateTarget(activeThread.messages, messageId);
@@ -758,7 +846,7 @@ function useChat(opts) {
     },
     [activeThread, runSend, runCompareSend]
   );
-  const editAndResend = useCallback(
+  const editAndResend = useCallback2(
     (messageId, newContent) => {
       if (!activeThread) return;
       const target = computeEditTarget(activeThread.messages, messageId);
@@ -771,7 +859,7 @@ function useChat(opts) {
     },
     [activeThread, runSend, runCompareSend]
   );
-  const setCompareMode = useCallback(
+  const setCompareMode = useCallback2(
     (enabled, models) => {
       if (!activeThread) return;
       const threadId = activeThread.id;
@@ -787,7 +875,7 @@ function useChat(opts) {
     },
     [activeThread]
   );
-  const togglePin = useCallback(
+  const togglePin = useCallback2(
     (id) => {
       setThreads((prev) => prev.map((t) => t.id === id ? { ...t, pinned: !t.pinned } : t));
       if (!persistenceEnabled) return;
@@ -799,7 +887,7 @@ function useChat(opts) {
     },
     [persistenceEnabled, api]
   );
-  const exportThread = useCallback(
+  const exportThread = useCallback2(
     (id) => {
       const thread = threads.find((t) => t.id === id);
       if (!thread) return;
@@ -817,7 +905,7 @@ function useChat(opts) {
     },
     [threads]
   );
-  const importThread = useCallback(async (file) => {
+  const importThread = useCallback2(async (file) => {
     const text = await file.text();
     let parsed;
     try {
@@ -826,14 +914,14 @@ function useChat(opts) {
       throw new Error("Not valid JSON");
     }
     const payload = parsed;
-    if (payload?.version !== THREAD_EXPORT_VERSION || !payload.thread || typeof payload.thread.id !== "string" || !Array.isArray(payload.thread.messages)) {
+    if (payload?.version !== 1 && payload?.version !== THREAD_EXPORT_VERSION || !payload.thread || typeof payload.thread.id !== "string" || !Array.isArray(payload.thread.messages)) {
       throw new Error("Unrecognized thread export format");
     }
     const src = payload.thread;
     const imported = {
       id: genId(),
       title: typeof src.title === "string" ? src.title : "Imported chat",
-      messages: src.messages,
+      messages: migrateThreadMessages(src.messages),
       model: typeof src.model === "string" ? src.model : "",
       vectorStoreIds: Array.isArray(src.vectorStoreIds) ? src.vectorStoreIds : [],
       personaId: typeof src.personaId === "string" ? src.personaId : "",
@@ -849,7 +937,7 @@ function useChat(opts) {
     setThreads((prev) => [imported, ...prev]);
     setActiveId(imported.id);
   }, []);
-  const submitFeedback = useCallback(
+  const submitFeedback = useCallback2(
     (messageId, vote) => {
       if (!activeThread) return;
       const message = activeThread.messages.find((m) => m.id === messageId);
@@ -861,7 +949,7 @@ function useChat(opts) {
           (t) => t.id !== threadId ? t : {
             ...t,
             messages: t.messages.map(
-              (m) => m.id === messageId ? { ...m, feedback: vote } : m
+              (m) => m.id === messageId ? { ...m, metadata: { ...m.metadata, feedback: vote } } : m
             )
           }
         )
@@ -870,8 +958,8 @@ function useChat(opts) {
         threadId,
         messageId,
         vote,
-        question: question?.content ?? "",
-        answer: message.content,
+        question: question ? extractText(question) : "",
+        answer: extractText(message),
         model: activeThread.model,
         personaId: activeThread.personaId || void 0,
         vectorStoreIds: activeThread.vectorStoreIds,
@@ -898,20 +986,23 @@ function useChat(opts) {
     importThread,
     setCompareMode,
     isStreaming,
-    streamingMessageIds: streamingIds,
+    streamingMessageIds,
     error,
     citations,
     keySpend
   };
 }
 var THREAD_EXPORT_VERSION, STORAGE_PREFIX, SAVE_DEBOUNCE_MS;
-var init_useChat = __esm({
-  "src/hooks/useChat.ts"() {
+var init_useThreads = __esm({
+  "src/hooks/useThreads.ts"() {
     "use strict";
     init_api();
     init_chatTruncation();
     init_threadPersistence();
-    THREAD_EXPORT_VERSION = 1;
+    init_aiSdkTransport();
+    init_messageShape();
+    init_useCompareChat();
+    THREAD_EXPORT_VERSION = 2;
     STORAGE_PREFIX = "ai-conversation:threads";
     SAVE_DEBOUNCE_MS = 400;
   }
@@ -1421,12 +1512,12 @@ import React9, { useState as useState6 } from "react";
 import { Box as Box6, IconButton as IconButton2, Tooltip as Tooltip2 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import CheckIcon from "@mui/icons-material/Check";
-function extractText(node) {
+function extractText2(node) {
   if (typeof node === "string") return node;
   if (typeof node === "number") return String(node);
-  if (Array.isArray(node)) return node.map(extractText).join("");
+  if (Array.isArray(node)) return node.map(extractText2).join("");
   if (React9.isValidElement(node)) {
-    return extractText(node.props.children);
+    return extractText2(node.props.children);
   }
   return "";
 }
@@ -1446,7 +1537,7 @@ var init_CodeBlock = __esm({
         return /* @__PURE__ */ React9.createElement("code", { className, style: { fontFamily: MONO_FONT_STACK }, ...props }, children);
       }
       const handleCopy = () => {
-        const text = extractText(children).replace(/\n$/, "");
+        const text = extractText2(children).replace(/\n$/, "");
         navigator.clipboard?.writeText(text).then(() => {
           setCopied(true);
           setTimeout(() => setCopied(false), 1500);
@@ -1477,7 +1568,7 @@ var init_CodeBlock = __esm({
 
 // src/components/AssistantMessage.tsx
 import React10, { useState as useState7 } from "react";
-import { Box as Box7, IconButton as IconButton3, Tooltip as Tooltip3 } from "@mui/material";
+import { Box as Box7, Chip as Chip4, IconButton as IconButton3, Tooltip as Tooltip3 } from "@mui/material";
 import ThumbUpIcon from "@mui/icons-material/ThumbUp";
 import ThumbUpOutlinedIcon from "@mui/icons-material/ThumbUpOutlined";
 import ThumbDownIcon from "@mui/icons-material/ThumbDown";
@@ -1485,21 +1576,81 @@ import ThumbDownOutlinedIcon from "@mui/icons-material/ThumbDownOutlined";
 import ContentCopyIcon2 from "@mui/icons-material/ContentCopy";
 import CheckIcon2 from "@mui/icons-material/Check";
 import ReplayIcon from "@mui/icons-material/Replay";
+import BuildIcon from "@mui/icons-material/Build";
+import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-var blink, AssistantMessage;
+var blink, ToolCallPart, FilePart, AssistantMessage;
 var init_AssistantMessage = __esm({
   "src/components/AssistantMessage.tsx"() {
     "use strict";
     init_PersonaAvatar();
     init_CodeBlock();
+    init_messageShape();
     blink = {
       "@keyframes blink": {
         "0%, 50%": { opacity: 1 },
         "51%, 100%": { opacity: 0 }
       }
+    };
+    ToolCallPart = ({ part }) => {
+      const toolName = part.type?.startsWith("tool-") ? part.type.slice("tool-".length) : "tool";
+      const state = part.state ?? "input-available";
+      if (state === "output-error" || part.errorText) {
+        return /* @__PURE__ */ React10.createElement(
+          Chip4,
+          {
+            size: "small",
+            icon: /* @__PURE__ */ React10.createElement(ErrorOutlineIcon, { fontSize: "small" }),
+            label: `${toolName} failed`,
+            color: "error",
+            variant: "outlined",
+            sx: { mb: 0.5 }
+          }
+        );
+      }
+      if (state === "output-available") {
+        return /* @__PURE__ */ React10.createElement(
+          Chip4,
+          {
+            size: "small",
+            icon: /* @__PURE__ */ React10.createElement(BuildIcon, { fontSize: "small" }),
+            label: `${toolName} done`,
+            variant: "outlined",
+            sx: { mb: 0.5 }
+          }
+        );
+      }
+      return /* @__PURE__ */ React10.createElement(
+        Chip4,
+        {
+          size: "small",
+          icon: /* @__PURE__ */ React10.createElement(BuildIcon, { fontSize: "small" }),
+          label: `${toolName}\u2026`,
+          variant: "outlined",
+          sx: { mb: 0.5 }
+        }
+      );
+    };
+    FilePart = ({
+      url,
+      mediaType,
+      filename
+    }) => {
+      if (mediaType.startsWith("image/")) {
+        return /* @__PURE__ */ React10.createElement(
+          Box7,
+          {
+            component: "img",
+            src: url,
+            alt: filename ?? "attachment",
+            sx: { maxWidth: 240, maxHeight: 240, borderRadius: 1, display: "block", mb: 0.5 }
+          }
+        );
+      }
+      return /* @__PURE__ */ React10.createElement(Chip4, { size: "small", label: filename ?? mediaType, variant: "outlined", sx: { mb: 0.5 } });
     };
     AssistantMessage = ({
       message,
@@ -1509,40 +1660,56 @@ var init_AssistantMessage = __esm({
       onRegenerate
     }) => {
       const [copied, setCopied] = useState7(false);
-      const showActions = !!message.content && !isStreaming;
+      const text = extractText(message);
+      const showActions = !!text && !isStreaming;
       const handleCopy = () => {
-        navigator.clipboard?.writeText(message.content).then(() => {
+        navigator.clipboard?.writeText(text).then(() => {
           setCopied(true);
           setTimeout(() => setCopied(false), 1500);
         });
       };
-      let body;
-      if (message.content) {
-        body = /* @__PURE__ */ React10.createElement(
-          ReactMarkdown,
-          {
-            remarkPlugins: [remarkGfm, remarkMath],
-            rehypePlugins: [rehypeKatex],
-            components: { code: CodeBlock }
-          },
-          message.content
-        );
-      } else if (isStreaming) {
-        body = /* @__PURE__ */ React10.createElement(
-          Box7,
-          {
-            component: "span",
-            sx: {
-              display: "inline-block",
-              width: 8,
-              height: 16,
-              bgcolor: "text.primary",
-              animation: "blink 1s step-end infinite",
-              verticalAlign: "text-bottom",
-              ...blink
-            }
+      const cursor = /* @__PURE__ */ React10.createElement(
+        Box7,
+        {
+          component: "span",
+          sx: {
+            display: "inline-block",
+            width: 8,
+            height: 16,
+            bgcolor: "text.primary",
+            animation: "blink 1s step-end infinite",
+            verticalAlign: "text-bottom",
+            ...blink
           }
-        );
+        }
+      );
+      let body;
+      if (message.parts.length > 0) {
+        body = message.parts.map((part, i) => {
+          if (part.type === "text") {
+            if (!part.text) return null;
+            return /* @__PURE__ */ React10.createElement(
+              ReactMarkdown,
+              {
+                key: i,
+                remarkPlugins: [remarkGfm, remarkMath],
+                rehypePlugins: [rehypeKatex],
+                components: { code: CodeBlock }
+              },
+              part.text
+            );
+          }
+          if (part.type === "file") {
+            const p = part;
+            return /* @__PURE__ */ React10.createElement(FilePart, { key: i, url: p.url, mediaType: p.mediaType, filename: p.filename });
+          }
+          if (typeof part.type === "string" && part.type.startsWith("tool-")) {
+            return /* @__PURE__ */ React10.createElement(ToolCallPart, { key: i, part });
+          }
+          return null;
+        });
+      } else if (isStreaming) {
+        body = cursor;
       } else {
         body = null;
       }
@@ -1588,19 +1755,19 @@ var init_AssistantMessage = __esm({
             {
               size: "small",
               "aria-label": "Good response",
-              color: message.feedback === "up" ? "primary" : "default",
+              color: message.metadata?.feedback === "up" ? "primary" : "default",
               onClick: () => onFeedback(message.id, "up")
             },
-            message.feedback === "up" ? /* @__PURE__ */ React10.createElement(ThumbUpIcon, { fontSize: "small" }) : /* @__PURE__ */ React10.createElement(ThumbUpOutlinedIcon, { fontSize: "small" })
+            message.metadata?.feedback === "up" ? /* @__PURE__ */ React10.createElement(ThumbUpIcon, { fontSize: "small" }) : /* @__PURE__ */ React10.createElement(ThumbUpOutlinedIcon, { fontSize: "small" })
           ), /* @__PURE__ */ React10.createElement(
             IconButton3,
             {
               size: "small",
               "aria-label": "Bad response",
-              color: message.feedback === "down" ? "primary" : "default",
+              color: message.metadata?.feedback === "down" ? "primary" : "default",
               onClick: () => onFeedback(message.id, "down")
             },
-            message.feedback === "down" ? /* @__PURE__ */ React10.createElement(ThumbDownIcon, { fontSize: "small" }) : /* @__PURE__ */ React10.createElement(ThumbDownOutlinedIcon, { fontSize: "small" })
+            message.metadata?.feedback === "down" ? /* @__PURE__ */ React10.createElement(ThumbDownIcon, { fontSize: "small" }) : /* @__PURE__ */ React10.createElement(ThumbDownOutlinedIcon, { fontSize: "small" })
           )),
           onRegenerate && /* @__PURE__ */ React10.createElement(Tooltip3, { title: "Regenerate" }, /* @__PURE__ */ React10.createElement(IconButton3, { size: "small", "aria-label": "Regenerate", onClick: () => onRegenerate(message.id) }, /* @__PURE__ */ React10.createElement(ReplayIcon, { fontSize: "small" }))),
           /* @__PURE__ */ React10.createElement(Tooltip3, { title: copied ? "Copied" : "Copy" }, /* @__PURE__ */ React10.createElement(IconButton3, { size: "small", "aria-label": "Copy", onClick: handleCopy }, copied ? /* @__PURE__ */ React10.createElement(CheckIcon2, { fontSize: "small" }) : /* @__PURE__ */ React10.createElement(ContentCopyIcon2, { fontSize: "small" })))
@@ -1628,7 +1795,7 @@ var init_safeUrl = __esm({
 
 // src/components/UserMessage.tsx
 import React11, { useState as useState8 } from "react";
-import { Box as Box8, Button as Button2, Chip as Chip4, IconButton as IconButton4, TextField as TextField3, Tooltip as Tooltip4 } from "@mui/material";
+import { Box as Box8, Button as Button2, Chip as Chip5, IconButton as IconButton4, TextField as TextField3, Tooltip as Tooltip4 } from "@mui/material";
 import ContentCopyIcon3 from "@mui/icons-material/ContentCopy";
 import CheckIcon3 from "@mui/icons-material/Check";
 import EditIcon from "@mui/icons-material/Edit";
@@ -1638,23 +1805,28 @@ var init_UserMessage = __esm({
   "src/components/UserMessage.tsx"() {
     "use strict";
     init_safeUrl();
+    init_messageShape();
     UserMessage = ({ message, onEditAndResend }) => {
+      const text = extractText(message);
+      const fileParts = message.parts.filter(
+        (p) => p.type === "file"
+      );
       const [editing, setEditing] = useState8(false);
-      const [draft, setDraft] = useState8(message.content);
+      const [draft, setDraft] = useState8(text);
       const [copied, setCopied] = useState8(false);
       const handleCopy = () => {
-        navigator.clipboard?.writeText(message.content).then(() => {
+        navigator.clipboard?.writeText(text).then(() => {
           setCopied(true);
           setTimeout(() => setCopied(false), 1500);
         });
       };
       const startEdit = () => {
-        setDraft(message.content);
+        setDraft(text);
         setEditing(true);
       };
       const saveEdit = () => {
         const trimmed = draft.trim();
-        if (trimmed && trimmed !== message.content) {
+        if (trimmed && trimmed !== text) {
           onEditAndResend?.(message.id, trimmed);
         }
         setEditing(false);
@@ -1682,23 +1854,35 @@ var init_UserMessage = __esm({
             "&:hover .litellm-actions": { opacity: 1 }
           }
         },
-        message.attachedUrl && /* @__PURE__ */ React11.createElement(Box8, { sx: { display: "flex", justifyContent: "flex-end", mb: 0.5 } }, /* @__PURE__ */ React11.createElement(Tooltip4, { title: message.attachedUrl.url }, /* @__PURE__ */ React11.createElement(
-          Chip4,
+        message.metadata?.attachedUrl && /* @__PURE__ */ React11.createElement(Box8, { sx: { display: "flex", justifyContent: "flex-end", mb: 0.5 } }, /* @__PURE__ */ React11.createElement(Tooltip4, { title: message.metadata.attachedUrl.url }, /* @__PURE__ */ React11.createElement(
+          Chip5,
           {
             size: "small",
             icon: /* @__PURE__ */ React11.createElement(LinkIcon, { fontSize: "small" }),
-            label: message.attachedUrl.title,
+            label: message.metadata.attachedUrl.title,
             variant: "outlined",
-            ...safeHref(message.attachedUrl.url) ? {
+            ...safeHref(message.metadata.attachedUrl.url) ? {
               component: "a",
-              href: safeHref(message.attachedUrl.url),
+              href: safeHref(message.metadata.attachedUrl.url),
               target: "_blank",
               rel: "noopener noreferrer",
               clickable: true
             } : {}
           }
         ))),
-        /* @__PURE__ */ React11.createElement(
+        fileParts.length > 0 && /* @__PURE__ */ React11.createElement(Box8, { sx: { display: "flex", flexWrap: "wrap", gap: 0.5, justifyContent: "flex-end", mb: 0.5 } }, fileParts.map(
+          (p, i) => p.mediaType.startsWith("image/") ? /* @__PURE__ */ React11.createElement(
+            Box8,
+            {
+              key: i,
+              component: "img",
+              src: p.url,
+              alt: p.filename ?? "attachment",
+              sx: { maxWidth: 160, maxHeight: 160, borderRadius: 1 }
+            }
+          ) : /* @__PURE__ */ React11.createElement(Chip5, { key: i, size: "small", label: p.filename ?? p.mediaType, variant: "outlined" })
+        )),
+        text && /* @__PURE__ */ React11.createElement(
           Box8,
           {
             sx: {
@@ -1711,7 +1895,7 @@ var init_UserMessage = __esm({
               textAlign: "right"
             }
           },
-          message.content
+          text
         ),
         /* @__PURE__ */ React11.createElement(
           Box8,
@@ -1775,12 +1959,12 @@ var init_MessageList = __esm({
             gap: 1.5
           }
         },
-        groups.map((group, gi) => /* @__PURE__ */ React12.createElement(React12.Fragment, { key: group.user?.id ?? `g${gi}` }, group.user && /* @__PURE__ */ React12.createElement(UserMessage, { message: group.user, onEditAndResend }), group.assistants.length > 1 ? /* @__PURE__ */ React12.createElement(Box9, { sx: { display: "flex", gap: 1.5, overflowX: "auto", width: "100%" } }, group.assistants.map((msg) => /* @__PURE__ */ React12.createElement(Box9, { key: msg.id, sx: { flex: "1 1 320px", minWidth: 280, maxWidth: "none" } }, msg.compareModel && /* @__PURE__ */ React12.createElement(Typography7, { variant: "caption", color: "text.secondary", sx: { display: "block", mb: 0.25 } }, msg.compareModel), /* @__PURE__ */ React12.createElement(
+        groups.map((group, gi) => /* @__PURE__ */ React12.createElement(React12.Fragment, { key: group.user?.id ?? `g${gi}` }, group.user && /* @__PURE__ */ React12.createElement(UserMessage, { message: group.user, onEditAndResend }), group.assistants.length > 1 ? /* @__PURE__ */ React12.createElement(Box9, { sx: { display: "flex", gap: 1.5, overflowX: "auto", width: "100%" } }, group.assistants.map((msg) => /* @__PURE__ */ React12.createElement(Box9, { key: msg.id, sx: { flex: "1 1 320px", minWidth: 280, maxWidth: "none" } }, msg.metadata?.compareModel && /* @__PURE__ */ React12.createElement(Typography7, { variant: "caption", color: "text.secondary", sx: { display: "block", mb: 0.25 } }, msg.metadata.compareModel), /* @__PURE__ */ React12.createElement(
           AssistantMessage,
           {
             message: msg,
             isStreaming: streamingMessageIds.has(msg.id),
-            avatarLabel: msg.compareModel ?? avatarLabel,
+            avatarLabel: msg.metadata?.compareModel ?? avatarLabel,
             onFeedback,
             onRegenerate
           }
@@ -1816,7 +2000,7 @@ var init_ErrorBanner = __esm({
 
 // src/components/SourcesPanel.tsx
 import React14 from "react";
-import { Box as Box10, Chip as Chip5, Typography as Typography8 } from "@mui/material";
+import { Box as Box10, Chip as Chip6, Typography as Typography8 } from "@mui/material";
 var SourcesPanel;
 var init_SourcesPanel = __esm({
   "src/components/SourcesPanel.tsx"() {
@@ -1824,14 +2008,14 @@ var init_SourcesPanel = __esm({
     init_safeUrl();
     SourcesPanel = ({ citations }) => {
       return /* @__PURE__ */ React14.createElement(Box10, { sx: { p: 1.5 } }, /* @__PURE__ */ React14.createElement(Typography8, { variant: "overline", color: "text.secondary" }, "Sources"), citations.length === 0 ? /* @__PURE__ */ React14.createElement(Typography8, { variant: "body2", color: "text.secondary", sx: { mt: 0.5 } }, "No sources for the latest reply yet.") : citations.map((c, i) => /* @__PURE__ */ React14.createElement(Box10, { key: i, sx: { mt: 1.5 } }, /* @__PURE__ */ React14.createElement(Box10, { sx: { display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" } }, /* @__PURE__ */ React14.createElement(Typography8, { variant: "body2", fontWeight: 500 }, safeHref(c.url) ? /* @__PURE__ */ React14.createElement("a", { href: safeHref(c.url), target: "_blank", rel: "noopener noreferrer" }, c.filename) : c.filename), c.source && /* @__PURE__ */ React14.createElement(
-        Chip5,
+        Chip6,
         {
           size: "small",
           label: c.source === "web" ? "Web" : "Knowledge base",
           variant: "outlined",
           color: c.source === "web" ? "secondary" : "default"
         }
-      ), /* @__PURE__ */ React14.createElement(Chip5, { size: "small", label: c.score.toFixed(3), color: "primary", variant: "outlined" })), /* @__PURE__ */ React14.createElement(
+      ), /* @__PURE__ */ React14.createElement(Chip6, { size: "small", label: c.score.toFixed(3), color: "primary", variant: "outlined" })), /* @__PURE__ */ React14.createElement(
         Typography8,
         {
           variant: "body2",
@@ -1886,7 +2070,7 @@ var ChatPage_exports = {};
 __export(ChatPage_exports, {
   ChatPage: () => ChatPage
 });
-import React16, { useEffect as useEffect5, useMemo, useRef as useRef2, useState as useState9 } from "react";
+import React16, { useEffect as useEffect5, useMemo as useMemo3, useRef as useRef3, useState as useState9 } from "react";
 import {
   Box as Box12,
   Button as Button3,
@@ -1907,7 +2091,7 @@ import {
   Menu,
   MenuItem as MenuItem4,
   ListItemIcon,
-  Chip as Chip6,
+  Chip as Chip7,
   Switch,
   FormControlLabel
 } from "@mui/material";
@@ -1933,7 +2117,7 @@ function threadMatchesQuery(thread, query) {
   const q = query.trim().toLowerCase();
   if (!q) return true;
   if (thread.title.toLowerCase().includes(q)) return true;
-  return thread.messages.some((m) => m.content.toLowerCase().includes(q));
+  return thread.messages.some((m) => extractText(m).toLowerCase().includes(q));
 }
 function sortThreads(threads) {
   return [...threads].sort((a, b) => {
@@ -1946,7 +2130,8 @@ var init_ChatPage = __esm({
   "src/components/ChatPage.tsx"() {
     "use strict";
     init_api();
-    init_useChat();
+    init_useThreads();
+    init_messageShape();
     init_theme();
     init_ModelPicker();
     init_CompareModelPicker();
@@ -2013,9 +2198,9 @@ var init_ChatPage = __esm({
       const [dismissedUrl, setDismissedUrl] = useState9(null);
       const [traits, setTraits] = useState9({ tones: [], focuses: [], verbosities: [] });
       const [traitsLoading, setTraitsLoading] = useState9(true);
-      const messagesEndRef = useRef2(null);
-      const messagesContainerRef = useRef2(null);
-      const importInputRef = useRef2(null);
+      const messagesEndRef = useRef3(null);
+      const messagesContainerRef = useRef3(null);
+      const importInputRef = useRef3(null);
       useEffect5(() => {
         injectDesignSystemAssets();
         chatApi.getChatConfig().then(setConfig).catch((err) => setConfigError(err.message ?? "Failed to reach the chat backend"));
@@ -2025,7 +2210,7 @@ var init_ChatPage = __esm({
         identityApi.getCredentials().then((c) => setUserId(c.token ? "oidc" : "default")).catch(() => {
         });
       }, [chatApi, identityApi]);
-      const chat = useChat({
+      const chat = useThreads({
         userId,
         model,
         vectorStoreIds,
@@ -2057,7 +2242,7 @@ var init_ChatPage = __esm({
         setCompareModelsSel(chat.activeThread.compareModels ?? []);
         setWebSearch(!!chat.activeThread.webSearch);
       }, [activeThreadId]);
-      const messages = useMemo(() => chat.activeThread?.messages ?? [], [
+      const messages = useMemo3(() => chat.activeThread?.messages ?? [], [
         chat.activeThread
       ]);
       const isStreaming = chat.isStreaming;
@@ -2087,7 +2272,7 @@ var init_ChatPage = __esm({
         }, URL_PREVIEW_DEBOUNCE_MS);
         return () => clearTimeout(timer);
       }, [input, dismissedUrl]);
-      const visibleThreads = useMemo(
+      const visibleThreads = useMemo3(
         () => sortThreads(chat.threads.filter((t) => threadMatchesQuery(t, searchQuery))),
         [chat.threads, searchQuery]
       );
@@ -2172,10 +2357,10 @@ var init_ChatPage = __esm({
       }
       let urlPreviewChip = null;
       if (urlPreviewLoading) {
-        urlPreviewChip = /* @__PURE__ */ React16.createElement(Chip6, { size: "small", icon: /* @__PURE__ */ React16.createElement(LinkIcon2, { fontSize: "small" }), label: "Fetching page\u2026", variant: "outlined" });
+        urlPreviewChip = /* @__PURE__ */ React16.createElement(Chip7, { size: "small", icon: /* @__PURE__ */ React16.createElement(LinkIcon2, { fontSize: "small" }), label: "Fetching page\u2026", variant: "outlined" });
       } else if (urlPreviewError) {
         urlPreviewChip = /* @__PURE__ */ React16.createElement(
-          Chip6,
+          Chip7,
           {
             size: "small",
             color: "error",
@@ -2188,7 +2373,7 @@ var init_ChatPage = __esm({
         );
       } else if (urlPreview) {
         urlPreviewChip = /* @__PURE__ */ React16.createElement(Tooltip5, { title: urlPreview.url }, /* @__PURE__ */ React16.createElement(
-          Chip6,
+          Chip7,
           {
             size: "small",
             icon: /* @__PURE__ */ React16.createElement(LinkIcon2, { fontSize: "small" }),
@@ -2680,12 +2865,12 @@ import {
   createFrontendPlugin,
   ApiBlueprint,
   PageBlueprint,
-  fetchApiRef
+  fetchApiRef as fetchApiRef2
 } from "@backstage/frontend-plugin-api";
 var liteLlmChatApi = ApiBlueprint.make({
   params: (defineParams) => defineParams({
     api: aiConversationApiRef,
-    deps: { fetchApi: fetchApiRef },
+    deps: { fetchApi: fetchApiRef2 },
     factory: ({ fetchApi }) => new AiConversationApi(fetchApi)
   })
 });

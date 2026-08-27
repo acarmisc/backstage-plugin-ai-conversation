@@ -1,5 +1,5 @@
 import type { ChatStatus, ChatTransport } from 'ai';
-import type { AiConversationUIMessage } from './messageShape';
+import type { AiConversationUIMessage } from '../types';
 /**
  * Compare mode: N models replying to the same prompt in parallel, side by
  * side (HANDOFF-ai-sdk-migration.md Phase 19 design decision). There's no

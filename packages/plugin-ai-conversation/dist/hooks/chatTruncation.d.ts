@@ -1,6 +1,6 @@
-import type { ChatMessage } from '../types';
+import type { AiConversationUIMessage } from '../types';
 export interface RegenerateTarget {
-    baseMessages: ChatMessage[];
+    baseMessages: AiConversationUIMessage[];
     text: string;
     /** Whether this target participated in a compare-mode turn — an
      * assistant message only counts if it actually carries a compareModel
@@ -20,12 +20,19 @@ export interface RegenerateTarget {
  *   unset — threads created before turnId existed), truncate up to
  *   (excluding) that user message, resend its content — the reply and
  *   anything after it is dropped and reproduced fresh.
+ *
+ * Deliberately NOT delegated to the AI SDK's own `regenerate()` — this
+ * exact inclusive/exclusive truncation contract is proven and unit tested,
+ * and the migration doc flags regenerate/edit-resend as needing *exact*
+ * parity, not approximate parity, which isn't something that could be
+ * verified against the SDK's own behavior without a live backend. See
+ * `useThreads.ts`'s module comment.
  */
-export declare function computeRegenerateTarget(messages: ChatMessage[], messageId: string): RegenerateTarget | null;
+export declare function computeRegenerateTarget(messages: AiConversationUIMessage[], messageId: string): RegenerateTarget | null;
 export interface EditTarget {
-    baseMessages: ChatMessage[];
+    baseMessages: AiConversationUIMessage[];
 }
 /** Pure truncation logic behind editAndResend: the target must be a user
  * message; returns the slice to resend against (excluding that message and
  * everything after it), or null if the target isn't a user message. */
-export declare function computeEditTarget(messages: ChatMessage[], messageId: string): EditTarget | null;
+export declare function computeEditTarget(messages: AiConversationUIMessage[], messageId: string): EditTarget | null;

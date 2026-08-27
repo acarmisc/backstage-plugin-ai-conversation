@@ -4,8 +4,6 @@ import type {
   Persona,
   ChatRequest,
   ChatFeedbackRequest,
-  ChatStreamChunk,
-  SearchResult,
   ChatResult,
   ChatConfig,
   ChatTraits,
@@ -26,12 +24,6 @@ export interface AiConversationApiInterface {
   fetchUrlContext(url: string): Promise<UrlContextPreview>;
   getFeedbackSummary(filters?: { personaId?: string; model?: string }): Promise<FeedbackSummary>;
   getUsageSummary(groupBy: 'persona' | 'model', range?: string): Promise<UsageSummaryRow[]>;
-  chatStream(
-    req: ChatRequest,
-    onToken: (chunk: ChatStreamChunk) => void,
-    onDone: () => void,
-    onError: (err: Error) => void,
-  ): AbortController;
   chatCompletions(req: ChatRequest): Promise<ChatResult>;
   mintChatKey(opts?: { models?: string[]; max_budget?: number }): Promise<ChatKey>;
   deleteChatKey(key: string): Promise<{ success: boolean }>;
@@ -54,42 +46,6 @@ export const aiConversationApiRef = createApiRef<AiConversationApiInterface>({
 });
 
 const BASE_PATH = '/api/ai-conversation';
-
-/**
- * Normalize a raw SSE `data:` JSON payload (OpenAI-shaped) into the
- * flat ChatStreamChunk shape the UI consumes. LiteLLM emits:
- *   { choices: [{ delta: { content, reasoning_content } }], search_results?: [...] }
- * Also handles the backend's own error events: { error: "..." }.
- */
-function normalizeChunk(raw: any): ChatStreamChunk {
-  if (raw && typeof raw === 'object' && ('error' in raw || 'delta' in raw)) {
-    return raw as ChatStreamChunk;
-  }
-  const chunk: ChatStreamChunk = {};
-  const delta = raw?.choices?.[0]?.delta;
-  const content = delta?.content ?? delta?.reasoning_content;
-  if (typeof content === 'string') chunk.delta = content;
-  if (Array.isArray(raw?.search_results)) {
-    chunk.search_results = raw.search_results.map((r: any): SearchResult => ({
-      filename: r.filename ?? r.file_name ?? r.title ?? r.source ?? r.name ?? '',
-      score: typeof r.score === 'number' ? r.score : 0,
-      text: r.text ?? r.snippet ?? r.content ?? '',
-      // LiteLLM doesn't tag result origin explicitly — a `url` field is the
-      // best available signal that this came from web search, not the KB.
-      source: r.url ? 'web' : 'kb',
-      url: r.url,
-    }));
-  }
-  if (raw?.usage && typeof raw.usage === 'object') {
-    chunk.usage = {
-      prompt_tokens: raw.usage.prompt_tokens ?? 0,
-      completion_tokens: raw.usage.completion_tokens ?? 0,
-      total_tokens: raw.usage.total_tokens ?? 0,
-    };
-  }
-  if (raw?.error) chunk.error = String(raw.error);
-  return chunk;
-}
 
 export class AiConversationApi implements AiConversationApiInterface {
   private fetchApi: FetchApi;
@@ -167,71 +123,6 @@ export class AiConversationApi implements AiConversationApiInterface {
     const res = await this.fetchApi.fetch(`${BASE_PATH}/usage/summary?${params.toString()}`);
     if (!res.ok) throw new Error(`usage/summary ${res.status}`);
     return res.json();
-  }
-
-  chatStream(
-    req: ChatRequest,
-    onToken: (chunk: ChatStreamChunk) => void,
-    onDone: () => void,
-    onError: (err: Error) => void,
-  ): AbortController {
-    const controller = new AbortController();
-
-    (async () => {
-      try {
-        const res = await this.fetchApi.fetch(`${BASE_PATH}/chat/stream`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(req),
-          signal: controller.signal,
-        });
-
-        if (!res.ok || !res.body) {
-          const text = await res.text().catch(() => '');
-          onError(new Error(`${res.status}: ${text || res.statusText}`));
-          return;
-        }
-
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-
-          const lines = buffer.split('\n');
-          buffer = lines.pop() ?? '';
-
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed.startsWith('data:')) continue;
-            const payload = trimmed.slice(5).trim();
-            if (payload === '[DONE]') {
-              onDone();
-              return;
-            }
-            try {
-              const raw = JSON.parse(payload);
-              const chunk = normalizeChunk(raw);
-              // Skip genuinely empty chunks (e.g. role-only deltas).
-              if (chunk.delta || chunk.error || chunk.search_results || chunk.usage) {
-                onToken(chunk);
-              }
-            } catch {
-              // partial JSON — skip, next chunk reassembles
-            }
-          }
-        }
-        onDone();
-      } catch (err: any) {
-        if (err.name === 'AbortError') return;
-        onError(err);
-      }
-    })();
-
-    return controller;
   }
 
   async chatCompletions(req: ChatRequest): Promise<ChatResult> {

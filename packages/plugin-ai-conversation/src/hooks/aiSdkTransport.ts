@@ -1,7 +1,6 @@
 import { DefaultChatTransport } from 'ai';
 import type { FetchApi } from '@backstage/core-plugin-api';
-import type { ReasoningEffort } from '../types';
-import type { AiConversationUIMessage } from './messageShape';
+import type { ReasoningEffort, AiConversationUIMessage } from '../types';
 
 /**
  * Everything the backend's /chat/stream/v2 needs alongside `messages` —

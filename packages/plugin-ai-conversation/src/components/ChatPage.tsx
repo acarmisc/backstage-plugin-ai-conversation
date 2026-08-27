@@ -42,7 +42,8 @@ import LinkIcon from '@mui/icons-material/Link';
 import CloseIcon from '@mui/icons-material/Close';
 import { useApi, identityApiRef } from '@backstage/core-plugin-api';
 import { aiConversationApiRef } from '../api';
-import { useChat } from '../hooks/useChat';
+import { useThreads } from '../hooks/useThreads';
+import { extractText } from '../hooks/messageShape';
 import { injectDesignSystemAssets } from '../theme';
 import { ModelPicker } from './ModelPicker';
 import { CompareModelPicker } from './CompareModelPicker';
@@ -77,7 +78,7 @@ function threadMatchesQuery(thread: Thread, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
   if (thread.title.toLowerCase().includes(q)) return true;
-  return thread.messages.some(m => m.content.toLowerCase().includes(q));
+  return thread.messages.some(m => extractText(m).toLowerCase().includes(q));
 }
 
 function sortThreads(threads: Thread[]): Thread[] {
@@ -159,7 +160,7 @@ export const ChatPage: React.FC = () => {
       .catch(() => {});
   }, [chatApi, identityApi]);
 
-  const chat = useChat({
+  const chat = useThreads({
     userId,
     model,
     vectorStoreIds,

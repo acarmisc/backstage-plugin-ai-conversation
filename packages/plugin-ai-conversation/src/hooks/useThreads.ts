@@ -5,19 +5,13 @@ import { fetchApiRef } from '@backstage/core-plugin-api';
 import { useChat as useAiSdkChat } from '@ai-sdk/react';
 import { aiConversationApiRef, AiConversationApi } from '../api';
 import { computeRegenerateTarget, computeEditTarget } from './chatTruncation';
-import { fromPersisted } from './threadPersistence';
+import { fromPersisted, migrateThreadMessages } from './threadPersistence';
 import { createAiConversationTransport, type ChatRequestSettings } from './aiSdkTransport';
-import {
-  chatMessageToUIMessage,
-  chatMessagesToUIMessages,
-  uiMessageToChatMessage,
-  uiMessagesToChatMessages,
-  type AiConversationUIMessage,
-} from './messageShape';
+import { extractText } from './messageShape';
 import { useCompareChat } from './useCompareChat';
 import type {
   Thread,
-  ChatMessage,
+  AiConversationUIMessage,
   Citation,
   KeySpend,
   ThreadExport,
@@ -33,10 +27,12 @@ import type {
  * (compare mode, see that file) replace the old hand-rolled SSE reader,
  * abort-map, and truncate-and-resend logic.
  *
- * `Thread.messages` stays `ChatMessage[]` (flat `content: string`) — a
- * deliberate compatibility shim (see `messageShape.ts`) so this phase
- * doesn't also have to rewrite every message-rendering component. That's
- * Phase 20 (persisted-shape migration) and Phase 21 (UI rendering rebuild).
+ * `Thread.messages` is `AiConversationUIMessage[]` (HANDOFF-ai-sdk-migration.md
+ * Phase 20) — the SDK's own message shape, with `metadata.turnId`/
+ * `metadata.compareModel` carrying what used to be top-level `ChatMessage`
+ * fields. Legacy `ChatMessage[]`-shaped data (localStorage from before
+ * this shipped, server-persisted rows, v1 thread exports) is migrated on
+ * load — see `threadPersistence.ts`'s `migrateThreadMessages`.
  *
  * Regenerate/edit-resend deliberately do NOT use the SDK's native
  * `regenerate()`/`sendMessage({messageId})` truncation — this repo's exact
@@ -53,14 +49,20 @@ import type {
  * the migration's own highest-risk item — smoke-test before trusting it.
  */
 
-const THREAD_EXPORT_VERSION = 1 as const;
+const THREAD_EXPORT_VERSION = 2 as const;
 
 const STORAGE_PREFIX = 'ai-conversation:threads';
 
+/** Threads written to localStorage before Phase 20 have flat
+ * `ChatMessage[]`-shaped `messages` — migrate each one on load. See
+ * `migrateThreadMessages`'s doc comment for why this is safe to do
+ * per-thread without a version marker. */
 function loadThreads(userId: string): Thread[] {
   try {
     const raw = localStorage.getItem(`${STORAGE_PREFIX}:${userId}`);
-    return raw ? (JSON.parse(raw) as Thread[]) : [];
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as Array<Thread & { messages: unknown }>;
+    return parsed.map(t => ({ ...t, messages: migrateThreadMessages(t.messages) }));
   } catch {
     return [];
   }
@@ -78,7 +80,10 @@ function genId(): string {
   return `t_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function findQuestionFor(messages: ChatMessage[], messageId: string): ChatMessage | undefined {
+function findQuestionFor(
+  messages: AiConversationUIMessage[],
+  messageId: string,
+): AiConversationUIMessage | undefined {
   const idx = messages.findIndex(m => m.id === messageId);
   if (idx <= 0) return undefined;
   return messages[idx - 1];
@@ -199,7 +204,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
   // SDK reinitializes its internal Chat when the user switches threads.
   const chat = useAiSdkChat<AiConversationUIMessage>({
     id: activeThread?.id ?? 'no-active-thread',
-    messages: activeThread ? chatMessagesToUIMessages(activeThread.messages) : [],
+    messages: activeThread?.messages ?? [],
     transport,
     onData: dataPart => {
       if (!activeThread) return;
@@ -247,31 +252,39 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
   });
 
   // Mirrors the live SDK engine's messages back into Thread.messages, so
-  // the rest of the app (sidebar previews, persistence, export) keeps
-  // reading the same ChatMessage[] shape it always has. Only one engine is
-  // "live" for the active thread at a time, gated by thread.mode.
+  // the rest of the app (sidebar previews, persistence, export) has a
+  // stable place to read from. Only one engine is "live" for the active
+  // thread at a time, gated by thread.mode.
   useEffect(() => {
     if (!activeThread || isCompareThread) return;
     const threadId = activeThread.id;
-    const flat = uiMessagesToChatMessages(chat.messages);
     setThreads(prev =>
-      prev.map(t => (t.id === threadId ? { ...t, messages: flat, updatedAt: Date.now() } : t)),
+      prev.map(t => (t.id === threadId ? { ...t, messages: chat.messages, updatedAt: Date.now() } : t)),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chat.messages, isCompareThread]);
 
-  const compareTurnRef = useRef<{ threadId: string; turnId: string; prefix: ChatMessage[] } | null>(
-    null,
-  );
+  const compareTurnRef = useRef<{
+    threadId: string;
+    turnId: string;
+    prefix: AiConversationUIMessage[];
+  } | null>(null);
 
   useEffect(() => {
     if (!activeThread || !isCompareThread) return;
     const turn = compareTurnRef.current;
     if (!turn || turn.threadId !== activeThread.id || compareChat.columns.length === 0) return;
-    const assistantMsgs: ChatMessage[] = compareChat.columns.map(col => {
+    const assistantMsgs: AiConversationUIMessage[] = compareChat.columns.map(col => {
       const last = col.messages[col.messages.length - 1];
-      const base = last ? uiMessageToChatMessage(last) : { id: genId(), role: 'assistant' as const, content: '' };
-      return { ...base, turnId: turn.turnId, compareModel: col.model };
+      const base: AiConversationUIMessage = last ?? {
+        id: genId(),
+        role: 'assistant',
+        parts: [],
+      };
+      return {
+        ...base,
+        metadata: { ...base.metadata, turnId: turn.turnId, compareModel: col.model },
+      };
     });
     const threadId = activeThread.id;
     setThreads(prev =>
@@ -445,7 +458,11 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
 
   // Shared core for sendMessage/regenerateFrom/editAndResend — single mode.
   const runSend = useCallback(
-    (text: string, baseMessages: ChatMessage[], attachedUrl?: { url: string; title: string }) => {
+    (
+      text: string,
+      baseMessages: AiConversationUIMessage[],
+      attachedUrl?: { url: string; title: string },
+    ) => {
       if (!text.trim() || !activeThread || !keyToken) return;
 
       setError(null);
@@ -476,7 +493,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
         ),
       );
 
-      chat.setMessages(chatMessagesToUIMessages(baseMessages));
+      chat.setMessages(baseMessages);
       chat
         .sendMessage(
           { text, metadata: { attachedUrl } },
@@ -504,7 +521,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
   const runCompareSend = useCallback(
     (
       text: string,
-      baseMessages: ChatMessage[],
+      baseMessages: AiConversationUIMessage[],
       models: string[],
       attachedUrl?: { url: string; title: string },
     ) => {
@@ -514,7 +531,12 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
       setCitations([]);
 
       const turnId = genId();
-      const userMsg: ChatMessage = { id: genId(), role: 'user', content: text, attachedUrl, turnId };
+      const userMsg: AiConversationUIMessage = {
+        id: genId(),
+        role: 'user',
+        metadata: { attachedUrl, turnId },
+        parts: [{ type: 'text', text }],
+      };
       const threadId = activeThread.id;
 
       compareTurnRef.current = { threadId, turnId, prefix: [...baseMessages, userMsg] };
@@ -544,8 +566,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
         ),
       );
 
-      const uiBaseMessages = [...chatMessagesToUIMessages(baseMessages), chatMessageToUIMessage(userMsg)];
-      compareChat.sendToAll(models, uiBaseMessages);
+      compareChat.sendToAll(models, [...baseMessages, userMsg]);
     },
     [
       activeThread,
@@ -670,7 +691,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
     }
     const payload = parsed as { version?: unknown; thread?: Partial<Thread> };
     if (
-      payload?.version !== THREAD_EXPORT_VERSION ||
+      (payload?.version !== 1 && payload?.version !== THREAD_EXPORT_VERSION) ||
       !payload.thread ||
       typeof payload.thread.id !== 'string' ||
       !Array.isArray(payload.thread.messages)
@@ -678,10 +699,13 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
       throw new Error('Unrecognized thread export format');
     }
     const src = payload.thread;
+    // Version-1 exports have flat ChatMessage[]-shaped messages — same
+    // migration used for legacy localStorage/server data (see
+    // migrateThreadMessages). Version-2 exports pass through unchanged.
     const imported: Thread = {
       id: genId(),
       title: typeof src.title === 'string' ? src.title : 'Imported chat',
-      messages: src.messages as ChatMessage[],
+      messages: migrateThreadMessages(src.messages),
       model: typeof src.model === 'string' ? src.model : '',
       vectorStoreIds: Array.isArray(src.vectorStoreIds) ? src.vectorStoreIds : [],
       personaId: typeof src.personaId === 'string' ? src.personaId : '',
@@ -713,7 +737,9 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
             ? t
             : {
                 ...t,
-                messages: t.messages.map(m => (m.id === messageId ? { ...m, feedback: vote } : m)),
+                messages: t.messages.map(m =>
+                  m.id === messageId ? { ...m, metadata: { ...m.metadata, feedback: vote } } : m,
+                ),
               },
         ),
       );
@@ -723,8 +749,8 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
           threadId,
           messageId,
           vote,
-          question: question?.content ?? '',
-          answer: message.content,
+          question: question ? extractText(question) : '',
+          answer: extractText(message),
           model: activeThread.model,
           personaId: activeThread.personaId || undefined,
           vectorStoreIds: activeThread.vectorStoreIds,

@@ -1,7 +1,8 @@
-import type { ChatMessage } from '../types';
+import type { AiConversationUIMessage } from '../types';
+import { extractText } from './messageShape';
 
 export interface RegenerateTarget {
-  baseMessages: ChatMessage[];
+  baseMessages: AiConversationUIMessage[];
   text: string;
   /** Whether this target participated in a compare-mode turn — an
    * assistant message only counts if it actually carries a compareModel
@@ -22,9 +23,16 @@ export interface RegenerateTarget {
  *   unset — threads created before turnId existed), truncate up to
  *   (excluding) that user message, resend its content — the reply and
  *   anything after it is dropped and reproduced fresh.
+ *
+ * Deliberately NOT delegated to the AI SDK's own `regenerate()` — this
+ * exact inclusive/exclusive truncation contract is proven and unit tested,
+ * and the migration doc flags regenerate/edit-resend as needing *exact*
+ * parity, not approximate parity, which isn't something that could be
+ * verified against the SDK's own behavior without a live backend. See
+ * `useThreads.ts`'s module comment.
  */
 export function computeRegenerateTarget(
-  messages: ChatMessage[],
+  messages: AiConversationUIMessage[],
   messageId: string,
 ): RegenerateTarget | null {
   const idx = messages.findIndex(m => m.id === messageId);
@@ -32,14 +40,18 @@ export function computeRegenerateTarget(
   const target = messages[idx];
 
   if (target.role === 'user') {
-    return { baseMessages: messages.slice(0, idx), text: target.content, isCompareEligible: true };
+    return {
+      baseMessages: messages.slice(0, idx),
+      text: extractText(target),
+      isCompareEligible: true,
+    };
   }
 
-  const turnId = target.turnId;
+  const turnId = target.metadata?.turnId;
   let userIdx = idx - 1;
   while (
     userIdx >= 0 &&
-    !(messages[userIdx].role === 'user' && (!turnId || messages[userIdx].turnId === turnId))
+    !(messages[userIdx].role === 'user' && (!turnId || messages[userIdx].metadata?.turnId === turnId))
   ) {
     userIdx -= 1;
   }
@@ -47,19 +59,22 @@ export function computeRegenerateTarget(
 
   return {
     baseMessages: messages.slice(0, userIdx),
-    text: messages[userIdx].content,
-    isCompareEligible: !!target.compareModel,
+    text: extractText(messages[userIdx]),
+    isCompareEligible: !!target.metadata?.compareModel,
   };
 }
 
 export interface EditTarget {
-  baseMessages: ChatMessage[];
+  baseMessages: AiConversationUIMessage[];
 }
 
 /** Pure truncation logic behind editAndResend: the target must be a user
  * message; returns the slice to resend against (excluding that message and
  * everything after it), or null if the target isn't a user message. */
-export function computeEditTarget(messages: ChatMessage[], messageId: string): EditTarget | null {
+export function computeEditTarget(
+  messages: AiConversationUIMessage[],
+  messageId: string,
+): EditTarget | null {
   const idx = messages.findIndex(m => m.id === messageId);
   if (idx === -1 || messages[idx].role !== 'user') return null;
   return { baseMessages: messages.slice(0, idx) };

@@ -2,10 +2,10 @@ import React from 'react';
 import { Box, Typography } from '@mui/material';
 import { AssistantMessage } from './AssistantMessage';
 import { UserMessage } from './UserMessage';
-import type { ChatMessage } from '../types';
+import type { AiConversationUIMessage } from '../types';
 
 export interface MessageListProps {
-  messages: ChatMessage[];
+  messages: AiConversationUIMessage[];
   streamingMessageIds: Set<string>;
   avatarLabel?: string;
   onFeedback?: (messageId: string, vote: 'up' | 'down') => void;
@@ -14,15 +14,15 @@ export interface MessageListProps {
 }
 
 interface MessageGroup {
-  user?: ChatMessage;
-  assistants: ChatMessage[];
+  user?: AiConversationUIMessage;
+  assistants: AiConversationUIMessage[];
 }
 
 // Groups messages into turns — a user message plus the assistant reply(ies)
 // that immediately follow it. In compare mode a turn has several assistant
 // messages (one per model, sharing turnId) and renders as side-by-side
 // columns instead of a single stacked reply.
-function groupMessages(messages: ChatMessage[]): MessageGroup[] {
+function groupMessages(messages: AiConversationUIMessage[]): MessageGroup[] {
   const groups: MessageGroup[] = [];
   let current: MessageGroup | null = null;
   for (const m of messages) {
@@ -69,15 +69,15 @@ export const MessageList: React.FC<MessageListProps> = ({
             <Box sx={{ display: 'flex', gap: 1.5, overflowX: 'auto', width: '100%' }}>
               {group.assistants.map(msg => (
                 <Box key={msg.id} sx={{ flex: '1 1 320px', minWidth: 280, maxWidth: 'none' }}>
-                  {msg.compareModel && (
+                  {msg.metadata?.compareModel && (
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.25 }}>
-                      {msg.compareModel}
+                      {msg.metadata.compareModel}
                     </Typography>
                   )}
                   <AssistantMessage
                     message={msg}
                     isStreaming={streamingMessageIds.has(msg.id)}
-                    avatarLabel={msg.compareModel ?? avatarLabel}
+                    avatarLabel={msg.metadata?.compareModel ?? avatarLabel}
                     onFeedback={onFeedback}
                     onRegenerate={onRegenerate}
                   />

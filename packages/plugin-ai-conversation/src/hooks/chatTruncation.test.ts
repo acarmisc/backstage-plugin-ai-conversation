@@ -1,22 +1,33 @@
 import { computeRegenerateTarget, computeEditTarget } from './chatTruncation';
-import type { ChatMessage } from '../types';
+import type { AiConversationUIMessage } from '../types';
 
-function msg(partial: Partial<ChatMessage> & Pick<ChatMessage, 'id' | 'role' | 'content'>): ChatMessage {
-  return partial;
+function msg(opts: {
+  id: string;
+  role: 'user' | 'assistant';
+  text: string;
+  turnId?: string;
+  compareModel?: string;
+}): AiConversationUIMessage {
+  return {
+    id: opts.id,
+    role: opts.role,
+    parts: [{ type: 'text', text: opts.text }],
+    metadata: { turnId: opts.turnId, compareModel: opts.compareModel },
+  };
 }
 
 describe('computeRegenerateTarget', () => {
   it('returns null for an unknown message id', () => {
-    const messages = [msg({ id: 'u1', role: 'user', content: 'hi' })];
+    const messages = [msg({ id: 'u1', role: 'user', text: 'hi' })];
     expect(computeRegenerateTarget(messages, 'missing')).toBeNull();
   });
 
   it('truncates through (inclusive) a user message target and resends its content', () => {
-    const messages: ChatMessage[] = [
-      msg({ id: 'u1', role: 'user', content: 'first' }),
-      msg({ id: 'a1', role: 'assistant', content: 'reply 1' }),
-      msg({ id: 'u2', role: 'user', content: 'second' }),
-      msg({ id: 'a2', role: 'assistant', content: 'reply 2' }),
+    const messages: AiConversationUIMessage[] = [
+      msg({ id: 'u1', role: 'user', text: 'first' }),
+      msg({ id: 'a1', role: 'assistant', text: 'reply 1' }),
+      msg({ id: 'u2', role: 'user', text: 'second' }),
+      msg({ id: 'a2', role: 'assistant', text: 'reply 2' }),
     ];
     const target = computeRegenerateTarget(messages, 'u2');
     expect(target).not.toBeNull();
@@ -26,11 +37,11 @@ describe('computeRegenerateTarget', () => {
   });
 
   it('truncates through (exclusive) an assistant message target, keeping its preceding user message out of baseMessages and resending its content', () => {
-    const messages: ChatMessage[] = [
-      msg({ id: 'u1', role: 'user', content: 'first' }),
-      msg({ id: 'a1', role: 'assistant', content: 'reply 1' }),
-      msg({ id: 'u2', role: 'user', content: 'second' }),
-      msg({ id: 'a2', role: 'assistant', content: 'reply 2' }),
+    const messages: AiConversationUIMessage[] = [
+      msg({ id: 'u1', role: 'user', text: 'first' }),
+      msg({ id: 'a1', role: 'assistant', text: 'reply 1' }),
+      msg({ id: 'u2', role: 'user', text: 'second' }),
+      msg({ id: 'a2', role: 'assistant', text: 'reply 2' }),
     ];
     const target = computeRegenerateTarget(messages, 'a2');
     expect(target).not.toBeNull();
@@ -39,10 +50,10 @@ describe('computeRegenerateTarget', () => {
   });
 
   it('walks back to the user message sharing turnId, skipping other compare-mode assistant columns', () => {
-    const messages: ChatMessage[] = [
-      msg({ id: 'u1', role: 'user', content: 'compare this' , turnId: 't1' }),
-      msg({ id: 'a1', role: 'assistant', content: 'model A reply', turnId: 't1', compareModel: 'model-a' }),
-      msg({ id: 'a2', role: 'assistant', content: 'model B reply', turnId: 't1', compareModel: 'model-b' }),
+    const messages: AiConversationUIMessage[] = [
+      msg({ id: 'u1', role: 'user', text: 'compare this', turnId: 't1' }),
+      msg({ id: 'a1', role: 'assistant', text: 'model A reply', turnId: 't1', compareModel: 'model-a' }),
+      msg({ id: 'a2', role: 'assistant', text: 'model B reply', turnId: 't1', compareModel: 'model-b' }),
     ];
     const target = computeRegenerateTarget(messages, 'a2');
     expect(target).not.toBeNull();
@@ -52,27 +63,27 @@ describe('computeRegenerateTarget', () => {
   });
 
   it('marks a plain (non-compare) assistant target as not compare-eligible', () => {
-    const messages: ChatMessage[] = [
-      msg({ id: 'u1', role: 'user', content: 'hello' }),
-      msg({ id: 'a1', role: 'assistant', content: 'hi there' }),
+    const messages: AiConversationUIMessage[] = [
+      msg({ id: 'u1', role: 'user', text: 'hello' }),
+      msg({ id: 'a1', role: 'assistant', text: 'hi there' }),
     ];
     const target = computeRegenerateTarget(messages, 'a1');
     expect(target!.isCompareEligible).toBe(false);
   });
 
   it('returns null when an assistant message has no preceding user message', () => {
-    const messages: ChatMessage[] = [msg({ id: 'a1', role: 'assistant', content: 'orphan reply' })];
+    const messages: AiConversationUIMessage[] = [msg({ id: 'a1', role: 'assistant', text: 'orphan reply' })];
     expect(computeRegenerateTarget(messages, 'a1')).toBeNull();
   });
 });
 
 describe('computeEditTarget', () => {
   it('truncates through (inclusive) the edited user message', () => {
-    const messages: ChatMessage[] = [
-      msg({ id: 'u1', role: 'user', content: 'first' }),
-      msg({ id: 'a1', role: 'assistant', content: 'reply 1' }),
-      msg({ id: 'u2', role: 'user', content: 'second' }),
-      msg({ id: 'a2', role: 'assistant', content: 'reply 2' }),
+    const messages: AiConversationUIMessage[] = [
+      msg({ id: 'u1', role: 'user', text: 'first' }),
+      msg({ id: 'a1', role: 'assistant', text: 'reply 1' }),
+      msg({ id: 'u2', role: 'user', text: 'second' }),
+      msg({ id: 'a2', role: 'assistant', text: 'reply 2' }),
     ];
     const target = computeEditTarget(messages, 'u2');
     expect(target).not.toBeNull();
@@ -80,15 +91,15 @@ describe('computeEditTarget', () => {
   });
 
   it('returns null when the target is an assistant message', () => {
-    const messages: ChatMessage[] = [
-      msg({ id: 'u1', role: 'user', content: 'first' }),
-      msg({ id: 'a1', role: 'assistant', content: 'reply 1' }),
+    const messages: AiConversationUIMessage[] = [
+      msg({ id: 'u1', role: 'user', text: 'first' }),
+      msg({ id: 'a1', role: 'assistant', text: 'reply 1' }),
     ];
     expect(computeEditTarget(messages, 'a1')).toBeNull();
   });
 
   it('returns null for an unknown message id', () => {
-    const messages: ChatMessage[] = [msg({ id: 'u1', role: 'user', content: 'first' })];
+    const messages: AiConversationUIMessage[] = [msg({ id: 'u1', role: 'user', text: 'first' })];
     expect(computeEditTarget(messages, 'missing')).toBeNull();
   });
 });

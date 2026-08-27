@@ -1,5 +1,5 @@
 import { FetchApi } from '@backstage/core-plugin-api';
-import type { VectorStore, Persona, ChatRequest, ChatFeedbackRequest, ChatStreamChunk, ChatResult, ChatConfig, ChatTraits, KeySpend, UrlContextPreview, FeedbackSummary, UsageSummaryRow, PersistedThread, Thread } from './types';
+import type { VectorStore, Persona, ChatRequest, ChatFeedbackRequest, ChatResult, ChatConfig, ChatTraits, KeySpend, UrlContextPreview, FeedbackSummary, UsageSummaryRow, PersistedThread, Thread } from './types';
 export interface AiConversationApiInterface {
     listVectorStores(): Promise<VectorStore[]>;
     listPersonas(): Promise<Persona[]>;
@@ -11,7 +11,6 @@ export interface AiConversationApiInterface {
         model?: string;
     }): Promise<FeedbackSummary>;
     getUsageSummary(groupBy: 'persona' | 'model', range?: string): Promise<UsageSummaryRow[]>;
-    chatStream(req: ChatRequest, onToken: (chunk: ChatStreamChunk) => void, onDone: () => void, onError: (err: Error) => void): AbortController;
     chatCompletions(req: ChatRequest): Promise<ChatResult>;
     mintChatKey(opts?: {
         models?: string[];
@@ -48,7 +47,6 @@ export declare class AiConversationApi implements AiConversationApiInterface {
         model?: string;
     }): Promise<FeedbackSummary>;
     getUsageSummary(groupBy: 'persona' | 'model', range?: string): Promise<UsageSummaryRow[]>;
-    chatStream(req: ChatRequest, onToken: (chunk: ChatStreamChunk) => void, onDone: () => void, onError: (err: Error) => void): AbortController;
     chatCompletions(req: ChatRequest): Promise<ChatResult>;
     mintChatKey(opts?: {
         models?: string[];

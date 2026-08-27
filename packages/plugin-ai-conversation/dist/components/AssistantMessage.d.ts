@@ -1,7 +1,7 @@
 import React from 'react';
-import type { ChatMessage } from '../types';
+import type { AiConversationUIMessage } from '../types';
 export interface AssistantMessageProps {
-    message: ChatMessage;
+    message: AiConversationUIMessage;
     isStreaming: boolean;
     avatarLabel?: string;
     onFeedback?: (messageId: string, vote: 'up' | 'down') => void;

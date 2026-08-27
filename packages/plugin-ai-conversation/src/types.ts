@@ -1,3 +1,5 @@
+import type { UIMessage } from 'ai';
+
 export interface VectorStore {
   id: string;
   name: string;
@@ -21,6 +23,15 @@ export interface Persona {
   tags?: string[];
 }
 
+/**
+ * Legacy flat-content message shape. Still used by `ChatRequest` (the old
+ * `/chat/stream` and `/chat/completions` REST calls in api.ts, which stay
+ * exactly as they were — see stream.ts on the backend, untouched by the
+ * AI SDK migration) and by `threadPersistence.ts`'s migration function as
+ * the "old shape" it converts *from*. `Thread.messages` itself moved to
+ * `AiConversationUIMessage[]` (HANDOFF-ai-sdk-migration.md Phase 20) — see
+ * that type below.
+ */
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
@@ -38,6 +49,26 @@ export interface ChatMessage {
    * Thread.compareModels generated this particular reply. */
   compareModel?: string;
 }
+
+/**
+ * Custom metadata carried on every `AiConversationUIMessage` — the fields
+ * `ChatMessage` used to carry as top-level properties, now on
+ * `UIMessage.metadata` since `UIMessage`'s own shape is fixed
+ * (id/role/parts). `turnId`/`compareModel` only matter for compare mode's
+ * column grouping (see `useCompareChat.ts`); `feedback`/`attachedUrl`
+ * apply to any message.
+ */
+export interface AiConversationMessageMetadata {
+  feedback?: 'up' | 'down';
+  attachedUrl?: { url: string; title: string };
+  turnId?: string;
+  compareModel?: string;
+}
+
+/** The AI SDK's `UIMessage`, parameterized with this plugin's metadata
+ * shape. This is what `Thread.messages` is made of (Phase 20) and what
+ * `@ai-sdk/react`'s `useChat`/`Chat` instances operate on directly. */
+export type AiConversationUIMessage = UIMessage<AiConversationMessageMetadata>;
 
 export interface UrlContextPreview {
   url: string;
@@ -194,7 +225,7 @@ export interface UsageSummaryRow {
 export interface Thread {
   id: string;
   title: string;
-  messages: ChatMessage[];
+  messages: AiConversationUIMessage[];
   model: string;
   vectorStoreIds: string[];
   personaId: string;
@@ -220,8 +251,20 @@ export interface Thread {
 
 /** Portable export shape written by exportThread() / read by importThread().
  * Deliberately excludes keyToken/keyAlias — a chat key is a live credential
- * scoped to its minting user and must never be written to a shared file. */
+ * scoped to its minting user and must never be written to a shared file.
+ *
+ * Version 2 (Phase 20): `thread.messages` is `AiConversationUIMessage[]`
+ * instead of the old flat `ChatMessage[]`. `importThread` still accepts a
+ * version-1 export and migrates it on the fly — see
+ * `threadPersistence.ts`'s `migrateChatMessagesToUIMessages`. */
 export interface ThreadExport {
-  version: 1;
-  thread: Omit<Thread, 'keyToken' | 'keyAlias'>;
+  version: 1 | 2;
+  thread: Omit<Thread, 'keyToken' | 'keyAlias'> | LegacyThreadV1;
 }
+
+/** Shape of a version-1 export's `thread` field — `Thread` but with the
+ * old flat-content `messages: ChatMessage[]`. Only used as the migration
+ * function's input type. */
+export type LegacyThreadV1 = Omit<Thread, 'keyToken' | 'keyAlias' | 'messages'> & {
+  messages: ChatMessage[];
+};
