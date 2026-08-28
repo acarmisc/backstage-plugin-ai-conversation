@@ -128,6 +128,11 @@ export const ChatPage: React.FC = () => {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const attachInputRef = useRef<HTMLInputElement>(null);
+  const pendingSendRef = useRef<{
+    text: string;
+    attachedUrl?: { url: string; title: string };
+    files?: FileUIPart[];
+  } | null>(null);
 
   useEffect(() => {
     injectDesignSystemAssets();
@@ -194,6 +199,20 @@ export const ChatPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeThreadId]);
 
+  // Fires a message queued by handleSend() when it had to create a new
+  // thread first — chat.newThread()'s setState is async, so chat.sendMessage
+  // (bound to the pre-creation, still-null activeThread) can't be called in
+  // the same tick. Waiting for activeThreadId to actually change and sending
+  // from here (against the freshly re-rendered `chat`) avoids the no-op that
+  // a same-tick or requestAnimationFrame call would silently hit.
+  useEffect(() => {
+    if (!pendingSendRef.current || !activeThreadId) return;
+    const pending = pendingSendRef.current;
+    pendingSendRef.current = null;
+    chat.sendMessage(pending.text, pending.attachedUrl, undefined, pending.files);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeThreadId]);
+
   // Auto-scroll to bottom when messages update or streaming.
   const messages = useMemo(() => chat.activeThread?.messages ?? [], [
     chat.activeThread,
@@ -243,9 +262,14 @@ export const ChatPage: React.FC = () => {
 
   const handlePersonaChange = (id: string, persona: Persona | undefined) => {
     setPersonaId(id);
-    if (persona?.defaultModel) setModel(persona.defaultModel);
-    if (persona?.defaultVectorStoreIds) {
-      setVectorStoreIds(persona.defaultVectorStoreIds);
+    // Only prefill from the persona's defaults when starting a fresh thread
+    // — once a conversation is underway, switching persona in Settings
+    // shouldn't silently overwrite a model the user already picked.
+    if (messages.length === 0) {
+      if (persona?.defaultModel) setModel(persona.defaultModel);
+      if (persona?.defaultVectorStoreIds) {
+        setVectorStoreIds(persona.defaultVectorStoreIds);
+      }
     }
   };
 
@@ -270,8 +294,14 @@ export const ChatPage: React.FC = () => {
         : undefined;
     const files = stagedFiles.length > 0 ? stagedFiles : undefined;
     if (!chat.activeThread) {
-      chat.newThread();
-      requestAnimationFrame(() => chat.sendMessage(text, attachedUrl, undefined, files));
+      // No "New chat" click required — just typing and sending starts one.
+      // newThread()'s setState is async, so the actual send is queued and
+      // fired by the activeThreadId effect once the new thread is live.
+      // currentKey is passed explicitly since it may have just been minted
+      // above — chat.newThread's own keyAlias/keyToken closure predates that
+      // mint and would otherwise bake in a stale empty key.
+      pendingSendRef.current = { text, attachedUrl, files };
+      chat.newThread(currentKey);
     } else {
       chat.sendMessage(text, attachedUrl, undefined, files);
     }
@@ -427,7 +457,7 @@ export const ChatPage: React.FC = () => {
         {sidebarCollapsed ? (
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, pt: 1 }}>
             <Tooltip title="New chat" placement="right">
-              <IconButton onClick={chat.newThread}>
+              <IconButton onClick={() => chat.newThread()}>
                 <AddIcon />
               </IconButton>
             </Tooltip>
@@ -462,6 +492,8 @@ export const ChatPage: React.FC = () => {
               onModelChange={setModel}
               vectorStoreIds={vectorStoreIds}
               onVectorStoreIdsChange={setVectorStoreIds}
+              webSearch={webSearch}
+              onWebSearchChange={setWebSearch}
               verbosityId={verbosityId}
               onVerbosityChange={setVerbosityId}
               reasoningEffort={reasoningEffort}
@@ -476,7 +508,7 @@ export const ChatPage: React.FC = () => {
                 fullWidth
                 variant="outlined"
                 startIcon={<AddIcon />}
-                onClick={chat.newThread}
+                onClick={() => chat.newThread()}
                 size="small"
               >
                 New chat

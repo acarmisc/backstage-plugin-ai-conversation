@@ -167,7 +167,6 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
         gap: 1,
         alignSelf: 'flex-start',
         maxWidth: '85%',
-        '&:hover .litellm-actions': { opacity: 1 },
       }}
     >
       <PersonaAvatar label={avatarLabel.slice(0, 2).toUpperCase()} isStreaming={isStreaming} size={28} />
@@ -193,7 +192,7 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
         {showActions && (
           <Box
             className="litellm-actions"
-            sx={{ display: 'flex', gap: 0.25, mt: 0.25, opacity: 0, transition: 'opacity 0.15s' }}
+            sx={{ display: 'flex', gap: 0.25, mt: 0.25 }}
           >
             {onFeedback && (
               <>

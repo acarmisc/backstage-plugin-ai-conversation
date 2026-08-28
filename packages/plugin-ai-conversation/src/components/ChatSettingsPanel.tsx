@@ -7,6 +7,8 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  Switch,
+  FormControlLabel,
 } from '@mui/material';
 import SettingsIcon from '@mui/icons-material/Settings';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -44,6 +46,8 @@ export interface ChatSettingsPanelProps {
   onModelChange: (model: string) => void;
   vectorStoreIds: string[];
   onVectorStoreIdsChange: (ids: string[]) => void;
+  webSearch: boolean;
+  onWebSearchChange: (enabled: boolean) => void;
   verbosityId: string;
   onVerbosityChange: (id: string) => void;
   reasoningEffort: ReasoningEffort | '';
@@ -81,6 +85,8 @@ export const ChatSettingsPanel: React.FC<ChatSettingsPanelProps> = ({
   onModelChange,
   vectorStoreIds,
   onVectorStoreIdsChange,
+  webSearch,
+  onWebSearchChange,
   verbosityId,
   onVerbosityChange,
   reasoningEffort,
@@ -190,6 +196,16 @@ export const ChatSettingsPanel: React.FC<ChatSettingsPanelProps> = ({
             value={vectorStoreIds}
             onChange={onVectorStoreIdsChange}
             defaultVectorStoreIds={config.defaultVectorStoreIds}
+          />
+          <FormControlLabel
+            control={
+              <Switch
+                size="small"
+                checked={webSearch}
+                onChange={e => onWebSearchChange(e.target.checked)}
+              />
+            }
+            label={<Typography variant="body2">Include web search</Typography>}
           />
         </Box>
       </Box>

@@ -81,6 +81,15 @@ function genId(): string {
   return `t_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/** Entries from `incoming` not already present (by id) in `prev` — shared by
+ * every effect that merges a second source of threads (userId-keyed
+ * localStorage, server persistence) into local state without clobbering or
+ * duplicating anything already loaded. */
+function newThreadsOnly(prev: Thread[], incoming: Thread[]): Thread[] {
+  const existingIds = new Set(prev.map(t => t.id));
+  return incoming.filter(t => !existingIds.has(t.id));
+}
+
 function findQuestionFor(
   messages: AiConversationUIMessage[],
   messageId: string,
@@ -112,7 +121,7 @@ export interface UseChatOptions {
 export interface UseChatResult {
   threads: Thread[];
   activeThread: Thread | null;
-  newThread: () => void;
+  newThread: (overrideKey?: { alias: string; token: string }) => void;
   selectThread: (id: string) => void;
   deleteThread: (id: string) => void;
   sendMessage: (
@@ -161,6 +170,26 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
   const [error, setError] = useState<string | null>(null);
   const [citations, setCitations] = useState<Citation[]>([]);
   const [keySpend, setKeySpend] = useState<KeySpend | null>(null);
+
+  // `userId` starts as the 'default' placeholder and only resolves to the
+  // real identity (e.g. 'oidc') asynchronously, after this hook has already
+  // mounted and loaded threads for the placeholder key. Without this, every
+  // reload reads the wrong localStorage bucket and the sidebar looks empty
+  // until a new message is sent (which saves — but never loads — under the
+  // resolved key). Re-load once userId settles and merge in anything found,
+  // rather than replacing state and risking dropping an in-flight thread.
+  const loadedUserIdRef = useRef(userId);
+  useEffect(() => {
+    if (userId === loadedUserIdRef.current) return;
+    loadedUserIdRef.current = userId;
+    const stored = loadThreads(userId);
+    if (stored.length === 0) return;
+    setThreads(prev => {
+      const fresh = newThreadsOnly(prev, stored);
+      return fresh.length ? [...prev, ...fresh] : prev;
+    });
+    setActiveId(prev => prev ?? stored[0]?.id ?? null);
+  }, [userId]);
 
   const activeThread = threads.find(t => t.id === activeId) ?? null;
   const isCompareThread = activeThread?.mode === 'compare';
@@ -364,8 +393,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
         .then(persisted => {
           if (cancelled) return;
           setThreads(prev => {
-            const localIds = new Set(prev.map(t => t.id));
-            const fresh = persisted.map(fromPersisted).filter(t => !localIds.has(t.id));
+            const fresh = newThreadsOnly(prev, persisted.map(fromPersisted));
             return fresh.length ? [...fresh, ...prev] : prev;
           });
         })
@@ -401,29 +429,40 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [keyToken, activeId, persistenceEnabled, api]);
 
-  const newThread = useCallback(() => {
-    const thread: Thread = {
-      id: genId(),
-      title: 'New chat',
-      messages: [],
-      model,
-      vectorStoreIds,
-      personaId,
-      customSystemPrompt,
-      keyAlias,
-      keyToken,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      totalTokens: 0,
-      lastTurnUsage: null,
-    };
-    setThreads(prev => [thread, ...prev]);
-    setActiveId(thread.id);
-    setError(null);
-    setCitations([]);
-    setKeySpend(null);
-    compareChat.reset();
-  }, [model, vectorStoreIds, personaId, customSystemPrompt, keyAlias, keyToken, compareChat]);
+  const newThread = useCallback(
+    // `overrideKey` lets a caller that just minted a key hand it in directly,
+    // instead of relying on this callback's own `keyAlias`/`keyToken`
+    // closure — which is stale immediately after an async mint (the caller
+    // awaited chatApi.mintChatKey() and called setKeyVal(), but this
+    // useCallback instance was still built from the pre-mint render). Baking
+    // in a stale empty key here meant the "restore thread settings" effect
+    // read it straight back onto keyVal on the next render, wiping out the
+    // just-minted key before the second message could use it.
+    (overrideKey?: { alias: string; token: string }) => {
+      const thread: Thread = {
+        id: genId(),
+        title: 'New chat',
+        messages: [],
+        model,
+        vectorStoreIds,
+        personaId,
+        customSystemPrompt,
+        keyAlias: overrideKey?.alias ?? keyAlias,
+        keyToken: overrideKey?.token ?? keyToken,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        totalTokens: 0,
+        lastTurnUsage: null,
+      };
+      setThreads(prev => [thread, ...prev]);
+      setActiveId(thread.id);
+      setError(null);
+      setCitations([]);
+      setKeySpend(null);
+      compareChat.reset();
+    },
+    [model, vectorStoreIds, personaId, customSystemPrompt, keyAlias, keyToken, compareChat],
+  );
 
   const selectThread = useCallback(
     (id: string) => {

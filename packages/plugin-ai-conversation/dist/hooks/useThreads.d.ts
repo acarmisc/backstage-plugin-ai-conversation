@@ -19,7 +19,10 @@ export interface UseChatOptions {
 export interface UseChatResult {
     threads: Thread[];
     activeThread: Thread | null;
-    newThread: () => void;
+    newThread: (overrideKey?: {
+        alias: string;
+        token: string;
+    }) => void;
     selectThread: (id: string) => void;
     deleteThread: (id: string) => void;
     sendMessage: (text: string, attachedUrl?: {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Typography, Chip, CircularProgress } from '@mui/material';
+import { Box, Typography, Chip, CircularProgress, Link } from '@mui/material';
 import PersonIcon from '@mui/icons-material/Person';
 import type { Persona } from '../types';
 
@@ -51,7 +51,16 @@ export const PersonaHomepage: React.FC<PersonaHomepageProps> = ({
       }}
     >
       <Typography variant="subtitle1" align="center" color="text.secondary">
-        Pick a persona to get started, or just start typing
+        Pick a persona to get started, or{' '}
+        <Link
+          component="button"
+          type="button"
+          underline="hover"
+          onClick={() => onSelect('', undefined)}
+        >
+          just start typing
+        </Link>{' '}
+        — a persona is optional.
       </Typography>
       <Box
         sx={{

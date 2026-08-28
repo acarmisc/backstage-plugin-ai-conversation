@@ -33,20 +33,27 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
         // rather than offer a model that always fails.
         const m = all.filter(x => !x.model_name.startsWith('claude'));
         setModels(m);
-        if (!value && m.length) {
-          const def =
-            (defaultModel && m.find(x => x.model_name === defaultModel)?.model_name) ||
-            m[0].model_name;
-          onChange(def);
-        }
       })
       .catch(err => {
         if (alive) setError(err.message ?? 'Failed to load models');
       })
       .finally(() => alive && setLoading(false));
     return () => { alive = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [liteLlmApi]);
+
+  // Separate from the fetch above: `defaultModel` (sourced from the backend's
+  // /config, itself from litellm.aiConversation.defaultModel in app-config)
+  // typically resolves after this component mounts. Selecting here — keyed
+  // on both `models` and `defaultModel` — means a late-arriving app-config
+  // default still wins, instead of being silently dropped by a mount-only
+  // effect that already picked models[0].
+  useEffect(() => {
+    if (value || models.length === 0) return;
+    const def =
+      (defaultModel && models.find(x => x.model_name === defaultModel)?.model_name) ||
+      models[0].model_name;
+    onChange(def);
+  }, [value, models, defaultModel, onChange]);
 
   return (
     <FormControl size="small" error={!!error} sx={{ minWidth: 200 }}>

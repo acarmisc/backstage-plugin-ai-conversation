@@ -91682,13 +91682,14 @@ async function createRouter(options) {
       const userId = (0, import_backstage_plugin_litellm_backend.toLiteLLMUserId)(tokenEntityRef, userIdDomain);
       const client = new import_backstage_plugin_litellm_backend.LiteLLMClient({ baseUrl: chatConfig.baseUrl, masterKey });
       const body = req.body ?? {};
-      const alias = `chat-${userId}-${Date.now()}`;
+      const entityName = tokenEntityRef.split("/").pop() ?? tokenEntityRef;
+      const alias = `chat-${entityName}-${Date.now()}`;
       const result = await client.generateKey({
         alias,
         models: body.models ?? [],
         max_budget: body.max_budget,
         user_id: userId,
-        duration: "24h",
+        duration: "3h",
         metadata: {
           created_via: "backstage-chat",
           created_by_backstage_user: tokenEntityRef
