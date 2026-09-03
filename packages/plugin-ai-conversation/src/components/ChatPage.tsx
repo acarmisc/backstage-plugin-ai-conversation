@@ -44,12 +44,11 @@ import { useThreads } from '../hooks/useThreads';
 import { extractText } from '../hooks/messageShape';
 import { injectDesignSystemAssets } from '../theme';
 import { ChatSettingsPanel } from './ChatSettingsPanel';
-import { PersonaHomepage } from './PersonaHomepage';
 import { MessageList } from './MessageList';
 import { ErrorBanner } from './ErrorBanner';
 import { SourcesPanel } from './SourcesPanel';
 import { UsagePanel } from './UsagePanel';
-import type { ChatConfig, ChatTraits, Persona, ReasoningEffort, Thread, UrlContextPreview } from '../types';
+import type { ChatConfig, ChatTraits, ReasoningEffort, Thread, UrlContextPreview } from '../types';
 
 const SIDEBAR_WIDTH = 280;
 const SIDEBAR_RAIL_WIDTH = 48;
@@ -92,7 +91,6 @@ export const ChatPage: React.FC = () => {
   const [model, setModel] = useState('');
   const [vectorStoreIds, setVectorStoreIds] = useState<string[]>([]);
   const [webSearch, setWebSearch] = useState(false);
-  const [personaId, setPersonaId] = useState('');
   const [customSystemPrompt, setCustomSystemPrompt] = useState('');
   const [toneId, setToneId] = useState('');
   const [focusId, setFocusId] = useState('');
@@ -105,9 +103,6 @@ export const ChatPage: React.FC = () => {
   const [showSettings, setShowSettings] = useState(true);
   const [input, setInput] = useState('');
   const [configError, setConfigError] = useState<string | null>(null);
-  const [personas, setPersonas] = useState<Persona[]>([]);
-  const [personasLoading, setPersonasLoading] = useState(true);
-  const [personasError, setPersonasError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [historyOpen, setHistoryOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -141,11 +136,6 @@ export const ChatPage: React.FC = () => {
       .then(setConfig)
       .catch(err => setConfigError(err.message ?? 'Failed to reach the chat backend'));
     chatApi
-      .listPersonas()
-      .then(setPersonas)
-      .catch(err => setPersonasError(err.message ?? 'Failed to load personas'))
-      .finally(() => setPersonasLoading(false));
-    chatApi
       .getChatTraits()
       .then(t => {
         setTraits(t);
@@ -166,7 +156,6 @@ export const ChatPage: React.FC = () => {
     userId,
     model,
     vectorStoreIds,
-    personaId,
     customSystemPrompt,
     toneId,
     focusId,
@@ -179,7 +168,7 @@ export const ChatPage: React.FC = () => {
     persistenceEnabled: config.persistence.enabled,
   });
 
-  // Restore the selected thread's own model/KBs/persona/key into Settings
+  // Restore the selected thread's own model/KBs/key into Settings
   // whenever the active thread changes — otherwise sending a message in an
   // older thread silently uses whatever is currently picked, not what that
   // conversation was built with.
@@ -188,7 +177,6 @@ export const ChatPage: React.FC = () => {
     if (!chat.activeThread) return;
     setModel(chat.activeThread.model);
     setVectorStoreIds(chat.activeThread.vectorStoreIds);
-    setPersonaId(chat.activeThread.personaId ?? '');
     setCustomSystemPrompt(chat.activeThread.customSystemPrompt ?? '');
     setToneId(chat.activeThread.toneId ?? '');
     setFocusId(chat.activeThread.focusId ?? '');
@@ -259,19 +247,6 @@ export const ChatPage: React.FC = () => {
     () => sortThreads(chat.threads.filter(t => threadMatchesQuery(t, searchQuery))),
     [chat.threads, searchQuery],
   );
-
-  const handlePersonaChange = (id: string, persona: Persona | undefined) => {
-    setPersonaId(id);
-    // Only prefill from the persona's defaults when starting a fresh thread
-    // — once a conversation is underway, switching persona in Settings
-    // shouldn't silently overwrite a model the user already picked.
-    if (messages.length === 0) {
-      if (persona?.defaultModel) setModel(persona.defaultModel);
-      if (persona?.defaultVectorStoreIds) {
-        setVectorStoreIds(persona.defaultVectorStoreIds);
-      }
-    }
-  };
 
   const handleSend = async () => {
     if (!input.trim() || isStreaming) return;
@@ -475,11 +450,6 @@ export const ChatPage: React.FC = () => {
               onToggleShowSettings={() => setShowSettings(v => !v)}
               configError={configError}
               config={config}
-              personas={personas}
-              personasLoading={personasLoading}
-              personasError={personasError}
-              personaId={personaId}
-              onPersonaChange={handlePersonaChange}
               traits={traits}
               traitsLoading={traitsLoading}
               toneId={toneId}
@@ -725,13 +695,9 @@ export const ChatPage: React.FC = () => {
             }}
           >
             {messages.length === 0 ? (
-              <PersonaHomepage
-                personas={personas}
-                loading={personasLoading}
-                error={personasError}
-                selectedId={personaId}
-                onSelect={handlePersonaChange}
-              />
+              <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Typography color="text.secondary">Start a conversation…</Typography>
+              </Box>
             ) : (
               <MessageList
                 messages={messages}

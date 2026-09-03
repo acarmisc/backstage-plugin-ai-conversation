@@ -1,7 +1,7 @@
 import { createApiRef, FetchApi } from '@backstage/core-plugin-api';
 import type {
   VectorStore,
-  Persona,
+  Skill,
   ChatRequest,
   ChatFeedbackRequest,
   ChatResult,
@@ -18,12 +18,12 @@ import { toSaveThreadBody } from './hooks/threadPersistence';
 
 export interface AiConversationApiInterface {
   listVectorStores(): Promise<VectorStore[]>;
-  listPersonas(): Promise<Persona[]>;
+  listSkills(): Promise<Skill[]>;
   getChatConfig(): Promise<ChatConfig>;
   getChatTraits(): Promise<ChatTraits>;
   fetchUrlContext(url: string): Promise<UrlContextPreview>;
-  getFeedbackSummary(filters?: { personaId?: string; model?: string }): Promise<FeedbackSummary>;
-  getUsageSummary(groupBy: 'persona' | 'model', range?: string): Promise<UsageSummaryRow[]>;
+  getFeedbackSummary(filters?: { skillId?: string; model?: string }): Promise<FeedbackSummary>;
+  getUsageSummary(groupBy: 'skill' | 'model', range?: string): Promise<UsageSummaryRow[]>;
   chatCompletions(req: ChatRequest): Promise<ChatResult>;
   mintChatKey(opts?: { models?: string[]; max_budget?: number }): Promise<ChatKey>;
   deleteChatKey(key: string): Promise<{ success: boolean }>;
@@ -60,9 +60,9 @@ export class AiConversationApi implements AiConversationApiInterface {
     return res.json();
   }
 
-  async listPersonas(): Promise<Persona[]> {
-    const res = await this.fetchApi.fetch(`${BASE_PATH}/personas`);
-    if (!res.ok) throw new Error(`personas ${res.status}`);
+  async listSkills(): Promise<Skill[]> {
+    const res = await this.fetchApi.fetch(`${BASE_PATH}/skills`);
+    if (!res.ok) throw new Error(`skills ${res.status}`);
     return res.json();
   }
 
@@ -108,9 +108,9 @@ export class AiConversationApi implements AiConversationApiInterface {
     return res.json();
   }
 
-  async getFeedbackSummary(filters?: { personaId?: string; model?: string }): Promise<FeedbackSummary> {
+  async getFeedbackSummary(filters?: { skillId?: string; model?: string }): Promise<FeedbackSummary> {
     const params = new URLSearchParams();
-    if (filters?.personaId) params.set('personaId', filters.personaId);
+    if (filters?.skillId) params.set('skillId', filters.skillId);
     if (filters?.model) params.set('model', filters.model);
     const qs = params.toString();
     const res = await this.fetchApi.fetch(`${BASE_PATH}/feedback/summary${qs ? `?${qs}` : ''}`);
@@ -118,7 +118,7 @@ export class AiConversationApi implements AiConversationApiInterface {
     return res.json();
   }
 
-  async getUsageSummary(groupBy: 'persona' | 'model', range = '30d'): Promise<UsageSummaryRow[]> {
+  async getUsageSummary(groupBy: 'skill' | 'model', range = '30d'): Promise<UsageSummaryRow[]> {
     const params = new URLSearchParams({ groupBy, range });
     const res = await this.fetchApi.fetch(`${BASE_PATH}/usage/summary?${params.toString()}`);
     if (!res.ok) throw new Error(`usage/summary ${res.status}`);

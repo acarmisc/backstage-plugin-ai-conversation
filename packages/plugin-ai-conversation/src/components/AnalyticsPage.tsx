@@ -25,7 +25,7 @@ const RANGES = [
 export const AnalyticsPage: React.FC = () => {
   const chatApi = useApi(aiConversationApiRef);
   const [range, setRange] = useState('30d');
-  const [byPersona, setByPersona] = useState<UsageSummaryRow[]>([]);
+  const [bySkill, setBySkill] = useState<UsageSummaryRow[]>([]);
   const [byModel, setByModel] = useState<UsageSummaryRow[]>([]);
   const [feedback, setFeedback] = useState<FeedbackSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -36,13 +36,13 @@ export const AnalyticsPage: React.FC = () => {
     setLoading(true);
     setError(null);
     Promise.all([
-      chatApi.getUsageSummary('persona', range),
+      chatApi.getUsageSummary('skill', range),
       chatApi.getUsageSummary('model', range),
       chatApi.getFeedbackSummary(),
     ])
-      .then(([persona, model, fb]) => {
+      .then(([skill, model, fb]) => {
         if (!alive) return;
-        setByPersona(persona);
+        setBySkill(skill);
         setByModel(model);
         setFeedback(fb);
       })
@@ -79,9 +79,9 @@ export const AnalyticsPage: React.FC = () => {
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         <Paper variant="outlined" sx={{ p: 2 }}>
           <Typography variant="subtitle1" sx={{ mb: 1.5 }}>
-            Turns by persona
+            Turns by skill
           </Typography>
-          <BarList rows={byPersona} emptyLabel={loading ? 'Loading…' : 'No chat turns in this range.'} />
+          <BarList rows={bySkill} emptyLabel={loading ? 'Loading…' : 'No chat turns in this range.'} />
         </Paper>
 
         <Paper variant="outlined" sx={{ p: 2 }}>

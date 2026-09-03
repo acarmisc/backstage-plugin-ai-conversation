@@ -24,7 +24,7 @@ import {
   toOpenAIMessageContent,
   AttachmentValidationError,
 } from './attachments';
-import { entityToPersonaSummary, resolveSystemPrompt } from './persona';
+import { entityToSkillSummary, resolveSystemPrompt } from './skills';
 import { fetchUrlContext, FetchedUrlContext } from './urlContext';
 import { TONE_OPTIONS, FOCUS_OPTIONS, VERBOSITY_OPTIONS, resolveTrait } from './traits';
 import {
@@ -63,10 +63,10 @@ export interface RouterOptions {
  * the plugin's scheduler namespace. */
 const THREAD_CLEANUP_TASK_ID = 'ai-conversation:thread-cleanup';
 
-/** How long a composed persona prompt is cached before it's re-fetched and
+/** How long a composed skill prompt is cached before it's re-fetched and
  * re-expanded from source. Keeps message sends off the SCM hot path while
  * still picking up prompt edits within a few minutes. */
-const PERSONA_PROMPT_TTL_MS = 5 * 60 * 1000;
+const SKILL_PROMPT_TTL_MS = 5 * 60 * 1000;
 
 function readChatConfig(config: Config): AiConversationConfig {
   return {
@@ -139,57 +139,57 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
     });
   }
 
-  // Resolves and caches a persona's system prompt by entity ref. Resolved
+  // Resolves and caches a skill's system prompt by entity ref. Resolved
   // server-side so the prompt text never has to round-trip through the
-  // browser (see PersonaSummary in types.ts). Throws with a `status` field
-  // on invalid/missing personas so callers can respond with the right HTTP
+  // browser (see SkillSummary in types.ts). Throws with a `status` field
+  // on invalid/missing skills so callers can respond with the right HTTP
   // status.
-  async function resolvePersonaPrompt(personaId: string): Promise<string> {
-    const cached = promptCache.get(personaId);
+  async function resolveSkillPrompt(skillId: string): Promise<string> {
+    const cached = promptCache.get(skillId);
     if (cached && cached.expiresAt > Date.now()) {
       return cached.prompt;
     }
 
     const credentials = await auth.getOwnServiceCredentials();
-    const entity = await catalog.getEntityByRef(personaId, { credentials });
+    const entity = await catalog.getEntityByRef(skillId, { credentials });
     if (!entity || entity.spec?.type !== CHAT_PERSONA_TYPE) {
-      throw Object.assign(new Error('invalid persona_id'), { status: 400 });
+      throw Object.assign(new Error('invalid skill_id'), { status: 400 });
     }
     const systemPrompt = await resolveSystemPrompt(entity, promptDeps);
     if (!systemPrompt) {
-      throw Object.assign(new Error('persona has no system prompt'), { status: 400 });
+      throw Object.assign(new Error('skill has no system prompt'), { status: 400 });
     }
-    promptCache.set(personaId, {
+    promptCache.set(skillId, {
       prompt: systemPrompt,
-      expiresAt: Date.now() + PERSONA_PROMPT_TTL_MS,
+      expiresAt: Date.now() + SKILL_PROMPT_TTL_MS,
     });
     return systemPrompt;
   }
 
   // Prepends a system message to `messages` layering, in order: the
-  // persona's system prompt, then tone/focus/verbosity trait fragments
+  // skill's system prompt, then tone/focus/verbosity trait fragments
   // (each resolved server-side by id, see traits.ts), then the user's
   // free-text `customSystemPrompt` last — so a power user's free text can
   // override or emphasize anything above it. Any layer that's unset is
   // skipped; if nothing resolves, `messages` is returned unchanged.
   async function composeSystemPrompt(
-    personaId: string | undefined,
+    skillId: string | undefined,
     toneId: string | undefined,
     focusId: string | undefined,
     verbosityId: string | undefined,
     customSystemPrompt: string | undefined,
     messages: ChatMessage[],
   ): Promise<ChatMessage[]> {
-    const personaPrompt = personaId ? await resolvePersonaPrompt(personaId) : undefined;
+    const skillPrompt = skillId ? await resolveSkillPrompt(skillId) : undefined;
     const tonePrompt = resolveTrait(TONE_OPTIONS, toneId);
     const focusPrompt = resolveTrait(FOCUS_OPTIONS, focusId);
     const verbosityPrompt = resolveTrait(VERBOSITY_OPTIONS, verbosityId);
     const trimmedCustom = customSystemPrompt?.trim() || undefined;
-    const systemPrompt = [personaPrompt, tonePrompt, focusPrompt, verbosityPrompt, trimmedCustom]
+    const systemPrompt = [skillPrompt, tonePrompt, focusPrompt, verbosityPrompt, trimmedCustom]
       .filter(Boolean)
       .join('\n\n');
     if (!systemPrompt) return messages;
-    return [{ id: 'persona-system', role: 'system', content: systemPrompt }, ...messages];
+    return [{ id: 'skill-system', role: 'system', content: systemPrompt }, ...messages];
   }
 
   // Ad-hoc #url context: SSRF-guarded fetch + extraction lives in
@@ -226,7 +226,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
   }
 
   // Prepends the fetched page as a one-off system message, after the
-  // persona/custom system prompt. Best-effort: a fetch failure here logs
+  // skill/custom system prompt. Best-effort: a fetch failure here logs
   // and degrades to no context rather than failing the whole chat turn —
   // the user already saw the error in the composer's preview chip before
   // sending.
@@ -250,7 +250,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       '',
       fetched.text,
     ].join('\n');
-    // Insert after any leading system messages so the persona/custom prompt
+    // Insert after any leading system messages so the skill/custom prompt
     // still comes first — a fetched page is reference material and must not
     // sit ahead of the prompt that governs the model's behaviour.
     const firstNonSystem = messages.findIndex(m => m.role !== 'system');
@@ -269,7 +269,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
     threadId: string;
     userRef: string;
     model: string;
-    personaId?: string;
+    skillId?: string;
     grounded: boolean;
   }) {
     dbClient('chat_events')
@@ -277,7 +277,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
         thread_id: fields.threadId,
         user_ref: fields.userRef,
         model: fields.model,
-        persona_id: fields.personaId ?? null,
+        persona_id: fields.skillId ?? null,
         grounded: fields.grounded,
       })
       .catch(err => logger.debug(`Failed to record chat_events row: ${err.message}`));
@@ -329,7 +329,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
     });
   });
 
-  router.get('/personas', async (_req: Request, res: Response) => {
+  router.get('/skills', async (_req: Request, res: Response) => {
     try {
       const credentials = await auth.getOwnServiceCredentials();
       const [result, stores] = await Promise.all([
@@ -337,30 +337,30 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
           { filter: { kind: 'Component', 'spec.type': CHAT_PERSONA_TYPE } },
           { credentials },
         ),
-        // Persona authors write human-friendly store names (e.g. "oo-kb")
+        // Skill authors write human-friendly store names (e.g. "data-kb")
         // in the catalog annotation — resolve them to the real
         // vector_store_id the picker/request payload expects. Best-effort:
-        // if LiteLLM is unreachable, personas still list, just without
+        // if LiteLLM is unreachable, skills still list, just without
         // resolved KB defaults.
         fetchVectorStores().catch(() => [] as VectorStore[]),
       ]);
       const byNameOrId = new Map(stores.flatMap(s => [[s.id, s.id], [s.name, s.id]] as const));
-      const personas = result.items.map(entityToPersonaSummary).map(p => ({
-        ...p,
-        defaultVectorStoreIds: p.defaultVectorStoreIds
+      const skills = result.items.map(entityToSkillSummary).map(s => ({
+        ...s,
+        defaultVectorStoreIds: s.defaultVectorStoreIds
           ?.map(v => byNameOrId.get(v))
           .filter((v): v is string => !!v),
       }));
-      res.json(personas);
+      res.json(skills);
     } catch (err: any) {
-      logger.error('Failed to list personas', err);
+      logger.error('Failed to list skills', err);
       res.status(502).json({ error: err.message });
     }
   });
 
   // Static tone/focus/verbosity option lists for the pickers — id/label
   // only, never the prompt text (see traits.ts). Requested once at page
-  // load, same shape as /personas.
+  // load, same shape as /skills.
   router.get('/chat/traits', (_req: Request, res: Response) => {
     const strip = (opts: typeof TONE_OPTIONS) => opts.map(({ id, label }) => ({ id, label }));
     res.json({
@@ -528,7 +528,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
           question: body.question ?? '',
           answer: body.answer ?? '',
           model: body.model ?? '',
-          persona_id: body.personaId ?? null,
+          persona_id: body.skillId ?? null,
           vector_store_ids: body.vectorStoreIds
             ? JSON.stringify(body.vectorStoreIds)
             : null,
@@ -555,8 +555,8 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
         return;
       }
       let query = dbClient('chat_message_feedback');
-      if (typeof req.query.personaId === 'string') {
-        query = query.where('persona_id', req.query.personaId);
+      if (typeof req.query.skillId === 'string') {
+        query = query.where('persona_id', req.query.skillId);
       }
       if (typeof req.query.model === 'string') {
         query = query.where('model', req.query.model);
@@ -577,7 +577,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
     }
   });
 
-  // Turn counts grouped by persona or model, from chat_events (phase15).
+  // Turn counts grouped by skill or model, from chat_events (phase15).
   router.get('/usage/summary', async (req: Request, res: Response) => {
     try {
       const tokenEntityRef = await resolveUserId(req, auth);
@@ -694,12 +694,12 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
         threadId: body.thread_id ?? '',
         userRef: tokenEntityRef,
         model: body.model,
-        personaId: body.persona_id,
+        skillId: body.skill_id,
         grounded: !!body.vector_store_ids?.length,
       });
 
       let messages = await composeSystemPrompt(
-        body.persona_id,
+        body.skill_id,
         body.tone_id,
         body.focus_id,
         body.verbosity_id,
@@ -767,12 +767,12 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
         threadId: body.thread_id ?? '',
         userRef: tokenEntityRef,
         model: body.model,
-        personaId: body.persona_id,
+        skillId: body.skill_id,
         grounded: !!body.vector_store_ids?.length,
       });
 
       let messages = await composeSystemPrompt(
-        body.persona_id,
+        body.skill_id,
         body.tone_id,
         body.focus_id,
         body.verbosity_id,
@@ -859,7 +859,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
         threadId: body.thread_id ?? '',
         userRef: tokenEntityRef,
         model: body.model,
-        personaId: body.persona_id,
+        skillId: body.skill_id,
         grounded: !!body.vector_store_ids?.length,
       });
 
@@ -876,7 +876,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
         content: extractText(m),
       }));
       let withSystemPrompt = await composeSystemPrompt(
-        body.persona_id,
+        body.skill_id,
         body.tone_id,
         body.focus_id,
         body.verbosity_id,

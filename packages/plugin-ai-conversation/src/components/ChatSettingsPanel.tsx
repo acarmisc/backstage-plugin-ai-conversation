@@ -14,9 +14,8 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { ModelPicker } from './ModelPicker';
 import { VectorStorePicker } from './VectorStorePicker';
-import { PersonaPicker } from './PersonaPicker';
 import { OptionPicker } from './OptionPicker';
-import type { ChatConfig, ChatTraits, Persona, ReasoningEffort } from '../types';
+import type { ChatConfig, ChatTraits, ReasoningEffort } from '../types';
 
 const REASONING_EFFORT_OPTIONS: { id: ReasoningEffort; label: string }[] = [
   { id: 'low', label: 'Low' },
@@ -29,11 +28,6 @@ export interface ChatSettingsPanelProps {
   onToggleShowSettings: () => void;
   configError: string | null;
   config: ChatConfig;
-  personas: Persona[];
-  personasLoading: boolean;
-  personasError: string | null;
-  personaId: string;
-  onPersonaChange: (id: string, persona: Persona | undefined) => void;
   traits: ChatTraits;
   traitsLoading: boolean;
   toneId: string;
@@ -54,25 +48,11 @@ export interface ChatSettingsPanelProps {
   onReasoningEffortChange: (value: ReasoningEffort | '') => void;
 }
 
-const SectionHeader: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <Typography
-    variant="overline"
-    sx={{ px: 1.5, pt: 1.5, display: 'block', color: 'text.secondary', fontSize: '0.7rem', letterSpacing: 1 }}
-  >
-    {children}
-  </Typography>
-);
-
 export const ChatSettingsPanel: React.FC<ChatSettingsPanelProps> = ({
   showSettings,
   onToggleShowSettings,
   configError,
   config,
-  personas,
-  personasLoading,
-  personasError,
-  personaId,
-  onPersonaChange,
   traits,
   traitsLoading,
   toneId,
@@ -124,23 +104,17 @@ export const ChatSettingsPanel: React.FC<ChatSettingsPanelProps> = ({
           </Typography>
         )}
 
-        {/* ── Identity ── */}
-        <SectionHeader>Identity</SectionHeader>
-        <Box sx={{ px: 1.5, pb: 1, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-          <PersonaPicker
-            value={personaId}
-            personas={personas}
-            loading={personasLoading}
-            error={personasError}
-            onChange={onPersonaChange}
+        {/* ── Main settings ── */}
+        <Box sx={{ px: 1.5, py: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          <ModelPicker value={model} onChange={onModelChange} defaultModel={config.defaultModel} />
+          <VectorStorePicker
+            value={vectorStoreIds}
+            onChange={onVectorStoreIdsChange}
+            defaultVectorStoreIds={config.defaultVectorStoreIds}
           />
           <TextField
             label="Extra prompt"
-            placeholder={
-              personaId
-                ? 'Appended after the persona system prompt…'
-                : 'Used as the system prompt (no persona selected)…'
-            }
+            placeholder="Additional instructions or context…"
             value={customSystemPrompt}
             onChange={e => onCustomSystemPromptChange(e.target.value)}
             multiline
@@ -149,65 +123,56 @@ export const ChatSettingsPanel: React.FC<ChatSettingsPanelProps> = ({
             size="small"
             fullWidth
           />
-          <Accordion disableGutters variant="outlined" sx={{ '&:before': { display: 'none' } }}>
-            <AccordionSummary expandIcon={<ExpandMoreIcon fontSize="small" />}>
-              <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                Advanced
-              </Typography>
-            </AccordionSummary>
-            <AccordionDetails sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-              <OptionPicker
-                label="Tone"
-                value={toneId}
-                options={traits.tones}
-                onChange={onToneChange}
-                loading={traitsLoading}
-              />
-              <OptionPicker
-                label="Focus"
-                value={focusId}
-                options={traits.focuses}
-                onChange={onFocusChange}
-                loading={traitsLoading}
-              />
-              <OptionPicker
-                label="Verbosity"
-                value={verbosityId}
-                options={traits.verbosities}
-                onChange={onVerbosityChange}
-                loading={traitsLoading}
-              />
-            </AccordionDetails>
-          </Accordion>
         </Box>
 
-        {/* ── Intelligence ── */}
-        <SectionHeader>Intelligence</SectionHeader>
-        <Box sx={{ px: 1.5, pb: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-          <ModelPicker value={model} onChange={onModelChange} defaultModel={config.defaultModel} />
-          <OptionPicker
-            label="Reasoning effort"
-            value={reasoningEffort}
-            options={REASONING_EFFORT_OPTIONS}
-            onChange={id => onReasoningEffortChange(id as ReasoningEffort | '')}
-            noneLabel="Model default"
-          />
-          <VectorStorePicker
-            value={vectorStoreIds}
-            onChange={onVectorStoreIdsChange}
-            defaultVectorStoreIds={config.defaultVectorStoreIds}
-          />
-          <FormControlLabel
-            control={
-              <Switch
-                size="small"
-                checked={webSearch}
-                onChange={e => onWebSearchChange(e.target.checked)}
-              />
-            }
-            label={<Typography variant="body2">Include web search</Typography>}
-          />
-        </Box>
+        {/* ── Advanced ── */}
+        <Accordion disableGutters variant="outlined" sx={{ '&:before': { display: 'none' }, mx: 1.5, mb: 1.5 }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon fontSize="small" />}>
+            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+              Advanced
+            </Typography>
+          </AccordionSummary>
+          <AccordionDetails sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, pt: 1 }}>
+            <OptionPicker
+              label="Tone"
+              value={toneId}
+              options={traits.tones}
+              onChange={onToneChange}
+              loading={traitsLoading}
+            />
+            <OptionPicker
+              label="Focus"
+              value={focusId}
+              options={traits.focuses}
+              onChange={onFocusChange}
+              loading={traitsLoading}
+            />
+            <OptionPicker
+              label="Verbosity"
+              value={verbosityId}
+              options={traits.verbosities}
+              onChange={onVerbosityChange}
+              loading={traitsLoading}
+            />
+            <OptionPicker
+              label="Reasoning effort"
+              value={reasoningEffort}
+              options={REASONING_EFFORT_OPTIONS}
+              onChange={id => onReasoningEffortChange(id as ReasoningEffort | '')}
+              noneLabel="Model default"
+            />
+            <FormControlLabel
+              control={
+                <Switch
+                  size="small"
+                  checked={webSearch}
+                  onChange={e => onWebSearchChange(e.target.checked)}
+                />
+              }
+              label={<Typography variant="body2">Include web search</Typography>}
+            />
+          </AccordionDetails>
+        </Accordion>
       </Box>
     </Collapse>
   </Box>

@@ -21,14 +21,20 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var types_exports = {};
 __export(types_exports, {
   CHAT_PERSONA_ANNOTATION_PREFIX: () => CHAT_PERSONA_ANNOTATION_PREFIX,
-  CHAT_PERSONA_TYPE: () => CHAT_PERSONA_TYPE
+  CHAT_PERSONA_TYPE: () => CHAT_PERSONA_TYPE,
+  CHAT_SKILL_ANNOTATION_PREFIX: () => CHAT_SKILL_ANNOTATION_PREFIX,
+  CHAT_SKILL_TYPE: () => CHAT_SKILL_TYPE
 });
 module.exports = __toCommonJS(types_exports);
-var CHAT_PERSONA_TYPE = "chat-persona";
-var CHAT_PERSONA_ANNOTATION_PREFIX = "chat-persona.acarmisc.org";
+var CHAT_SKILL_TYPE = "chat-skill";
+var CHAT_SKILL_ANNOTATION_PREFIX = "chat-skill.acarmisc.org";
+var CHAT_PERSONA_TYPE = CHAT_SKILL_TYPE;
+var CHAT_PERSONA_ANNOTATION_PREFIX = CHAT_SKILL_ANNOTATION_PREFIX;
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   CHAT_PERSONA_ANNOTATION_PREFIX,
-  CHAT_PERSONA_TYPE
+  CHAT_PERSONA_TYPE,
+  CHAT_SKILL_ANNOTATION_PREFIX,
+  CHAT_SKILL_TYPE
 });
 //# sourceMappingURL=types.cjs.js.map

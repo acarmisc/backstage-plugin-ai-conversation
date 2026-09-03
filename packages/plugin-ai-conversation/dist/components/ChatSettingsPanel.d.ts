@@ -1,15 +1,10 @@
 import React from 'react';
-import type { ChatConfig, ChatTraits, Persona, ReasoningEffort } from '../types';
+import type { ChatConfig, ChatTraits, ReasoningEffort } from '../types';
 export interface ChatSettingsPanelProps {
     showSettings: boolean;
     onToggleShowSettings: () => void;
     configError: string | null;
     config: ChatConfig;
-    personas: Persona[];
-    personasLoading: boolean;
-    personasError: string | null;
-    personaId: string;
-    onPersonaChange: (id: string, persona: Persona | undefined) => void;
     traits: ChatTraits;
     traitsLoading: boolean;
     toneId: string;

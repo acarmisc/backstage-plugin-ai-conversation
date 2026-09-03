@@ -79,7 +79,6 @@ export function fromPersisted(persisted: PersistedThread): Thread {
     messages: migrateThreadMessages(raw.messages),
     model: typeof raw.model === 'string' ? raw.model : '',
     vectorStoreIds: Array.isArray(raw.vectorStoreIds) ? raw.vectorStoreIds : [],
-    personaId: typeof raw.personaId === 'string' ? raw.personaId : '',
     customSystemPrompt: typeof raw.customSystemPrompt === 'string' ? raw.customSystemPrompt : '',
     createdAt: typeof raw.createdAt === 'number' ? raw.createdAt : Date.now(),
     updatedAt: typeof raw.updatedAt === 'number' ? raw.updatedAt : Date.now(),

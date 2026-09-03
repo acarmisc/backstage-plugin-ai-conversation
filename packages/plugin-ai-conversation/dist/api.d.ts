@@ -1,16 +1,16 @@
 import { FetchApi } from '@backstage/core-plugin-api';
-import type { VectorStore, Persona, ChatRequest, ChatFeedbackRequest, ChatResult, ChatConfig, ChatTraits, KeySpend, UrlContextPreview, FeedbackSummary, UsageSummaryRow, PersistedThread, Thread } from './types';
+import type { VectorStore, Skill, ChatRequest, ChatFeedbackRequest, ChatResult, ChatConfig, ChatTraits, KeySpend, UrlContextPreview, FeedbackSummary, UsageSummaryRow, PersistedThread, Thread } from './types';
 export interface AiConversationApiInterface {
     listVectorStores(): Promise<VectorStore[]>;
-    listPersonas(): Promise<Persona[]>;
+    listSkills(): Promise<Skill[]>;
     getChatConfig(): Promise<ChatConfig>;
     getChatTraits(): Promise<ChatTraits>;
     fetchUrlContext(url: string): Promise<UrlContextPreview>;
     getFeedbackSummary(filters?: {
-        personaId?: string;
+        skillId?: string;
         model?: string;
     }): Promise<FeedbackSummary>;
-    getUsageSummary(groupBy: 'persona' | 'model', range?: string): Promise<UsageSummaryRow[]>;
+    getUsageSummary(groupBy: 'skill' | 'model', range?: string): Promise<UsageSummaryRow[]>;
     chatCompletions(req: ChatRequest): Promise<ChatResult>;
     mintChatKey(opts?: {
         models?: string[];
@@ -38,15 +38,15 @@ export declare class AiConversationApi implements AiConversationApiInterface {
     private fetchApi;
     constructor(fetchApi: FetchApi);
     listVectorStores(): Promise<VectorStore[]>;
-    listPersonas(): Promise<Persona[]>;
+    listSkills(): Promise<Skill[]>;
     getChatConfig(): Promise<ChatConfig>;
     getChatTraits(): Promise<ChatTraits>;
     fetchUrlContext(url: string): Promise<UrlContextPreview>;
     getFeedbackSummary(filters?: {
-        personaId?: string;
+        skillId?: string;
         model?: string;
     }): Promise<FeedbackSummary>;
-    getUsageSummary(groupBy: 'persona' | 'model', range?: string): Promise<UsageSummaryRow[]>;
+    getUsageSummary(groupBy: 'skill' | 'model', range?: string): Promise<UsageSummaryRow[]>;
     chatCompletions(req: ChatRequest): Promise<ChatResult>;
     mintChatKey(opts?: {
         models?: string[];

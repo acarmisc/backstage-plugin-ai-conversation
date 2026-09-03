@@ -7,20 +7,24 @@ export interface VectorStore {
   status?: string;
 }
 
-/** Value of `spec.type` that marks a catalog Component as a chat persona. */
-export const CHAT_PERSONA_TYPE = 'chat-persona';
+/** Value of `spec.type` that marks a catalog Component as a chat skill. */
+export const CHAT_SKILL_TYPE = 'chat-skill';
 
-/** Annotation namespace for persona-specific fields on a catalog entity. */
-export const CHAT_PERSONA_ANNOTATION_PREFIX = 'chat-persona.acarmisc.org';
+/** Annotation namespace for skill-specific fields on a catalog entity. */
+export const CHAT_SKILL_ANNOTATION_PREFIX = 'chat-skill.acarmisc.org';
+
+/** Backwards compatibility: old persona type/annotation names. */
+export const CHAT_PERSONA_TYPE = CHAT_SKILL_TYPE;
+export const CHAT_PERSONA_ANNOTATION_PREFIX = CHAT_SKILL_ANNOTATION_PREFIX;
 
 /**
- * Public persona metadata returned to the frontend picker. Deliberately
+ * Public skill metadata returned to the frontend picker. Deliberately
  * excludes the system prompt text — that's resolved server-side by
- * `persona_id` when a chat request comes in, so it never has to round-trip
+ * `skill_id` when a chat request comes in, so it never has to round-trip
  * through the browser and can't be tampered with client-side.
  */
-export interface PersonaSummary {
-  /** Catalog entity ref, e.g. "component:default/oo-business-analyst". */
+export interface SkillSummary {
+  /** Catalog entity ref, e.g. "component:default/data-analyst-skill". */
   id: string;
   title: string;
   description?: string;
@@ -28,6 +32,9 @@ export interface PersonaSummary {
   defaultVectorStoreIds?: string[];
   tags?: string[];
 }
+
+/** Backwards compatibility: old persona interface name. */
+export type PersonaSummary = SkillSummary;
 
 export interface ChatMessage {
   id: string;
@@ -43,7 +50,7 @@ export interface ChatFeedbackRequest {
   question: string;
   answer: string;
   model: string;
-  personaId?: string;
+  skillId?: string;
   vectorStoreIds?: string[];
   toneId?: string;
   focusId?: string;
@@ -66,10 +73,10 @@ export interface ChatStreamRequest {
    * chat_events / GET /usage/summary. Never used to reconstruct or persist
    * message content. */
   thread_id?: string;
-  /** Catalog entity ref of a chat-persona, e.g. "component:default/oo-business-analyst". */
-  persona_id?: string;
+  /** Catalog entity ref of a chat-skill, e.g. "component:default/data-analyst-skill". */
+  skill_id?: string;
   /** Free-text system prompt supplied by the user. Combined with the
-   * persona's system prompt (if any) rather than replacing it. */
+   * skill's system prompt (if any) rather than replacing it. */
   custom_system_prompt?: string;
   /** URL typed as `#https://...` in the composer. Fetched server-side
    * (SSRF-guarded, see urlContext.ts) and injected as one-off context for
@@ -82,7 +89,7 @@ export interface ChatStreamRequest {
   web_search?: boolean;
   /** Ids into TONE_OPTIONS/FOCUS_OPTIONS/VERBOSITY_OPTIONS (see traits.ts).
    * Resolved server-side into prompt fragments composed alongside the
-   * persona's system prompt — see composeSystemPrompt in router.ts. */
+   * skill's system prompt — see composeSystemPrompt in router.ts. */
   tone_id?: string;
   focus_id?: string;
   verbosity_id?: string;

@@ -14,7 +14,6 @@ import type { ReasoningEffort, AiConversationUIMessage } from '../types';
 export interface ChatRequestSettings {
     model: string;
     vectorStoreIds: string[];
-    personaId: string;
     customSystemPrompt: string;
     toneId: string;
     focusId: string;

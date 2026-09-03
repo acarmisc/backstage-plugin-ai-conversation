@@ -6,13 +6,13 @@ export interface VectorStore {
     status?: string;
 }
 /**
- * Persona metadata for the picker, sourced from `chat-persona` catalog
- * entities (see the `ces-ai-personas` repo). Deliberately excludes the
- * system prompt text — the backend resolves it server-side from
- * `persona_id` so it never round-trips through the browser.
+ * Skill metadata for the picker, sourced from `chat-skill` catalog
+ * entities. Deliberately excludes the system prompt text — the backend
+ * resolves it server-side from `skill_id` so it never round-trips through
+ * the browser.
  */
-export interface Persona {
-    /** Catalog entity ref, e.g. "component:default/oo-business-analyst". */
+export interface Skill {
+    /** Catalog entity ref, e.g. "component:default/data-analyst-skill". */
     id: string;
     title: string;
     description?: string;
@@ -20,6 +20,8 @@ export interface Persona {
     defaultVectorStoreIds?: string[];
     tags?: string[];
 }
+/** @deprecated Use Skill instead */
+export type Persona = Skill;
 /**
  * Legacy flat-content message shape. Still used by `ChatRequest` (the old
  * `/chat/stream` and `/chat/completions` REST calls in api.ts, which stay
@@ -211,7 +213,6 @@ export interface Thread {
     messages: AiConversationUIMessage[];
     model: string;
     vectorStoreIds: string[];
-    personaId: string;
     customSystemPrompt: string;
     keyAlias: string;
     keyToken: string;

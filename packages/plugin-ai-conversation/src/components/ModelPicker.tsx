@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Select, MenuItem, FormControl, InputLabel, Typography } from '@mui/material';
+import { Autocomplete, TextField, Typography, Box } from '@mui/material';
 import { useApi } from '@backstage/core-plugin-api';
 import { liteLlmApiRef } from '@acarmisc/backstage-plugin-litellm';
 import type { ModelInfo } from '@acarmisc/backstage-plugin-litellm';
@@ -41,12 +41,6 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
     return () => { alive = false; };
   }, [liteLlmApi]);
 
-  // Separate from the fetch above: `defaultModel` (sourced from the backend's
-  // /config, itself from litellm.aiConversation.defaultModel in app-config)
-  // typically resolves after this component mounts. Selecting here — keyed
-  // on both `models` and `defaultModel` — means a late-arriving app-config
-  // default still wins, instead of being silently dropped by a mount-only
-  // effect that already picked models[0].
   useEffect(() => {
     if (value || models.length === 0) return;
     const def =
@@ -56,25 +50,42 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
   }, [value, models, defaultModel, onChange]);
 
   return (
-    <FormControl size="small" error={!!error} sx={{ minWidth: 200 }}>
-      <InputLabel>Model</InputLabel>
-      <Select
+    <Box>
+      <Autocomplete
+        freeSolo
+        size="small"
+        options={models}
+        getOptionLabel={(option) => {
+          if (typeof option === 'string') return option;
+          return option.model_name;
+        }}
         value={value}
-        label="Model"
-        onChange={e => onChange(e.target.value as string)}
-        disabled={loading}
-      >
-        {models.map(m => (
-          <MenuItem key={m.model_name} value={m.model_name}>
-            {m.model_name}
-          </MenuItem>
-        ))}
-      </Select>
+        inputValue={value}
+        loading={loading}
+        onChange={(_e, model) => {
+          if (typeof model === 'string') {
+            onChange(model);
+          } else if (model && 'model_name' in model) {
+            onChange(model.model_name);
+          }
+        }}
+        onInputChange={(_e, inputValue) => {
+          onChange(inputValue);
+        }}
+        renderInput={params => (
+          <TextField
+            {...params}
+            label="Model"
+            error={!!error}
+            fullWidth
+          />
+        )}
+      />
       {error && (
-        <Typography variant="caption" color="error" sx={{ mt: 0.5 }}>
+        <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5 }}>
           {error}
         </Typography>
       )}
-    </FormControl>
+    </Box>
   );
 };

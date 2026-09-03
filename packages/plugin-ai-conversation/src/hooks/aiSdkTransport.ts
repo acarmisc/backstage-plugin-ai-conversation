@@ -15,7 +15,6 @@ import type { ReasoningEffort, AiConversationUIMessage } from '../types';
 export interface ChatRequestSettings {
   model: string;
   vectorStoreIds: string[];
-  personaId: string;
   customSystemPrompt: string;
   toneId: string;
   focusId: string;
@@ -56,7 +55,6 @@ export function createAiConversationTransport(
           messages,
           thread_id: s.threadId,
           vector_store_ids: s.vectorStoreIds.length ? s.vectorStoreIds : undefined,
-          persona_id: s.personaId || undefined,
           custom_system_prompt: s.customSystemPrompt || undefined,
           tone_id: s.toneId || undefined,
           focus_id: s.focusId || undefined,

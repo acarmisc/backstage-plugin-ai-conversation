@@ -105,7 +105,6 @@ export interface UseChatOptions {
   userId: string;
   model: string;
   vectorStoreIds: string[];
-  personaId: string;
   customSystemPrompt: string;
   toneId: string;
   focusId: string;
@@ -150,7 +149,6 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
     userId,
     model,
     vectorStoreIds,
-    personaId,
     customSystemPrompt,
     toneId,
     focusId,
@@ -200,7 +198,6 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
   const settingsRef = useRef<ChatRequestSettings>({
     model,
     vectorStoreIds,
-    personaId,
     customSystemPrompt,
     toneId,
     focusId,
@@ -214,7 +211,6 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
   settingsRef.current = {
     model,
     vectorStoreIds,
-    personaId,
     customSystemPrompt,
     toneId,
     focusId,
@@ -415,7 +411,6 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
       messages: [],
       model,
       vectorStoreIds,
-      personaId,
       customSystemPrompt,
       keyAlias,
       keyToken,
@@ -445,7 +440,6 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
         messages: [],
         model,
         vectorStoreIds,
-        personaId,
         customSystemPrompt,
         keyAlias: overrideKey?.alias ?? keyAlias,
         keyToken: overrideKey?.token ?? keyToken,
@@ -461,7 +455,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
       setKeySpend(null);
       compareChat.reset();
     },
-    [model, vectorStoreIds, personaId, customSystemPrompt, keyAlias, keyToken, compareChat],
+    [model, vectorStoreIds, customSystemPrompt, keyAlias, keyToken, compareChat],
   );
 
   const selectThread = useCallback(
@@ -519,7 +513,6 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
                 title: t.messages.length === 0 ? text.slice(0, 40) : t.title,
                 model,
                 vectorStoreIds,
-                personaId,
                 customSystemPrompt,
                 toneId,
                 focusId,
@@ -548,7 +541,6 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
       keyToken,
       model,
       vectorStoreIds,
-      personaId,
       customSystemPrompt,
       toneId,
       focusId,
@@ -592,7 +584,6 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
                 messages: [...baseMessages, userMsg],
                 title: t.messages.length === 0 ? text.slice(0, 40) : t.title,
                 vectorStoreIds,
-                personaId,
                 customSystemPrompt,
                 toneId,
                 focusId,
@@ -615,7 +606,6 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
       activeThread,
       keyToken,
       vectorStoreIds,
-      personaId,
       customSystemPrompt,
       toneId,
       focusId,
@@ -756,7 +746,6 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
       messages: migrateThreadMessages(src.messages),
       model: typeof src.model === 'string' ? src.model : '',
       vectorStoreIds: Array.isArray(src.vectorStoreIds) ? src.vectorStoreIds : [],
-      personaId: typeof src.personaId === 'string' ? src.personaId : '',
       customSystemPrompt:
         typeof src.customSystemPrompt === 'string' ? src.customSystemPrompt : '',
       keyAlias: '',
@@ -800,7 +789,6 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
           question: question ? extractText(question) : '',
           answer: extractText(message),
           model: activeThread.model,
-          personaId: activeThread.personaId || undefined,
           vectorStoreIds: activeThread.vectorStoreIds,
           toneId: activeThread.toneId || undefined,
           focusId: activeThread.focusId || undefined,

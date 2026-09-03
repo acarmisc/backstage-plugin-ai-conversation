@@ -81228,6 +81228,8 @@ var index_exports = {};
 __export(index_exports, {
   CHAT_PERSONA_ANNOTATION_PREFIX: () => CHAT_PERSONA_ANNOTATION_PREFIX,
   CHAT_PERSONA_TYPE: () => CHAT_PERSONA_TYPE,
+  CHAT_SKILL_ANNOTATION_PREFIX: () => CHAT_SKILL_ANNOTATION_PREFIX,
+  CHAT_SKILL_TYPE: () => CHAT_SKILL_TYPE,
   aiConversationPlugin: () => aiConversationPlugin,
   createRouter: () => createRouter,
   default: () => aiConversationPlugin,
@@ -91037,14 +91039,16 @@ function toOpenAIMessageContent(message) {
 }
 
 // src/types.ts
-var CHAT_PERSONA_TYPE = "chat-persona";
-var CHAT_PERSONA_ANNOTATION_PREFIX = "chat-persona.acarmisc.org";
+var CHAT_SKILL_TYPE = "chat-skill";
+var CHAT_SKILL_ANNOTATION_PREFIX = "chat-skill.acarmisc.org";
+var CHAT_PERSONA_TYPE = CHAT_SKILL_TYPE;
+var CHAT_PERSONA_ANNOTATION_PREFIX = CHAT_SKILL_ANNOTATION_PREFIX;
 
-// src/persona.ts
+// src/skills.ts
 var LOCATION_ANNOTATION = "backstage.io/managed-by-location";
 var INCLUDE_RE = /^[ \t]*\{\{include:\s*(.+?)\s*\}\}[ \t]*$/;
 function annotation(entity, key) {
-  return entity.metadata.annotations?.[`${CHAT_PERSONA_ANNOTATION_PREFIX}/${key}`];
+  return entity.metadata.annotations?.[`${CHAT_SKILL_ANNOTATION_PREFIX}/${key}`];
 }
 function entityRef(entity) {
   const ns = entity.metadata.namespace ?? "default";
@@ -91079,7 +91083,7 @@ async function expandFile(url, deps, ancestors) {
   }
   return out.join("\n");
 }
-function entityToPersonaSummary(entity) {
+function entityToSkillSummary(entity) {
   return {
     id: entityRef(entity),
     title: entity.metadata.title ?? entity.metadata.name,
@@ -91095,7 +91099,7 @@ async function resolveSystemPrompt(entity, deps) {
     const location = entity.metadata.annotations?.[LOCATION_ANNOTATION];
     if (!location) {
       throw new Error(
-        `persona ${entity.metadata.name} has a system-prompt-ref but no ${LOCATION_ANNOTATION} to resolve it against`
+        `skill ${entity.metadata.name} has a system-prompt-ref but no ${LOCATION_ANNOTATION} to resolve it against`
       );
     }
     const base = location.replace(/^(url|file):/, "");
@@ -91435,7 +91439,7 @@ async function purgeExpiredThreads(db, ttlDays) {
 // src/router.ts
 var DEFAULT_PERSISTENCE_TTL_DAYS = 30;
 var THREAD_CLEANUP_TASK_ID = "ai-conversation:thread-cleanup";
-var PERSONA_PROMPT_TTL_MS = 5 * 60 * 1e3;
+var SKILL_PROMPT_TTL_MS = 5 * 60 * 1e3;
 function readChatConfig(config2) {
   return {
     baseUrl: config2.getString("litellm.baseUrl"),
@@ -91491,35 +91495,35 @@ async function createRouter(options) {
       }
     });
   }
-  async function resolvePersonaPrompt(personaId) {
-    const cached2 = promptCache.get(personaId);
+  async function resolveSkillPrompt(skillId) {
+    const cached2 = promptCache.get(skillId);
     if (cached2 && cached2.expiresAt > Date.now()) {
       return cached2.prompt;
     }
     const credentials = await auth.getOwnServiceCredentials();
-    const entity = await catalog.getEntityByRef(personaId, { credentials });
+    const entity = await catalog.getEntityByRef(skillId, { credentials });
     if (!entity || entity.spec?.type !== CHAT_PERSONA_TYPE) {
-      throw Object.assign(new Error("invalid persona_id"), { status: 400 });
+      throw Object.assign(new Error("invalid skill_id"), { status: 400 });
     }
     const systemPrompt = await resolveSystemPrompt(entity, promptDeps);
     if (!systemPrompt) {
-      throw Object.assign(new Error("persona has no system prompt"), { status: 400 });
+      throw Object.assign(new Error("skill has no system prompt"), { status: 400 });
     }
-    promptCache.set(personaId, {
+    promptCache.set(skillId, {
       prompt: systemPrompt,
-      expiresAt: Date.now() + PERSONA_PROMPT_TTL_MS
+      expiresAt: Date.now() + SKILL_PROMPT_TTL_MS
     });
     return systemPrompt;
   }
-  async function composeSystemPrompt(personaId, toneId, focusId, verbosityId, customSystemPrompt, messages) {
-    const personaPrompt = personaId ? await resolvePersonaPrompt(personaId) : void 0;
+  async function composeSystemPrompt(skillId, toneId, focusId, verbosityId, customSystemPrompt, messages) {
+    const skillPrompt = skillId ? await resolveSkillPrompt(skillId) : void 0;
     const tonePrompt = resolveTrait(TONE_OPTIONS, toneId);
     const focusPrompt = resolveTrait(FOCUS_OPTIONS, focusId);
     const verbosityPrompt = resolveTrait(VERBOSITY_OPTIONS, verbosityId);
     const trimmedCustom = customSystemPrompt?.trim() || void 0;
-    const systemPrompt = [personaPrompt, tonePrompt, focusPrompt, verbosityPrompt, trimmedCustom].filter(Boolean).join("\n\n");
+    const systemPrompt = [skillPrompt, tonePrompt, focusPrompt, verbosityPrompt, trimmedCustom].filter(Boolean).join("\n\n");
     if (!systemPrompt) return messages;
-    return [{ id: "persona-system", role: "system", content: systemPrompt }, ...messages];
+    return [{ id: "skill-system", role: "system", content: systemPrompt }, ...messages];
   }
   const URL_CONTEXT_TTL_MS = 10 * 60 * 1e3;
   const URL_CONTEXT_MAX_ENTRIES = 200;
@@ -91573,7 +91577,7 @@ async function createRouter(options) {
       thread_id: fields.threadId,
       user_ref: fields.userRef,
       model: fields.model,
-      persona_id: fields.personaId ?? null,
+      persona_id: fields.skillId ?? null,
       grounded: fields.grounded
     }).catch((err) => logger.debug(`Failed to record chat_events row: ${err.message}`));
   }
@@ -91606,7 +91610,7 @@ async function createRouter(options) {
       persistence: chatConfig.persistence
     });
   });
-  router.get("/personas", async (_req, res) => {
+  router.get("/skills", async (_req, res) => {
     try {
       const credentials = await auth.getOwnServiceCredentials();
       const [result, stores] = await Promise.all([
@@ -91614,21 +91618,21 @@ async function createRouter(options) {
           { filter: { kind: "Component", "spec.type": CHAT_PERSONA_TYPE } },
           { credentials }
         ),
-        // Persona authors write human-friendly store names (e.g. "oo-kb")
+        // Skill authors write human-friendly store names (e.g. "data-kb")
         // in the catalog annotation — resolve them to the real
         // vector_store_id the picker/request payload expects. Best-effort:
-        // if LiteLLM is unreachable, personas still list, just without
+        // if LiteLLM is unreachable, skills still list, just without
         // resolved KB defaults.
         fetchVectorStores().catch(() => [])
       ]);
       const byNameOrId = new Map(stores.flatMap((s) => [[s.id, s.id], [s.name, s.id]]));
-      const personas = result.items.map(entityToPersonaSummary).map((p) => ({
-        ...p,
-        defaultVectorStoreIds: p.defaultVectorStoreIds?.map((v) => byNameOrId.get(v)).filter((v) => !!v)
+      const skills = result.items.map(entityToSkillSummary).map((s) => ({
+        ...s,
+        defaultVectorStoreIds: s.defaultVectorStoreIds?.map((v) => byNameOrId.get(v)).filter((v) => !!v)
       }));
-      res.json(personas);
+      res.json(skills);
     } catch (err) {
-      logger.error("Failed to list personas", err);
+      logger.error("Failed to list skills", err);
       res.status(502).json({ error: err.message });
     }
   });
@@ -91770,7 +91774,7 @@ async function createRouter(options) {
         question: body.question ?? "",
         answer: body.answer ?? "",
         model: body.model ?? "",
-        persona_id: body.personaId ?? null,
+        persona_id: body.skillId ?? null,
         vector_store_ids: body.vectorStoreIds ? JSON.stringify(body.vectorStoreIds) : null,
         tone_id: body.toneId ?? null,
         focus_id: body.focusId ?? null,
@@ -91790,8 +91794,8 @@ async function createRouter(options) {
         return;
       }
       let query = dbClient("chat_message_feedback");
-      if (typeof req.query.personaId === "string") {
-        query = query.where("persona_id", req.query.personaId);
+      if (typeof req.query.skillId === "string") {
+        query = query.where("persona_id", req.query.skillId);
       }
       if (typeof req.query.model === "string") {
         query = query.where("model", req.query.model);
@@ -91899,11 +91903,11 @@ async function createRouter(options) {
         threadId: body.thread_id ?? "",
         userRef: tokenEntityRef,
         model: body.model,
-        personaId: body.persona_id,
+        skillId: body.skill_id,
         grounded: !!body.vector_store_ids?.length
       });
       let messages = await composeSystemPrompt(
-        body.persona_id,
+        body.skill_id,
         body.tone_id,
         body.focus_id,
         body.verbosity_id,
@@ -91967,11 +91971,11 @@ async function createRouter(options) {
         threadId: body.thread_id ?? "",
         userRef: tokenEntityRef,
         model: body.model,
-        personaId: body.persona_id,
+        skillId: body.skill_id,
         grounded: !!body.vector_store_ids?.length
       });
       let messages = await composeSystemPrompt(
-        body.persona_id,
+        body.skill_id,
         body.tone_id,
         body.focus_id,
         body.verbosity_id,
@@ -92044,7 +92048,7 @@ async function createRouter(options) {
         threadId: body.thread_id ?? "",
         userRef: tokenEntityRef,
         model: body.model,
-        personaId: body.persona_id,
+        skillId: body.skill_id,
         grounded: !!body.vector_store_ids?.length
       });
       const textOnlyMessages = body.messages.map((m) => ({
@@ -92053,7 +92057,7 @@ async function createRouter(options) {
         content: extractText(m)
       }));
       let withSystemPrompt = await composeSystemPrompt(
-        body.persona_id,
+        body.skill_id,
         body.tone_id,
         body.focus_id,
         body.verbosity_id,
@@ -92148,6 +92152,8 @@ var aiConversationPlugin = (0, import_backend_plugin_api2.createBackendPlugin)({
 0 && (module.exports = {
   CHAT_PERSONA_ANNOTATION_PREFIX,
   CHAT_PERSONA_TYPE,
+  CHAT_SKILL_ANNOTATION_PREFIX,
+  CHAT_SKILL_TYPE,
   aiConversationPlugin,
   createRouter,
   proxySSE
