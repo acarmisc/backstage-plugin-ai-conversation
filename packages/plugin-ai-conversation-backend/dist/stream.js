@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.proxySSE = proxySSE;
 const stream_1 = require("stream");
 async function proxySSE(opts) {
-    const { upstreamUrl, upstreamBody, userKey, res, logger } = opts;
+    const { upstreamUrl, upstreamBody, userKey, res, logger, prelude } = opts;
     const controller = new AbortController();
     res.on('close', () => controller.abort());
     const headers = {
@@ -36,6 +36,9 @@ async function proxySSE(opts) {
         const stream = await fetchUpstream(upstreamUrl, upstreamBody);
         res.writeHead(200, headers);
         res.flushHeaders();
+        for (const event of prelude ?? []) {
+            res.write(`data: ${JSON.stringify(event)}\n\n`);
+        }
         stream.on('data', (chunk) => {
             res.write(chunk);
         });

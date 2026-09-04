@@ -80,7 +80,7 @@ function toUIMessageChunks(chunk, state) {
  * changes until something is deliberately migrated to consume this instead.
  */
 async function proxyUIMessageStream(opts) {
-    const { upstreamUrl, upstreamBody, userKey, res, logger } = opts;
+    const { upstreamUrl, upstreamBody, userKey, res, logger, prelude } = opts;
     const controller = new AbortController();
     res.on('close', () => controller.abort());
     const state = { textId: 'msg-0', textStarted: false };
@@ -91,6 +91,9 @@ async function proxyUIMessageStream(opts) {
         },
         execute: async ({ writer }) => {
             writer.write({ type: 'start' });
+            for (const chunk of prelude ?? []) {
+                writer.write(chunk);
+            }
             let upstream;
             try {
                 upstream = await fetch(upstreamUrl, {

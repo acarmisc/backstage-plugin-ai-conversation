@@ -39,6 +39,9 @@ export interface ProxyUIMessageStreamOptions {
     userKey: string;
     res: Response;
     logger: any;
+    /** UIMessageChunks written right after `start`, before the upstream is
+     * contacted — e.g. this turn's retrieval results as `data-citations`. */
+    prelude?: UIMessageChunk[];
 }
 /**
  * Fetches LiteLLM's OpenAI-shaped SSE stream and re-emits it to the client

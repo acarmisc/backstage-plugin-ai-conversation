@@ -43,6 +43,7 @@ const uiMessageStream_1 = require("./uiMessageStream");
 const attachments_1 = require("./attachments");
 const skills_1 = require("./skills");
 const urlContext_1 = require("./urlContext");
+const rag_1 = require("./rag");
 const traits_1 = require("./traits");
 const persistence_1 = require("./persistence");
 const DEFAULT_PERSISTENCE_TTL_DAYS = 30;
@@ -80,6 +81,15 @@ function rangeToCutoff(range) {
     const amount = Number(match[1]);
     const ms = match[2] === 'h' ? amount * 3600000 : amount * 86400000;
     return new Date(Date.now() - ms);
+}
+/** Text of the most recent user message — the retrieval query for KB
+ * grounding. Empty when there's no user turn yet. */
+function lastUserText(messages) {
+    for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].role === 'user')
+            return messages[i].content;
+    }
+    return '';
 }
 async function createRouter(options) {
     const { config, logger, auth, catalog, database, urlReader, scheduler } = options;
@@ -678,15 +688,24 @@ async function createRouter(options) {
             });
             let messages = await composeSystemPrompt(body.skill_id, body.tone_id, body.focus_id, body.verbosity_id, body.custom_system_prompt, body.messages);
             messages = await applyUrlContext(body.context_url, messages);
+            // Same two-step RAG as /chat/stream (see rag.ts — Bedrock managed KBs
+            // reject vector_store_ids on /v1/chat/completions).
+            const searchResults = body.vector_store_ids?.length
+                ? await (0, rag_1.retrieveContext)({
+                    baseUrl: chatConfig.baseUrl,
+                    userKey: body.user_key,
+                    vectorStoreIds: body.vector_store_ids,
+                    query: lastUserText(messages),
+                    topK: body.top_k ?? 5,
+                })
+                : [];
             const payload = {
                 model: body.model,
-                messages,
+                messages: searchResults.length
+                    ? [(0, rag_1.buildContextMessage)(searchResults), ...messages]
+                    : messages,
                 stream: false,
             };
-            if (body.vector_store_ids?.length) {
-                payload.vector_store_ids = body.vector_store_ids;
-                payload.top_k = body.top_k ?? 5;
-            }
             if (body.web_search) {
                 payload.web_search_options = {};
             }
@@ -706,7 +725,7 @@ async function createRouter(options) {
                 res.status(upstream.status).json(data);
                 return;
             }
-            res.json(data);
+            res.json({ ...data, search_results: searchResults });
         }
         catch (err) {
             logger.error('chat/completions failed', err);
@@ -738,19 +757,27 @@ async function createRouter(options) {
             let messages = await composeSystemPrompt(body.skill_id, body.tone_id, body.focus_id, body.verbosity_id, body.custom_system_prompt, body.messages);
             messages = await applyUrlContext(body.context_url, messages);
             const base = chatConfig.baseUrl;
-            // /v1/chat/completions (+ vector_store_ids for RAG) — works on
-            // LiteLLM v1.90.0 with DB-backed pgvector stores. No fallback: the
-            // primary path retrieves and cites KB results, and a fallback here
-            // only masks the real primary error from the client.
+            // Grounding: search the selected KBs first and inject the chunks as a
+            // system message. Do NOT pass vector_store_ids to /v1/chat/completions
+            // — LiteLLM forwards it to the provider verbatim and Bedrock managed
+            // KBs reject it ("Extra inputs are not permitted"); see rag.ts.
+            const searchResults = body.vector_store_ids?.length
+                ? await (0, rag_1.retrieveContext)({
+                    baseUrl: base,
+                    userKey: body.user_key,
+                    vectorStoreIds: body.vector_store_ids,
+                    query: lastUserText(messages),
+                    topK: body.top_k ?? 5,
+                })
+                : [];
             const chatBody = {
                 model: body.model,
-                messages,
+                messages: searchResults.length
+                    ? [(0, rag_1.buildContextMessage)(searchResults), ...messages]
+                    : messages,
                 stream: true,
                 stream_options: { include_usage: true },
             };
-            if (body.vector_store_ids?.length) {
-                chatBody.vector_store_ids = body.vector_store_ids;
-            }
             if (body.web_search) {
                 chatBody.web_search_options = {};
             }
@@ -763,6 +790,9 @@ async function createRouter(options) {
                 userKey: body.user_key,
                 res,
                 logger,
+                prelude: searchResults.length
+                    ? [{ search_results: searchResults }]
+                    : undefined,
             });
         }
         catch (err) {
@@ -835,15 +865,23 @@ async function createRouter(options) {
                 ...body.messages.map(m => ({ role: m.role, content: (0, attachments_1.toOpenAIMessageContent)(m) })),
             ];
             const base = chatConfig.baseUrl;
+            const searchResults = body.vector_store_ids?.length
+                ? await (0, rag_1.retrieveContext)({
+                    baseUrl: base,
+                    userKey: body.user_key,
+                    vectorStoreIds: body.vector_store_ids,
+                    query: lastUserText(withSystemPrompt),
+                    topK: body.top_k ?? 5,
+                })
+                : [];
             const chatBody = {
                 model: body.model,
-                messages: upstreamMessages,
+                messages: searchResults.length
+                    ? [(0, rag_1.buildContextMessage)(searchResults), ...upstreamMessages]
+                    : upstreamMessages,
                 stream: true,
                 stream_options: { include_usage: true },
             };
-            if (body.vector_store_ids?.length) {
-                chatBody.vector_store_ids = body.vector_store_ids;
-            }
             if (body.web_search) {
                 chatBody.web_search_options = {};
             }
@@ -856,6 +894,9 @@ async function createRouter(options) {
                 userKey: body.user_key,
                 res,
                 logger,
+                prelude: searchResults.length
+                    ? [{ type: 'data-citations', data: searchResults }]
+                    : undefined,
             });
         }
         catch (err) {

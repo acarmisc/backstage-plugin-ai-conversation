@@ -81250,7 +81250,7 @@ var import_backstage_plugin_litellm_backend = require("@acarmisc/backstage-plugi
 // src/stream.ts
 var import_stream = require("stream");
 async function proxySSE(opts) {
-  const { upstreamUrl, upstreamBody, userKey, res, logger } = opts;
+  const { upstreamUrl, upstreamBody, userKey, res, logger, prelude } = opts;
   const controller = new AbortController();
   res.on("close", () => controller.abort());
   const headers = {
@@ -81282,6 +81282,11 @@ async function proxySSE(opts) {
     const stream = await fetchUpstream(upstreamUrl, upstreamBody);
     res.writeHead(200, headers);
     res.flushHeaders();
+    for (const event of prelude ?? []) {
+      res.write(`data: ${JSON.stringify(event)}
+
+`);
+    }
     stream.on("data", (chunk) => {
       res.write(chunk);
     });
@@ -90894,7 +90899,7 @@ function toUIMessageChunks(chunk, state) {
   return out;
 }
 async function proxyUIMessageStream(opts) {
-  const { upstreamUrl, upstreamBody, userKey, res, logger } = opts;
+  const { upstreamUrl, upstreamBody, userKey, res, logger, prelude } = opts;
   const controller = new AbortController();
   res.on("close", () => controller.abort());
   const state = { textId: "msg-0", textStarted: false };
@@ -90905,6 +90910,9 @@ async function proxyUIMessageStream(opts) {
     },
     execute: async ({ writer }) => {
       writer.write({ type: "start" });
+      for (const chunk of prelude ?? []) {
+        writer.write(chunk);
+      }
       let upstream;
       try {
         upstream = await fetch(upstreamUrl, {
@@ -91421,6 +91429,62 @@ async function fetchUrlContext(rawUrl, maxChars = DEFAULT_MAX_CHARS) {
   throw Object.assign(new Error("too many redirects"), { status: 400 });
 }
 
+// src/rag.ts
+async function retrieveContext(opts) {
+  const { baseUrl, userKey, vectorStoreIds, query, topK } = opts;
+  const search = (id, extra) => fetch(`${baseUrl}/v1/vector_stores/${encodeURIComponent(id)}/search`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${userKey}`
+    },
+    body: JSON.stringify(extra ? { query, extra_body: extra } : { query }),
+    signal: AbortSignal.timeout(3e4)
+  });
+  const perStore = await Promise.all(
+    vectorStoreIds.map(async (id) => {
+      let upstream = await search(id, {
+        retrievalConfiguration: {
+          managedSearchConfiguration: {
+            managedSearchType: "SEMANTIC",
+            numberOfResults: topK
+          }
+        }
+      });
+      if (!upstream.ok && upstream.status === 400) {
+        upstream = await search(id, null);
+      }
+      if (!upstream.ok) {
+        const text2 = await upstream.text().catch(() => "");
+        throw new Error(
+          `vector store ${id} search ${upstream.status}: ${text2 || upstream.statusText}`
+        );
+      }
+      const data = await upstream.json();
+      return (data.data ?? []).map(
+        (r) => ({
+          filename: r.attributes?._document_title ?? r.filename ?? r.file_id ?? "unknown",
+          score: typeof r.score === "number" ? r.score : 0,
+          text: r.content?.[0]?.text ?? r.text ?? "",
+          url: r.attributes?._source_uri
+        })
+      );
+    })
+  );
+  return perStore.flat();
+}
+function buildContextMessage(results) {
+  const context = results.map((r, i) => `[${i + 1}] ${r.filename}
+${r.text}`).join("\n\n");
+  return {
+    id: "kb-context",
+    role: "system",
+    content: `Answer the user's question using the knowledge base excerpts below.${results.length ? " Cite sources as [n] where used." : ""}
+
+${context}`
+  };
+}
+
 // src/traits.ts
 var TONE_OPTIONS = [
   {
@@ -91607,6 +91671,12 @@ function rangeToCutoff(range) {
   const amount = Number(match[1]);
   const ms = match[2] === "h" ? amount * 36e5 : amount * 864e5;
   return new Date(Date.now() - ms);
+}
+function lastUserText(messages) {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === "user") return messages[i].content;
+  }
+  return "";
 }
 async function createRouter(options) {
   const { config: config2, logger, auth, catalog, database, urlReader, scheduler } = options;
@@ -92081,15 +92151,18 @@ async function createRouter(options) {
         body.messages
       );
       messages = await applyUrlContext(body.context_url, messages);
+      const searchResults = body.vector_store_ids?.length ? await retrieveContext({
+        baseUrl: chatConfig.baseUrl,
+        userKey: body.user_key,
+        vectorStoreIds: body.vector_store_ids,
+        query: lastUserText(messages),
+        topK: body.top_k ?? 5
+      }) : [];
       const payload = {
         model: body.model,
-        messages,
+        messages: searchResults.length ? [buildContextMessage(searchResults), ...messages] : messages,
         stream: false
       };
-      if (body.vector_store_ids?.length) {
-        payload.vector_store_ids = body.vector_store_ids;
-        payload.top_k = body.top_k ?? 5;
-      }
       if (body.web_search) {
         payload.web_search_options = {};
       }
@@ -92112,7 +92185,7 @@ async function createRouter(options) {
         res.status(upstream.status).json(data);
         return;
       }
-      res.json(data);
+      res.json({ ...data, search_results: searchResults });
     } catch (err) {
       logger.error("chat/completions failed", err);
       res.status(err.status ?? 500).json({ error: err.message });
@@ -92150,15 +92223,19 @@ async function createRouter(options) {
       );
       messages = await applyUrlContext(body.context_url, messages);
       const base = chatConfig.baseUrl;
+      const searchResults = body.vector_store_ids?.length ? await retrieveContext({
+        baseUrl: base,
+        userKey: body.user_key,
+        vectorStoreIds: body.vector_store_ids,
+        query: lastUserText(messages),
+        topK: body.top_k ?? 5
+      }) : [];
       const chatBody = {
         model: body.model,
-        messages,
+        messages: searchResults.length ? [buildContextMessage(searchResults), ...messages] : messages,
         stream: true,
         stream_options: { include_usage: true }
       };
-      if (body.vector_store_ids?.length) {
-        chatBody.vector_store_ids = body.vector_store_ids;
-      }
       if (body.web_search) {
         chatBody.web_search_options = {};
       }
@@ -92170,7 +92247,8 @@ async function createRouter(options) {
         upstreamBody: chatBody,
         userKey: body.user_key,
         res,
-        logger
+        logger,
+        prelude: searchResults.length ? [{ search_results: searchResults }] : void 0
       });
     } catch (err) {
       logger.error("chat/stream failed", err);
@@ -92240,15 +92318,19 @@ async function createRouter(options) {
         ...body.messages.map((m) => ({ role: m.role, content: toOpenAIMessageContent(m) }))
       ];
       const base = chatConfig.baseUrl;
+      const searchResults = body.vector_store_ids?.length ? await retrieveContext({
+        baseUrl: base,
+        userKey: body.user_key,
+        vectorStoreIds: body.vector_store_ids,
+        query: lastUserText(withSystemPrompt),
+        topK: body.top_k ?? 5
+      }) : [];
       const chatBody = {
         model: body.model,
-        messages: upstreamMessages,
+        messages: searchResults.length ? [buildContextMessage(searchResults), ...upstreamMessages] : upstreamMessages,
         stream: true,
         stream_options: { include_usage: true }
       };
-      if (body.vector_store_ids?.length) {
-        chatBody.vector_store_ids = body.vector_store_ids;
-      }
       if (body.web_search) {
         chatBody.web_search_options = {};
       }
@@ -92260,7 +92342,8 @@ async function createRouter(options) {
         upstreamBody: chatBody,
         userKey: body.user_key,
         res,
-        logger
+        logger,
+        prelude: searchResults.length ? [{ type: "data-citations", data: searchResults }] : void 0
       });
     } catch (err) {
       logger.error("chat/stream/v2 failed", err);
