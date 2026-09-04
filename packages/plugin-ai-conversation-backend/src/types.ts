@@ -124,6 +124,8 @@ export interface SearchResult {
   filename: string;
   score: number;
   text: string;
+  /** Source URI from Bedrock KB metadata (_source_uri), if present. */
+  url?: string;
 }
 
 export interface UsageInfo {

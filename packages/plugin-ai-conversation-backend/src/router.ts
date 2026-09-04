@@ -30,6 +30,7 @@ import {
   type SkillSource,
 } from './skills';
 import { fetchUrlContext, FetchedUrlContext } from './urlContext';
+import { retrieveContext, buildContextMessage } from './rag';
 import { TONE_OPTIONS, FOCUS_OPTIONS, VERBOSITY_OPTIONS, resolveTrait } from './traits';
 import {
   deleteThread as deletePersistedThread,
@@ -100,6 +101,15 @@ function rangeToCutoff(range: string): Date | null {
   const amount = Number(match[1]);
   const ms = match[2] === 'h' ? amount * 3600_000 : amount * 86400_000;
   return new Date(Date.now() - ms);
+}
+
+/** Text of the most recent user message — the retrieval query for KB
+ * grounding. Empty when there's no user turn yet. */
+function lastUserText(messages: Array<{ role: string; content: string }>): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'user') return messages[i].content;
+  }
+  return '';
 }
 
 export async function createRouter(options: RouterOptions): Promise<Router> {
@@ -750,15 +760,25 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       );
       messages = await applyUrlContext(body.context_url, messages);
 
+      // Same two-step RAG as /chat/stream (see rag.ts — Bedrock managed KBs
+      // reject vector_store_ids on /v1/chat/completions).
+      const searchResults = body.vector_store_ids?.length
+        ? await retrieveContext({
+            baseUrl: chatConfig.baseUrl,
+            userKey: body.user_key,
+            vectorStoreIds: body.vector_store_ids,
+            query: lastUserText(messages),
+            topK: body.top_k ?? 5,
+          })
+        : [];
+
       const payload: Record<string, unknown> = {
         model: body.model,
-        messages,
+        messages: searchResults.length
+          ? [buildContextMessage(searchResults), ...messages]
+          : messages,
         stream: false,
       };
-      if (body.vector_store_ids?.length) {
-        payload.vector_store_ids = body.vector_store_ids;
-        payload.top_k = body.top_k ?? 5;
-      }
       if (body.web_search) {
         payload.web_search_options = {};
       }
@@ -782,7 +802,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
         res.status(upstream.status).json(data);
         return;
       }
-      res.json(data);
+      res.json({ ...data, search_results: searchResults });
     } catch (err: any) {
       logger.error('chat/completions failed', err);
       res.status(err.status ?? 500).json({ error: err.message });
@@ -825,19 +845,28 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
 
       const base = chatConfig.baseUrl;
 
-      // /v1/chat/completions (+ vector_store_ids for RAG) — works on
-      // LiteLLM v1.90.0 with DB-backed pgvector stores. No fallback: the
-      // primary path retrieves and cites KB results, and a fallback here
-      // only masks the real primary error from the client.
+      // Grounding: search the selected KBs first and inject the chunks as a
+      // system message. Do NOT pass vector_store_ids to /v1/chat/completions
+      // — LiteLLM forwards it to the provider verbatim and Bedrock managed
+      // KBs reject it ("Extra inputs are not permitted"); see rag.ts.
+      const searchResults = body.vector_store_ids?.length
+        ? await retrieveContext({
+            baseUrl: base,
+            userKey: body.user_key,
+            vectorStoreIds: body.vector_store_ids,
+            query: lastUserText(messages),
+            topK: body.top_k ?? 5,
+          })
+        : [];
+
       const chatBody: Record<string, unknown> = {
         model: body.model,
-        messages,
+        messages: searchResults.length
+          ? [buildContextMessage(searchResults), ...messages]
+          : messages,
         stream: true,
         stream_options: { include_usage: true },
       };
-      if (body.vector_store_ids?.length) {
-        chatBody.vector_store_ids = body.vector_store_ids;
-      }
       if (body.web_search) {
         chatBody.web_search_options = {};
       }
@@ -850,6 +879,9 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
         userKey: body.user_key,
         res,
         logger,
+        prelude: searchResults.length
+          ? [{ search_results: searchResults }]
+          : undefined,
       });
     } catch (err: any) {
       logger.error('chat/stream failed', err);
@@ -937,15 +969,24 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       ];
 
       const base = chatConfig.baseUrl;
+      const searchResults = body.vector_store_ids?.length
+        ? await retrieveContext({
+            baseUrl: base,
+            userKey: body.user_key,
+            vectorStoreIds: body.vector_store_ids,
+            query: lastUserText(withSystemPrompt),
+            topK: body.top_k ?? 5,
+          })
+        : [];
+
       const chatBody: Record<string, unknown> = {
         model: body.model,
-        messages: upstreamMessages,
+        messages: searchResults.length
+          ? [buildContextMessage(searchResults), ...upstreamMessages]
+          : upstreamMessages,
         stream: true,
         stream_options: { include_usage: true },
       };
-      if (body.vector_store_ids?.length) {
-        chatBody.vector_store_ids = body.vector_store_ids;
-      }
       if (body.web_search) {
         chatBody.web_search_options = {};
       }
@@ -958,6 +999,9 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
         userKey: body.user_key,
         res,
         logger,
+        prelude: searchResults.length
+          ? [{ type: 'data-citations', data: searchResults } as const]
+          : undefined,
       });
     } catch (err: any) {
       logger.error('chat/stream/v2 failed', err);

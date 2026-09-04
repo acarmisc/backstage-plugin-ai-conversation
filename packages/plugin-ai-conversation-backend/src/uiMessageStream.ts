@@ -111,6 +111,9 @@ export interface ProxyUIMessageStreamOptions {
   userKey: string;
   res: Response;
   logger: any;
+  /** UIMessageChunks written right after `start`, before the upstream is
+   * contacted — e.g. this turn's retrieval results as `data-citations`. */
+  prelude?: UIMessageChunk[];
 }
 
 /**
@@ -124,7 +127,7 @@ export interface ProxyUIMessageStreamOptions {
 export async function proxyUIMessageStream(
   opts: ProxyUIMessageStreamOptions,
 ): Promise<void> {
-  const { upstreamUrl, upstreamBody, userKey, res, logger } = opts;
+  const { upstreamUrl, upstreamBody, userKey, res, logger, prelude } = opts;
   const controller = new AbortController();
   res.on('close', () => controller.abort());
 
@@ -137,6 +140,9 @@ export async function proxyUIMessageStream(
     },
     execute: async ({ writer }) => {
       writer.write({ type: 'start' });
+      for (const chunk of prelude ?? []) {
+        writer.write(chunk);
+      }
 
       let upstream: globalThis.Response;
       try {

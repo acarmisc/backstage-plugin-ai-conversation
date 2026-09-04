@@ -7,10 +7,15 @@ export interface ProxySSEOptions {
   userKey: string;
   res: Response;
   logger: any;
+  /** Extra SSE `data:` events emitted after the headers but before the
+   * upstream stream is piped — e.g. the retrieval results for this turn,
+   * which arrive as a `search_results` event the frontend maps to its
+   * sources panel. */
+  prelude?: Array<Record<string, unknown>>;
 }
 
 export async function proxySSE(opts: ProxySSEOptions): Promise<void> {
-  const { upstreamUrl, upstreamBody, userKey, res, logger } = opts;
+  const { upstreamUrl, upstreamBody, userKey, res, logger, prelude } = opts;
 
   const controller = new AbortController();
 
@@ -51,6 +56,10 @@ export async function proxySSE(opts: ProxySSEOptions): Promise<void> {
 
     res.writeHead(200, headers);
     res.flushHeaders();
+
+    for (const event of prelude ?? []) {
+      res.write(`data: ${JSON.stringify(event)}\n\n`);
+    }
 
     stream.on('data', (chunk: Buffer) => {
       res.write(chunk);
