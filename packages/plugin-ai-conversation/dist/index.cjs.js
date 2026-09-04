@@ -2040,38 +2040,108 @@ var init_ErrorBanner = __esm({
 });
 
 // src/components/SourcesPanel.tsx
-var import_react16, import_material12, SourcesPanel;
+function relevanceLabel(score) {
+  if (score >= 0.7) return "High";
+  if (score >= 0.4) return "Medium";
+  return "Low";
+}
+function dedupe(citations) {
+  const byKey = /* @__PURE__ */ new Map();
+  for (const c of citations) {
+    const key = (c.url || c.filename || "").toLowerCase();
+    const existing = byKey.get(key);
+    if (existing) {
+      existing.bestScore = Math.max(existing.bestScore, c.score);
+      if (c.snippet && !existing.snippets.includes(c.snippet)) {
+        existing.snippets.push(c.snippet);
+      }
+    } else {
+      byKey.set(key, {
+        filename: c.filename,
+        url: c.url,
+        source: c.source,
+        bestScore: c.score,
+        snippets: c.snippet ? [c.snippet] : []
+      });
+    }
+  }
+  return [...byKey.values()].sort((a, b) => b.bestScore - a.bestScore);
+}
+function groupSources(citations) {
+  const deduped = dedupe(citations);
+  const groups = [
+    { key: "kb", label: "Knowledge base", items: [] },
+    { key: "web", label: "Web", items: [] },
+    { key: "other", label: "Other", items: [] }
+  ];
+  for (const s of deduped) {
+    if (s.source === "kb") groups[0].items.push(s);
+    else if (s.source === "web") groups[1].items.push(s);
+    else groups[2].items.push(s);
+  }
+  return groups.filter((g) => g.items.length > 0);
+}
+var import_react16, import_material12, import_ExpandMore2, SourceRow, SourcesPanel;
 var init_SourcesPanel = __esm({
   "src/components/SourcesPanel.tsx"() {
     "use strict";
     import_react16 = __toESM(require("react"));
     import_material12 = require("@mui/material");
+    import_ExpandMore2 = __toESM(require("@mui/icons-material/ExpandMore"));
     init_safeUrl();
-    SourcesPanel = ({ citations }) => {
-      return /* @__PURE__ */ import_react16.default.createElement(import_material12.Box, { sx: { p: 1.5 } }, /* @__PURE__ */ import_react16.default.createElement(import_material12.Typography, { variant: "overline", color: "text.secondary" }, "Sources"), citations.length === 0 ? /* @__PURE__ */ import_react16.default.createElement(import_material12.Typography, { variant: "body2", color: "text.secondary", sx: { mt: 0.5 } }, "No sources for the latest reply yet.") : citations.map((c, i) => /* @__PURE__ */ import_react16.default.createElement(import_material12.Box, { key: i, sx: { mt: 1.5 } }, /* @__PURE__ */ import_react16.default.createElement(import_material12.Box, { sx: { display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" } }, /* @__PURE__ */ import_react16.default.createElement(import_material12.Typography, { variant: "body2", fontWeight: 500 }, safeHref(c.url) ? /* @__PURE__ */ import_react16.default.createElement("a", { href: safeHref(c.url), target: "_blank", rel: "noopener noreferrer" }, c.filename) : c.filename), c.source && /* @__PURE__ */ import_react16.default.createElement(
-        import_material12.Chip,
+    SourceRow = ({ source }) => {
+      const href = safeHref(source.url);
+      const rel = relevanceLabel(source.bestScore);
+      const passages = source.snippets.length;
+      return /* @__PURE__ */ import_react16.default.createElement(
+        import_material12.Accordion,
         {
-          size: "small",
-          label: c.source === "web" ? "Web" : "Knowledge base",
+          disableGutters: true,
           variant: "outlined",
-          color: c.source === "web" ? "secondary" : "default"
-        }
-      ), /* @__PURE__ */ import_react16.default.createElement(import_material12.Chip, { size: "small", label: c.score.toFixed(3), color: "primary", variant: "outlined" })), /* @__PURE__ */ import_react16.default.createElement(
+          sx: { "&:before": { display: "none" }, mb: 0.5 }
+        },
+        /* @__PURE__ */ import_react16.default.createElement(
+          import_material12.AccordionSummary,
+          {
+            expandIcon: /* @__PURE__ */ import_react16.default.createElement(import_ExpandMore2.default, { fontSize: "small" }),
+            sx: { minHeight: 0, "& .MuiAccordionSummary-content": { my: 0.75, mr: 1 } }
+          },
+          /* @__PURE__ */ import_react16.default.createElement(import_material12.Box, { sx: { display: "flex", flexDirection: "column", gap: 0.25, minWidth: 0 } }, /* @__PURE__ */ import_react16.default.createElement(
+            import_material12.Typography,
+            {
+              variant: "body2",
+              fontWeight: 500,
+              sx: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }
+            },
+            source.filename
+          ), /* @__PURE__ */ import_react16.default.createElement(import_material12.Typography, { variant: "caption", color: "text.secondary" }, /* @__PURE__ */ import_react16.default.createElement(import_material12.Tooltip, { title: `Score ${source.bestScore.toFixed(3)}` }, /* @__PURE__ */ import_react16.default.createElement("span", null, rel, " relevance")), passages > 1 ? ` \xB7 ${passages} passages` : ""))
+        ),
+        /* @__PURE__ */ import_react16.default.createElement(import_material12.AccordionDetails, { sx: { pt: 0 } }, href && /* @__PURE__ */ import_react16.default.createElement(import_material12.Typography, { variant: "caption", sx: { display: "block", mb: 1 } }, /* @__PURE__ */ import_react16.default.createElement("a", { href, target: "_blank", rel: "noopener noreferrer" }, "Open source")), source.snippets.map((snippet, i) => /* @__PURE__ */ import_react16.default.createElement(import_material12.Box, { key: i }, i > 0 && /* @__PURE__ */ import_react16.default.createElement(import_material12.Divider, { sx: { my: 1 } }), /* @__PURE__ */ import_react16.default.createElement(
+          import_material12.Typography,
+          {
+            variant: "body2",
+            color: "text.secondary",
+            sx: { whiteSpace: "pre-wrap", maxHeight: 220, overflow: "auto" }
+          },
+          snippet
+        ))), source.snippets.length === 0 && /* @__PURE__ */ import_react16.default.createElement(import_material12.Typography, { variant: "body2", color: "text.secondary" }, "No excerpt available."))
+      );
+    };
+    SourcesPanel = ({ citations }) => {
+      const groups = groupSources(citations);
+      const total = groups.reduce((n, g) => n + g.items.length, 0);
+      return /* @__PURE__ */ import_react16.default.createElement(import_material12.Box, { sx: { p: 1.5 } }, /* @__PURE__ */ import_react16.default.createElement(import_material12.Box, { sx: { display: "flex", alignItems: "center", gap: 1 } }, /* @__PURE__ */ import_react16.default.createElement(import_material12.Typography, { variant: "overline", color: "text.secondary" }, "Sources"), total > 0 && /* @__PURE__ */ import_react16.default.createElement(import_material12.Chip, { size: "small", label: total, variant: "outlined" })), total === 0 ? /* @__PURE__ */ import_react16.default.createElement(import_material12.Typography, { variant: "body2", color: "text.secondary", sx: { mt: 0.5 } }, "No sources for the latest reply yet.") : groups.map((group) => /* @__PURE__ */ import_react16.default.createElement(import_material12.Box, { key: group.key, sx: { mt: 1 } }, /* @__PURE__ */ import_react16.default.createElement(
         import_material12.Typography,
         {
-          variant: "body2",
+          variant: "caption",
           color: "text.secondary",
-          sx: {
-            mt: 0.5,
-            whiteSpace: "pre-wrap",
-            maxHeight: 120,
-            overflow: "auto",
-            fontFamily: "monospace",
-            fontSize: "0.75rem"
-          }
+          sx: { display: "block", mb: 0.5, fontWeight: 600 }
         },
-        c.snippet
-      ))));
+        group.label,
+        " (",
+        group.items.length,
+        ")"
+      ), group.items.map((s, i) => /* @__PURE__ */ import_react16.default.createElement(SourceRow, { key: `${group.key}-${i}`, source: s })))));
     };
   }
 });
@@ -2123,7 +2193,7 @@ function sortThreads(threads) {
     return b.updatedAt - a.updatedAt;
   });
 }
-var import_react18, import_material14, import_Add, import_Delete, import_Settings2, import_Chat, import_Send, import_Stop, import_Search, import_MoreVert, import_PushPin, import_PushPinOutlined, import_FileDownload, import_FileUpload, import_ChevronLeft, import_ChevronRight, import_Link2, import_Close, import_AttachFile, import_ExpandMore2, import_History, import_ai2, import_core_plugin_api6, SIDEBAR_WIDTH, SIDEBAR_RAIL_WIDTH, RIGHT_RAIL_WIDTH, CHAT_MAX_WIDTH, URL_TOKEN_RE, URL_PREVIEW_DEBOUNCE_MS, KEY_REMINT_SKEW_MS, MAX_ATTACHMENTS_PER_MESSAGE, ALLOWED_ATTACHMENT_MEDIA_TYPES, ChatPage;
+var import_react18, import_material14, import_Add, import_Delete, import_Settings2, import_Chat, import_Send, import_Stop, import_Search, import_MoreVert, import_PushPin, import_PushPinOutlined, import_FileDownload, import_FileUpload, import_ChevronLeft, import_ChevronRight, import_Link2, import_Close, import_AttachFile, import_ExpandMore3, import_History, import_ai2, import_core_plugin_api6, SIDEBAR_WIDTH, SIDEBAR_RAIL_WIDTH, RIGHT_RAIL_WIDTH, CHAT_MAX_WIDTH, URL_TOKEN_RE, URL_PREVIEW_DEBOUNCE_MS, KEY_REMINT_SKEW_MS, MAX_ATTACHMENTS_PER_MESSAGE, ALLOWED_ATTACHMENT_MEDIA_TYPES, ChatPage;
 var init_ChatPage = __esm({
   "src/components/ChatPage.tsx"() {
     "use strict";
@@ -2146,7 +2216,7 @@ var init_ChatPage = __esm({
     import_Link2 = __toESM(require("@mui/icons-material/Link"));
     import_Close = __toESM(require("@mui/icons-material/Close"));
     import_AttachFile = __toESM(require("@mui/icons-material/AttachFile"));
-    import_ExpandMore2 = __toESM(require("@mui/icons-material/ExpandMore"));
+    import_ExpandMore3 = __toESM(require("@mui/icons-material/ExpandMore"));
     import_History = __toESM(require("@mui/icons-material/History"));
     import_ai2 = require("ai");
     import_core_plugin_api6 = require("@backstage/core-plugin-api");
@@ -2528,7 +2598,7 @@ var init_ChatPage = __esm({
           /* @__PURE__ */ import_react18.default.createElement(import_material14.Typography, { variant: "overline", sx: { flex: 1 } }, "History"),
           config.persistence.enabled && /* @__PURE__ */ import_react18.default.createElement(import_material14.Tooltip, { title: persistenceTooltip }, /* @__PURE__ */ import_react18.default.createElement(import_material14.Typography, { variant: "caption", color: "text.secondary", sx: { mr: 0.5 } }, config.persistence.ttlDays > 0 ? `${config.persistence.ttlDays}d` : "saved")),
           /* @__PURE__ */ import_react18.default.createElement(
-            import_ExpandMore2.default,
+            import_ExpandMore3.default,
             {
               fontSize: "small",
               sx: {

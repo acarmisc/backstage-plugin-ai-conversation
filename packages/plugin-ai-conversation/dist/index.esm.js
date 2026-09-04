@@ -2036,44 +2036,123 @@ var init_ErrorBanner = __esm({
 
 // src/components/SourcesPanel.tsx
 import React12 from "react";
-import { Box as Box10, Chip as Chip5, Typography as Typography6 } from "@mui/material";
-var SourcesPanel;
+import {
+  Accordion as Accordion2,
+  AccordionDetails as AccordionDetails2,
+  AccordionSummary as AccordionSummary2,
+  Box as Box10,
+  Chip as Chip5,
+  Divider,
+  Tooltip as Tooltip4,
+  Typography as Typography6
+} from "@mui/material";
+import ExpandMoreIcon2 from "@mui/icons-material/ExpandMore";
+function relevanceLabel(score) {
+  if (score >= 0.7) return "High";
+  if (score >= 0.4) return "Medium";
+  return "Low";
+}
+function dedupe(citations) {
+  const byKey = /* @__PURE__ */ new Map();
+  for (const c of citations) {
+    const key = (c.url || c.filename || "").toLowerCase();
+    const existing = byKey.get(key);
+    if (existing) {
+      existing.bestScore = Math.max(existing.bestScore, c.score);
+      if (c.snippet && !existing.snippets.includes(c.snippet)) {
+        existing.snippets.push(c.snippet);
+      }
+    } else {
+      byKey.set(key, {
+        filename: c.filename,
+        url: c.url,
+        source: c.source,
+        bestScore: c.score,
+        snippets: c.snippet ? [c.snippet] : []
+      });
+    }
+  }
+  return [...byKey.values()].sort((a, b) => b.bestScore - a.bestScore);
+}
+function groupSources(citations) {
+  const deduped = dedupe(citations);
+  const groups = [
+    { key: "kb", label: "Knowledge base", items: [] },
+    { key: "web", label: "Web", items: [] },
+    { key: "other", label: "Other", items: [] }
+  ];
+  for (const s of deduped) {
+    if (s.source === "kb") groups[0].items.push(s);
+    else if (s.source === "web") groups[1].items.push(s);
+    else groups[2].items.push(s);
+  }
+  return groups.filter((g) => g.items.length > 0);
+}
+var SourceRow, SourcesPanel;
 var init_SourcesPanel = __esm({
   "src/components/SourcesPanel.tsx"() {
     "use strict";
     init_safeUrl();
-    SourcesPanel = ({ citations }) => {
-      return /* @__PURE__ */ React12.createElement(Box10, { sx: { p: 1.5 } }, /* @__PURE__ */ React12.createElement(Typography6, { variant: "overline", color: "text.secondary" }, "Sources"), citations.length === 0 ? /* @__PURE__ */ React12.createElement(Typography6, { variant: "body2", color: "text.secondary", sx: { mt: 0.5 } }, "No sources for the latest reply yet.") : citations.map((c, i) => /* @__PURE__ */ React12.createElement(Box10, { key: i, sx: { mt: 1.5 } }, /* @__PURE__ */ React12.createElement(Box10, { sx: { display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" } }, /* @__PURE__ */ React12.createElement(Typography6, { variant: "body2", fontWeight: 500 }, safeHref(c.url) ? /* @__PURE__ */ React12.createElement("a", { href: safeHref(c.url), target: "_blank", rel: "noopener noreferrer" }, c.filename) : c.filename), c.source && /* @__PURE__ */ React12.createElement(
-        Chip5,
+    SourceRow = ({ source }) => {
+      const href = safeHref(source.url);
+      const rel = relevanceLabel(source.bestScore);
+      const passages = source.snippets.length;
+      return /* @__PURE__ */ React12.createElement(
+        Accordion2,
         {
-          size: "small",
-          label: c.source === "web" ? "Web" : "Knowledge base",
+          disableGutters: true,
           variant: "outlined",
-          color: c.source === "web" ? "secondary" : "default"
-        }
-      ), /* @__PURE__ */ React12.createElement(Chip5, { size: "small", label: c.score.toFixed(3), color: "primary", variant: "outlined" })), /* @__PURE__ */ React12.createElement(
+          sx: { "&:before": { display: "none" }, mb: 0.5 }
+        },
+        /* @__PURE__ */ React12.createElement(
+          AccordionSummary2,
+          {
+            expandIcon: /* @__PURE__ */ React12.createElement(ExpandMoreIcon2, { fontSize: "small" }),
+            sx: { minHeight: 0, "& .MuiAccordionSummary-content": { my: 0.75, mr: 1 } }
+          },
+          /* @__PURE__ */ React12.createElement(Box10, { sx: { display: "flex", flexDirection: "column", gap: 0.25, minWidth: 0 } }, /* @__PURE__ */ React12.createElement(
+            Typography6,
+            {
+              variant: "body2",
+              fontWeight: 500,
+              sx: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }
+            },
+            source.filename
+          ), /* @__PURE__ */ React12.createElement(Typography6, { variant: "caption", color: "text.secondary" }, /* @__PURE__ */ React12.createElement(Tooltip4, { title: `Score ${source.bestScore.toFixed(3)}` }, /* @__PURE__ */ React12.createElement("span", null, rel, " relevance")), passages > 1 ? ` \xB7 ${passages} passages` : ""))
+        ),
+        /* @__PURE__ */ React12.createElement(AccordionDetails2, { sx: { pt: 0 } }, href && /* @__PURE__ */ React12.createElement(Typography6, { variant: "caption", sx: { display: "block", mb: 1 } }, /* @__PURE__ */ React12.createElement("a", { href, target: "_blank", rel: "noopener noreferrer" }, "Open source")), source.snippets.map((snippet, i) => /* @__PURE__ */ React12.createElement(Box10, { key: i }, i > 0 && /* @__PURE__ */ React12.createElement(Divider, { sx: { my: 1 } }), /* @__PURE__ */ React12.createElement(
+          Typography6,
+          {
+            variant: "body2",
+            color: "text.secondary",
+            sx: { whiteSpace: "pre-wrap", maxHeight: 220, overflow: "auto" }
+          },
+          snippet
+        ))), source.snippets.length === 0 && /* @__PURE__ */ React12.createElement(Typography6, { variant: "body2", color: "text.secondary" }, "No excerpt available."))
+      );
+    };
+    SourcesPanel = ({ citations }) => {
+      const groups = groupSources(citations);
+      const total = groups.reduce((n, g) => n + g.items.length, 0);
+      return /* @__PURE__ */ React12.createElement(Box10, { sx: { p: 1.5 } }, /* @__PURE__ */ React12.createElement(Box10, { sx: { display: "flex", alignItems: "center", gap: 1 } }, /* @__PURE__ */ React12.createElement(Typography6, { variant: "overline", color: "text.secondary" }, "Sources"), total > 0 && /* @__PURE__ */ React12.createElement(Chip5, { size: "small", label: total, variant: "outlined" })), total === 0 ? /* @__PURE__ */ React12.createElement(Typography6, { variant: "body2", color: "text.secondary", sx: { mt: 0.5 } }, "No sources for the latest reply yet.") : groups.map((group) => /* @__PURE__ */ React12.createElement(Box10, { key: group.key, sx: { mt: 1 } }, /* @__PURE__ */ React12.createElement(
         Typography6,
         {
-          variant: "body2",
+          variant: "caption",
           color: "text.secondary",
-          sx: {
-            mt: 0.5,
-            whiteSpace: "pre-wrap",
-            maxHeight: 120,
-            overflow: "auto",
-            fontFamily: "monospace",
-            fontSize: "0.75rem"
-          }
+          sx: { display: "block", mb: 0.5, fontWeight: 600 }
         },
-        c.snippet
-      ))));
+        group.label,
+        " (",
+        group.items.length,
+        ")"
+      ), group.items.map((s, i) => /* @__PURE__ */ React12.createElement(SourceRow, { key: `${group.key}-${i}`, source: s })))));
     };
   }
 });
 
 // src/components/UsagePanel.tsx
 import React13 from "react";
-import { Box as Box11, Divider, LinearProgress, Typography as Typography7 } from "@mui/material";
+import { Box as Box11, Divider as Divider2, LinearProgress, Typography as Typography7 } from "@mui/material";
 function formatUsd(n) {
   return `$${n.toFixed(4)}`;
 }
@@ -2088,7 +2167,7 @@ var init_UsagePanel = __esm({
       keySpend
     }) => {
       const budgetPct = keySpend?.max_budget && keySpend.max_budget > 0 ? Math.min(100, keySpend.spend / keySpend.max_budget * 100) : null;
-      return /* @__PURE__ */ React13.createElement(Box11, { sx: { p: 1.5 } }, /* @__PURE__ */ React13.createElement(Typography7, { variant: "overline", color: "text.secondary" }, "Usage"), !lastTurnUsage && !keySpend ? /* @__PURE__ */ React13.createElement(Typography7, { variant: "body2", color: "text.secondary", sx: { mt: 0.5 } }, "Send a message to see token and budget usage.") : /* @__PURE__ */ React13.createElement(Box11, { sx: { mt: 0.5 } }, lastTurnUsage && /* @__PURE__ */ React13.createElement(React13.Fragment, null, /* @__PURE__ */ React13.createElement(Stat, { label: "This turn", value: `${lastTurnUsage.total_tokens.toLocaleString()} tokens` }), /* @__PURE__ */ React13.createElement(Stat, { label: "Prompt / completion", value: `${lastTurnUsage.prompt_tokens.toLocaleString()} / ${lastTurnUsage.completion_tokens.toLocaleString()}` }), /* @__PURE__ */ React13.createElement(Stat, { label: "Session total", value: `${totalTokens.toLocaleString()} tokens` })), keySpend && /* @__PURE__ */ React13.createElement(React13.Fragment, null, /* @__PURE__ */ React13.createElement(Divider, { sx: { my: 1 } }), /* @__PURE__ */ React13.createElement(Stat, { label: "Spent", value: formatUsd(keySpend.spend) }), keySpend.max_budget != null && /* @__PURE__ */ React13.createElement(React13.Fragment, null, /* @__PURE__ */ React13.createElement(Stat, { label: "Budget", value: `${formatUsd(keySpend.spend)} / ${formatUsd(keySpend.max_budget)}` }), /* @__PURE__ */ React13.createElement(
+      return /* @__PURE__ */ React13.createElement(Box11, { sx: { p: 1.5 } }, /* @__PURE__ */ React13.createElement(Typography7, { variant: "overline", color: "text.secondary" }, "Usage"), !lastTurnUsage && !keySpend ? /* @__PURE__ */ React13.createElement(Typography7, { variant: "body2", color: "text.secondary", sx: { mt: 0.5 } }, "Send a message to see token and budget usage.") : /* @__PURE__ */ React13.createElement(Box11, { sx: { mt: 0.5 } }, lastTurnUsage && /* @__PURE__ */ React13.createElement(React13.Fragment, null, /* @__PURE__ */ React13.createElement(Stat, { label: "This turn", value: `${lastTurnUsage.total_tokens.toLocaleString()} tokens` }), /* @__PURE__ */ React13.createElement(Stat, { label: "Prompt / completion", value: `${lastTurnUsage.prompt_tokens.toLocaleString()} / ${lastTurnUsage.completion_tokens.toLocaleString()}` }), /* @__PURE__ */ React13.createElement(Stat, { label: "Session total", value: `${totalTokens.toLocaleString()} tokens` })), keySpend && /* @__PURE__ */ React13.createElement(React13.Fragment, null, /* @__PURE__ */ React13.createElement(Divider2, { sx: { my: 1 } }), /* @__PURE__ */ React13.createElement(Stat, { label: "Spent", value: formatUsd(keySpend.spend) }), keySpend.max_budget != null && /* @__PURE__ */ React13.createElement(React13.Fragment, null, /* @__PURE__ */ React13.createElement(Stat, { label: "Budget", value: `${formatUsd(keySpend.spend)} / ${formatUsd(keySpend.max_budget)}` }), /* @__PURE__ */ React13.createElement(
         LinearProgress,
         {
           variant: "determinate",
@@ -2116,9 +2195,9 @@ import {
   ListItemButton,
   ListItemText,
   IconButton as IconButton4,
-  Divider as Divider2,
+  Divider as Divider3,
   Typography as Typography8,
-  Tooltip as Tooltip4,
+  Tooltip as Tooltip5,
   InputBase,
   Menu,
   MenuItem as MenuItem3,
@@ -2142,7 +2221,7 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import LinkIcon2 from "@mui/icons-material/Link";
 import CloseIcon from "@mui/icons-material/Close";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
-import ExpandMoreIcon2 from "@mui/icons-material/ExpandMore";
+import ExpandMoreIcon3 from "@mui/icons-material/ExpandMore";
 import HistoryIcon from "@mui/icons-material/History";
 import { convertFileListToFileUIParts } from "ai";
 import { useApi as useApi4, identityApiRef } from "@backstage/core-plugin-api";
@@ -2448,7 +2527,7 @@ var init_ChatPage = __esm({
           }
         );
       } else if (urlPreview) {
-        urlPreviewChip = /* @__PURE__ */ React14.createElement(Tooltip4, { title: urlPreview.url }, /* @__PURE__ */ React14.createElement(
+        urlPreviewChip = /* @__PURE__ */ React14.createElement(Tooltip5, { title: urlPreview.url }, /* @__PURE__ */ React14.createElement(
           Chip6,
           {
             size: "small",
@@ -2474,8 +2553,8 @@ var init_ChatPage = __esm({
             transition: "width 0.15s"
           }
         },
-        /* @__PURE__ */ React14.createElement(Box12, { sx: { display: "flex", alignItems: "center", justifyContent: sidebarCollapsed ? "center" : "flex-end", px: 0.5, py: 0.5 } }, /* @__PURE__ */ React14.createElement(Tooltip4, { title: sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar" }, /* @__PURE__ */ React14.createElement(IconButton4, { size: "small", onClick: () => setSidebarCollapsed((v) => !v) }, sidebarCollapsed ? /* @__PURE__ */ React14.createElement(ChevronRightIcon, { fontSize: "small" }) : /* @__PURE__ */ React14.createElement(ChevronLeftIcon, { fontSize: "small" })))),
-        sidebarCollapsed ? /* @__PURE__ */ React14.createElement(Box12, { sx: { display: "flex", flexDirection: "column", alignItems: "center", gap: 1, pt: 1 } }, /* @__PURE__ */ React14.createElement(Tooltip4, { title: "New chat", placement: "right" }, /* @__PURE__ */ React14.createElement(IconButton4, { onClick: () => chat.newThread() }, /* @__PURE__ */ React14.createElement(AddIcon, null))), /* @__PURE__ */ React14.createElement(Tooltip4, { title: "Settings", placement: "right" }, /* @__PURE__ */ React14.createElement(IconButton4, { onClick: () => setSidebarCollapsed(false) }, /* @__PURE__ */ React14.createElement(SettingsIcon2, null)))) : /* @__PURE__ */ React14.createElement(React14.Fragment, null, /* @__PURE__ */ React14.createElement(
+        /* @__PURE__ */ React14.createElement(Box12, { sx: { display: "flex", alignItems: "center", justifyContent: sidebarCollapsed ? "center" : "flex-end", px: 0.5, py: 0.5 } }, /* @__PURE__ */ React14.createElement(Tooltip5, { title: sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar" }, /* @__PURE__ */ React14.createElement(IconButton4, { size: "small", onClick: () => setSidebarCollapsed((v) => !v) }, sidebarCollapsed ? /* @__PURE__ */ React14.createElement(ChevronRightIcon, { fontSize: "small" }) : /* @__PURE__ */ React14.createElement(ChevronLeftIcon, { fontSize: "small" })))),
+        sidebarCollapsed ? /* @__PURE__ */ React14.createElement(Box12, { sx: { display: "flex", flexDirection: "column", alignItems: "center", gap: 1, pt: 1 } }, /* @__PURE__ */ React14.createElement(Tooltip5, { title: "New chat", placement: "right" }, /* @__PURE__ */ React14.createElement(IconButton4, { onClick: () => chat.newThread() }, /* @__PURE__ */ React14.createElement(AddIcon, null))), /* @__PURE__ */ React14.createElement(Tooltip5, { title: "Settings", placement: "right" }, /* @__PURE__ */ React14.createElement(IconButton4, { onClick: () => setSidebarCollapsed(false) }, /* @__PURE__ */ React14.createElement(SettingsIcon2, null)))) : /* @__PURE__ */ React14.createElement(React14.Fragment, null, /* @__PURE__ */ React14.createElement(
           ChatSettingsPanel,
           {
             showSettings,
@@ -2504,7 +2583,7 @@ var init_ChatPage = __esm({
             reasoningEffort,
             onReasoningEffortChange: setReasoningEffort
           }
-        ), /* @__PURE__ */ React14.createElement(Divider2, null), /* @__PURE__ */ React14.createElement(Box12, { sx: { p: 1.5, display: "flex", gap: 1 } }, /* @__PURE__ */ React14.createElement(
+        ), /* @__PURE__ */ React14.createElement(Divider3, null), /* @__PURE__ */ React14.createElement(Box12, { sx: { p: 1.5, display: "flex", gap: 1 } }, /* @__PURE__ */ React14.createElement(
           Button2,
           {
             fullWidth: true,
@@ -2514,7 +2593,7 @@ var init_ChatPage = __esm({
             size: "small"
           },
           "New chat"
-        ), /* @__PURE__ */ React14.createElement(Tooltip4, { title: "Import thread" }, /* @__PURE__ */ React14.createElement(IconButton4, { size: "small", onClick: () => importInputRef.current?.click() }, /* @__PURE__ */ React14.createElement(FileUploadIcon, { fontSize: "small" }))), /* @__PURE__ */ React14.createElement(
+        ), /* @__PURE__ */ React14.createElement(Tooltip5, { title: "Import thread" }, /* @__PURE__ */ React14.createElement(IconButton4, { size: "small", onClick: () => importInputRef.current?.click() }, /* @__PURE__ */ React14.createElement(FileUploadIcon, { fontSize: "small" }))), /* @__PURE__ */ React14.createElement(
           "input",
           {
             ref: importInputRef,
@@ -2538,9 +2617,9 @@ var init_ChatPage = __esm({
           },
           /* @__PURE__ */ React14.createElement(HistoryIcon, { fontSize: "small", sx: { mr: 1 } }),
           /* @__PURE__ */ React14.createElement(Typography8, { variant: "overline", sx: { flex: 1 } }, "History"),
-          config.persistence.enabled && /* @__PURE__ */ React14.createElement(Tooltip4, { title: persistenceTooltip }, /* @__PURE__ */ React14.createElement(Typography8, { variant: "caption", color: "text.secondary", sx: { mr: 0.5 } }, config.persistence.ttlDays > 0 ? `${config.persistence.ttlDays}d` : "saved")),
+          config.persistence.enabled && /* @__PURE__ */ React14.createElement(Tooltip5, { title: persistenceTooltip }, /* @__PURE__ */ React14.createElement(Typography8, { variant: "caption", color: "text.secondary", sx: { mr: 0.5 } }, config.persistence.ttlDays > 0 ? `${config.persistence.ttlDays}d` : "saved")),
           /* @__PURE__ */ React14.createElement(
-            ExpandMoreIcon2,
+            ExpandMoreIcon3,
             {
               fontSize: "small",
               sx: {
@@ -2658,7 +2737,7 @@ var init_ChatPage = __esm({
             },
             /* @__PURE__ */ React14.createElement(ChatIcon, { fontSize: "small", color: "action" }),
             /* @__PURE__ */ React14.createElement(Typography8, { variant: "subtitle2", noWrap: true, sx: { flex: 1 } }, chat.activeThread?.title ?? "AI Chat"),
-            /* @__PURE__ */ React14.createElement(Tooltip4, { title: rightPanelCollapsed ? "Show context panel" : "Hide context panel" }, /* @__PURE__ */ React14.createElement(IconButton4, { size: "small", onClick: () => setRightPanelCollapsed((v) => !v) }, rightPanelCollapsed ? /* @__PURE__ */ React14.createElement(ChevronLeftIcon, { fontSize: "small" }) : /* @__PURE__ */ React14.createElement(ChevronRightIcon, { fontSize: "small" })))
+            /* @__PURE__ */ React14.createElement(Tooltip5, { title: rightPanelCollapsed ? "Show context panel" : "Hide context panel" }, /* @__PURE__ */ React14.createElement(IconButton4, { size: "small", onClick: () => setRightPanelCollapsed((v) => !v) }, rightPanelCollapsed ? /* @__PURE__ */ React14.createElement(ChevronLeftIcon, { fontSize: "small" }) : /* @__PURE__ */ React14.createElement(ChevronRightIcon, { fontSize: "small" })))
           ),
           chat.error && /* @__PURE__ */ React14.createElement(Box12, { sx: { px: 2, pt: 1 } }, /* @__PURE__ */ React14.createElement(ErrorBanner, { error: chat.error, onDismiss: () => {
           } })),
@@ -2721,7 +2800,7 @@ var init_ChatPage = __esm({
                 alignItems: "flex-end"
               }
             },
-            /* @__PURE__ */ React14.createElement(Tooltip4, { title: "Attach image" }, /* @__PURE__ */ React14.createElement(IconButton4, { size: "small", onClick: () => attachInputRef.current?.click() }, /* @__PURE__ */ React14.createElement(AttachFileIcon, { fontSize: "small" }))),
+            /* @__PURE__ */ React14.createElement(Tooltip5, { title: "Attach image" }, /* @__PURE__ */ React14.createElement(IconButton4, { size: "small", onClick: () => attachInputRef.current?.click() }, /* @__PURE__ */ React14.createElement(AttachFileIcon, { fontSize: "small" }))),
             /* @__PURE__ */ React14.createElement(
               "input",
               {
@@ -2754,7 +2833,7 @@ var init_ChatPage = __esm({
                 }
               }
             ),
-            isStreaming ? /* @__PURE__ */ React14.createElement(Tooltip4, { title: "Stop" }, /* @__PURE__ */ React14.createElement(IconButton4, { color: "error", onClick: chat.stopGeneration }, /* @__PURE__ */ React14.createElement(StopIcon, null))) : /* @__PURE__ */ React14.createElement(Tooltip4, { title: "Send" }, /* @__PURE__ */ React14.createElement(
+            isStreaming ? /* @__PURE__ */ React14.createElement(Tooltip5, { title: "Stop" }, /* @__PURE__ */ React14.createElement(IconButton4, { color: "error", onClick: chat.stopGeneration }, /* @__PURE__ */ React14.createElement(StopIcon, null))) : /* @__PURE__ */ React14.createElement(Tooltip5, { title: "Send" }, /* @__PURE__ */ React14.createElement(
               IconButton4,
               {
                 color: "primary",
@@ -2780,7 +2859,7 @@ var init_ChatPage = __esm({
           }
         },
         /* @__PURE__ */ React14.createElement(SourcesPanel, { citations: chat.citations }),
-        /* @__PURE__ */ React14.createElement(Divider2, null),
+        /* @__PURE__ */ React14.createElement(Divider3, null),
         /* @__PURE__ */ React14.createElement(
           UsagePanel,
           {
