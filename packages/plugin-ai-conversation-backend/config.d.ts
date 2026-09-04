@@ -64,6 +64,28 @@ export interface Config {
       };
 
       /**
+       * Where chat skills (system-prompt presets) are discovered. When
+       * omitted, both the skills bundled with the plugin and any
+       * `chat-skill` catalog entities are used.
+       * @visibility backend
+       */
+      skills?: {
+        /**
+         * Ordered list of skill sources. Each entry currently supports
+         * `type: 'bundled'` (SKILL.md dirs shipped with the plugin) or
+         * `type: 'catalog'` (`chat-skill` Component entities). Order is
+         * the precedence for id collisions and prompt resolution.
+         */
+        sources?: Array<{ type: string }>;
+
+        /**
+         * Override the directory the `bundled` source reads SKILL.md
+         * folders from. Defaults to the `skills/` dir inside this package.
+         */
+        bundledPath?: string;
+      };
+
+      /**
        * Model ids known to accept image attachments (Phase 18). Overrides
        * the built-in naming-pattern heuristic — LiteLLM's own model
        * registry carries no vision/multimodal capability metadata, so

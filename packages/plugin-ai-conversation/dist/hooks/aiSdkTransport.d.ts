@@ -23,6 +23,7 @@ export interface ChatRequestSettings {
     topK?: number;
     userKey: string;
     threadId: string;
+    skillId?: string;
 }
 /**
  * Builds the custom Transport `useChat` streams through — points at the

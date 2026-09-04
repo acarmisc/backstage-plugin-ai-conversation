@@ -48,7 +48,7 @@ import { MessageList } from './MessageList';
 import { ErrorBanner } from './ErrorBanner';
 import { SourcesPanel } from './SourcesPanel';
 import { UsagePanel } from './UsagePanel';
-import type { ChatConfig, ChatTraits, ReasoningEffort, Thread, UrlContextPreview } from '../types';
+import type { ChatConfig, ChatTraits, ReasoningEffort, Skill, Thread, UrlContextPreview } from '../types';
 
 const SIDEBAR_WIDTH = 280;
 const SIDEBAR_RAIL_WIDTH = 48;
@@ -56,6 +56,9 @@ const RIGHT_RAIL_WIDTH = 300;
 const CHAT_MAX_WIDTH = 900;
 const URL_TOKEN_RE = /#(https:\/\/\S+)/;
 const URL_PREVIEW_DEBOUNCE_MS = 500;
+// Re-mint a chat key this far ahead of its expiry rather than letting the
+// send race the TTL and fail upstream.
+const KEY_REMINT_SKEW_MS = 60_000;
 // Mirrors plugin-ai-conversation-backend/src/attachments.ts — kept in sync
 // manually since the two packages don't share a types module. A mismatch
 // here just means the user sees a later 400 instead of an earlier one.
@@ -96,10 +99,12 @@ export const ChatPage: React.FC = () => {
   const [focusId, setFocusId] = useState('');
   const [verbosityId, setVerbosityId] = useState('');
   const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort | ''>('');
-  const [keyVal, setKeyVal] = useState<{ alias: string; token: string }>({
+  const [keyVal, setKeyVal] = useState<{ alias: string; token: string; expiresAt?: number }>({
     alias: '',
     token: '',
   });
+  const [skillId, setSkillId] = useState('');
+  const [skills, setSkills] = useState<Skill[]>([]);
   const [showSettings, setShowSettings] = useState(true);
   const [input, setInput] = useState('');
   const [configError, setConfigError] = useState<string | null>(null);
@@ -146,6 +151,10 @@ export const ChatPage: React.FC = () => {
       })
       .catch(() => {})
       .finally(() => setTraitsLoading(false));
+    chatApi
+      .listSkills()
+      .then(setSkills)
+      .catch(() => {});
     identityApi
       .getCredentials()
       .then(c => setUserId(c.token ? 'oidc' : 'default'))
@@ -163,9 +172,12 @@ export const ChatPage: React.FC = () => {
     reasoningEffort,
     keyAlias: keyVal.alias,
     keyToken: keyVal.token,
+    keyExpiresAt: keyVal.expiresAt,
+    skillId,
     topK: 5,
     webSearch,
     persistenceEnabled: config.persistence.enabled,
+    onKeyChange: setKeyVal,
   });
 
   // Restore the selected thread's own model/KBs/key into Settings
@@ -182,7 +194,12 @@ export const ChatPage: React.FC = () => {
     setFocusId(chat.activeThread.focusId ?? '');
     setVerbosityId(chat.activeThread.verbosityId ?? '');
     setReasoningEffort(chat.activeThread.reasoningEffort ?? '');
-    setKeyVal({ alias: chat.activeThread.keyAlias, token: chat.activeThread.keyToken });
+    setKeyVal({
+      alias: chat.activeThread.keyAlias,
+      token: chat.activeThread.keyToken,
+      expiresAt: chat.activeThread.keyExpiresAt,
+    });
+    setSkillId(chat.activeThread.skillId ?? '');
     setWebSearch(!!chat.activeThread.webSearch);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeThreadId]);
@@ -248,14 +265,36 @@ export const ChatPage: React.FC = () => {
     [chat.threads, searchQuery],
   );
 
+  // Selecting a skill prefills the model / knowledge bases it declares as
+  // defaults (the user can still override afterwards) — same behaviour the
+  // old PersonaPicker had. Clearing the skill leaves the current picks
+  // untouched.
+  const handleSkillChange = (id: string) => {
+    setSkillId(id);
+    const skill = skills.find(s => s.id === id);
+    if (!skill) return;
+    if (skill.defaultModel) setModel(skill.defaultModel);
+    if (skill.defaultVectorStoreIds?.length) setVectorStoreIds(skill.defaultVectorStoreIds);
+  };
+
   const handleSend = async () => {
     if (!input.trim() || isStreaming) return;
     let currentKey = keyVal;
-    // Auto-mint a chat key on first message if none exists yet.
-    if (!currentKey.token) {
+    // Mint a chat key on the first message, or re-mint an expired one when
+    // starting a fresh thread (no active thread to attach a retry to).
+    // A key that goes stale on an existing thread is instead recovered
+    // reactively in useThreads — mint once, then replay the failed turn —
+    // so it isn't re-minted here as well.
+    const expired =
+      !!currentKey.expiresAt && currentKey.expiresAt - Date.now() < KEY_REMINT_SKEW_MS;
+    if (!currentKey.token || (expired && !chat.activeThread)) {
       try {
         const keyInfo = await chatApi.mintChatKey();
-        currentKey = { alias: keyInfo.key_alias, token: keyInfo.key };
+        currentKey = {
+          alias: keyInfo.key_alias,
+          token: keyInfo.key,
+          expiresAt: keyInfo.expires_at ? Date.parse(keyInfo.expires_at) : undefined,
+        };
         setKeyVal(currentKey);
       } catch {
         return; // key mint failed — silently abort
@@ -452,6 +491,9 @@ export const ChatPage: React.FC = () => {
               config={config}
               traits={traits}
               traitsLoading={traitsLoading}
+              skills={skills}
+              skillId={skillId}
+              onSkillChange={handleSkillChange}
               toneId={toneId}
               onToneChange={setToneId}
               focusId={focusId}

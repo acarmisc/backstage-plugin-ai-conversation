@@ -24,7 +24,11 @@ import {
   toOpenAIMessageContent,
   AttachmentValidationError,
 } from './attachments';
-import { entityToSkillSummary, resolveSystemPrompt } from './skills';
+import {
+  bundledSkillSource,
+  catalogSkillSource,
+  type SkillSource,
+} from './skills';
 import { fetchUrlContext, FetchedUrlContext } from './urlContext';
 import { TONE_OPTIONS, FOCUS_OPTIONS, VERBOSITY_OPTIONS, resolveTrait } from './traits';
 import {
@@ -44,7 +48,6 @@ import type {
   AiConversationConfig,
   SaveThreadRequest,
 } from './types';
-import { CHAT_PERSONA_TYPE } from './types';
 
 const DEFAULT_PERSISTENCE_TTL_DAYS = 30;
 
@@ -105,6 +108,28 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
   const scm = ScmIntegrations.fromConfig(config);
   const promptDeps = { reader: urlReader, scm };
   const promptCache = new Map<string, { prompt: string; expiresAt: number }>();
+
+  // Where skills come from. Default: the skills bundled with this package
+  // (so the picker works with no catalog setup) plus any `chat-skill`
+  // catalog entities. `litellm.aiConversation.skills.sources` overrides the
+  // list and order; a later `git` type slots in here without a config
+  // reshape. `resolveSkillPrompt` walks sources in order, first match wins.
+  const bundledSkillsDir =
+    config.getOptionalString('litellm.aiConversation.skills.bundledPath') ??
+    resolvePackagePath('@acarmisc/backstage-plugin-ai-conversation-backend', 'skills');
+  const makeSource = (type: string): SkillSource | undefined => {
+    if (type === 'bundled') return bundledSkillSource(bundledSkillsDir);
+    if (type === 'catalog') return catalogSkillSource({ catalog, auth, promptDeps });
+    logger.warn(`Unknown skill source type "${type}" — ignoring`);
+    return undefined;
+  };
+  const configuredSourceTypes =
+    config
+      .getOptionalConfigArray('litellm.aiConversation.skills.sources')
+      ?.map(s => s.getString('type')) ?? ['bundled', 'catalog'];
+  const skillSources: SkillSource[] = configuredSourceTypes
+    .map(makeSource)
+    .filter((s): s is SkillSource => !!s);
   const userIdDomain = config.getOptionalString('litellm.userIdDomain');
   const masterKey = config.getString('litellm.masterKey');
 
@@ -139,25 +164,29 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
     });
   }
 
-  // Resolves and caches a skill's system prompt by entity ref. Resolved
-  // server-side so the prompt text never has to round-trip through the
-  // browser (see SkillSummary in types.ts). Throws with a `status` field
-  // on invalid/missing skills so callers can respond with the right HTTP
-  // status.
+  // Resolves and caches a skill's system prompt by id, asking each
+  // configured source in order (first non-empty wins). Resolved
+  // server-side so the prompt text never round-trips through the browser
+  // (see SkillSummary in types.ts). Throws with a `status` field when no
+  // source recognizes the id, so callers can respond 400.
   async function resolveSkillPrompt(skillId: string): Promise<string> {
     const cached = promptCache.get(skillId);
     if (cached && cached.expiresAt > Date.now()) {
       return cached.prompt;
     }
 
-    const credentials = await auth.getOwnServiceCredentials();
-    const entity = await catalog.getEntityByRef(skillId, { credentials });
-    if (!entity || entity.spec?.type !== CHAT_PERSONA_TYPE) {
-      throw Object.assign(new Error('invalid skill_id'), { status: 400 });
+    let systemPrompt: string | undefined;
+    for (const source of skillSources) {
+      try {
+        systemPrompt = await source.resolvePrompt(skillId);
+      } catch (err: any) {
+        logger.warn(`Skill source ${source.name} failed to resolve "${skillId}": ${err.message}`);
+        continue;
+      }
+      if (systemPrompt) break;
     }
-    const systemPrompt = await resolveSystemPrompt(entity, promptDeps);
     if (!systemPrompt) {
-      throw Object.assign(new Error('skill has no system prompt'), { status: 400 });
+      throw Object.assign(new Error('unknown skill_id'), { status: 400 });
     }
     promptCache.set(skillId, {
       prompt: systemPrompt,
@@ -331,21 +360,34 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
 
   router.get('/skills', async (_req: Request, res: Response) => {
     try {
-      const credentials = await auth.getOwnServiceCredentials();
-      const [result, stores] = await Promise.all([
-        catalog.getEntities(
-          { filter: { kind: 'Component', 'spec.type': CHAT_PERSONA_TYPE } },
-          { credentials },
+      const [lists, stores] = await Promise.all([
+        // One source failing (catalog unreachable, bundled dir gone) must
+        // not blank the whole picker — degrade to whatever else resolved.
+        Promise.all(
+          skillSources.map(s =>
+            s.list().catch(err => {
+              logger.warn(`Skill source ${s.name} list failed: ${err.message}`);
+              return [];
+            }),
+          ),
         ),
         // Skill authors write human-friendly store names (e.g. "data-kb")
-        // in the catalog annotation — resolve them to the real
-        // vector_store_id the picker/request payload expects. Best-effort:
-        // if LiteLLM is unreachable, skills still list, just without
-        // resolved KB defaults.
+        // in frontmatter / the catalog annotation — resolve them to the
+        // real vector_store_id the picker/request payload expects.
+        // Best-effort: if LiteLLM is unreachable, skills still list, just
+        // without resolved KB defaults.
         fetchVectorStores().catch(() => [] as VectorStore[]),
       ]);
+
+      // First source to declare an id owns it (matches resolveSkillPrompt's
+      // first-match-wins order).
+      const byId = new Map<string, (typeof lists)[number][number]>();
+      for (const list of lists) {
+        for (const skill of list) if (!byId.has(skill.id)) byId.set(skill.id, skill);
+      }
+
       const byNameOrId = new Map(stores.flatMap(s => [[s.id, s.id], [s.name, s.id]] as const));
-      const skills = result.items.map(entityToSkillSummary).map(s => ({
+      const skills = [...byId.values()].map(s => ({
         ...s,
         defaultVectorStoreIds: s.defaultVectorStoreIds
           ?.map(v => byNameOrId.get(v))

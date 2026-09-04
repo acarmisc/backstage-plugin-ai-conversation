@@ -15,7 +15,8 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { ModelPicker } from './ModelPicker';
 import { VectorStorePicker } from './VectorStorePicker';
 import { OptionPicker } from './OptionPicker';
-import type { ChatConfig, ChatTraits, ReasoningEffort } from '../types';
+import { SkillPicker } from './SkillPicker';
+import type { ChatConfig, ChatTraits, ReasoningEffort, Skill } from '../types';
 
 const REASONING_EFFORT_OPTIONS: { id: ReasoningEffort; label: string }[] = [
   { id: 'low', label: 'Low' },
@@ -30,6 +31,9 @@ export interface ChatSettingsPanelProps {
   config: ChatConfig;
   traits: ChatTraits;
   traitsLoading: boolean;
+  skills: Skill[];
+  skillId: string;
+  onSkillChange: (id: string) => void;
   toneId: string;
   onToneChange: (id: string) => void;
   focusId: string;
@@ -55,6 +59,9 @@ export const ChatSettingsPanel: React.FC<ChatSettingsPanelProps> = ({
   config,
   traits,
   traitsLoading,
+  skills,
+  skillId,
+  onSkillChange,
   toneId,
   onToneChange,
   focusId,
@@ -106,6 +113,7 @@ export const ChatSettingsPanel: React.FC<ChatSettingsPanelProps> = ({
 
         {/* ── Main settings ── */}
         <Box sx={{ px: 1.5, py: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          <SkillPicker value={skillId} skills={skills} onChange={onSkillChange} />
           <ModelPicker value={model} onChange={onModelChange} defaultModel={config.defaultModel} />
           <VectorStorePicker
             value={vectorStoreIds}

@@ -101,6 +101,24 @@ function findQuestionFor(
 
 const SAVE_DEBOUNCE_MS = 400;
 
+/** True when a stream error is LiteLLM rejecting the chat key — expired,
+ * purged (proxy DB reset), or otherwise absent from its token table. The
+ * backend surfaces these as `upstream 401: {…}` (see proxyUIMessageStream);
+ * LiteLLM's own bodies carry `token_not_found_in_db` / `ExpiredToken` /
+ * "Invalid proxy server token". Any of these is recoverable by minting a
+ * fresh key and retrying. A 401 from our own backend ("unauthenticated")
+ * is deliberately not matched — that's a Backstage session problem, not a
+ * chat-key problem, and re-minting wouldn't help. */
+export function isChatKeyAuthError(message: string | undefined): boolean {
+  if (!message) return false;
+  return (
+    /upstream 401\b/i.test(message) ||
+    /token_not_found_in_db/i.test(message) ||
+    /invalid proxy server token/i.test(message) ||
+    /expiredtoken|expired token/i.test(message)
+  );
+}
+
 export interface UseChatOptions {
   userId: string;
   model: string;
@@ -112,15 +130,23 @@ export interface UseChatOptions {
   reasoningEffort: ReasoningEffort | '';
   keyAlias: string;
   keyToken: string;
+  keyExpiresAt?: number;
+  skillId?: string;
   topK?: number;
   webSearch?: boolean;
   persistenceEnabled?: boolean;
+  /** Called when the hook mints a replacement chat key after an upstream
+   * 401 (expired/purged key). Lets the owner (ChatPage) update the state
+   * it holds `keyAlias`/`keyToken` in, so subsequent sends and the
+   * thread-restore effect see the new key rather than reinstating the
+   * dead one. */
+  onKeyChange?: (key: { alias: string; token: string; expiresAt?: number }) => void;
 }
 
 export interface UseChatResult {
   threads: Thread[];
   activeThread: Thread | null;
-  newThread: (overrideKey?: { alias: string; token: string }) => void;
+  newThread: (overrideKey?: { alias: string; token: string; expiresAt?: number }) => void;
   selectThread: (id: string) => void;
   deleteThread: (id: string) => void;
   sendMessage: (
@@ -156,12 +182,31 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
     reasoningEffort,
     keyAlias,
     keyToken,
+    keyExpiresAt,
+    skillId,
     topK,
     webSearch,
     persistenceEnabled,
+    onKeyChange,
   } = opts;
   const api = useApi(aiConversationApiRef) as InstanceType<typeof AiConversationApi>;
   const fetchApi = useApi(fetchApiRef) as FetchApi;
+
+  // One auto re-mint + retry per run of consecutive auth failures — reset
+  // on a user-initiated send and on a successful finish. Without the guard
+  // a permanently-broken key (wrong LiteLLM, master-key mismatch) would
+  // mint-and-retry in a tight loop.
+  const authRetryRef = useRef(false);
+  // The last single-mode send's inputs, replayed by the retry effect once
+  // a replacement key has propagated back through props.
+  const lastSendRef = useRef<{
+    threadId: string;
+    text: string;
+    baseMessages: AiConversationUIMessage[];
+    attachedUrl?: { url: string; title: string };
+    files?: FileUIPart[];
+  } | null>(null);
+  const pendingRetryRef = useRef<typeof lastSendRef.current>(null);
 
   const [threads, setThreads] = useState<Thread[]>(() => loadThreads(userId));
   const [activeId, setActiveId] = useState<string | null>(() => threads[0]?.id ?? null);
@@ -207,6 +252,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
     topK,
     userKey: keyToken,
     threadId: activeThread?.id ?? '',
+    skillId,
   });
   settingsRef.current = {
     model,
@@ -220,6 +266,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
     topK,
     userKey: keyToken,
     threadId: activeThread?.id ?? '',
+    skillId,
   };
 
   const transport = useMemo(
@@ -261,8 +308,47 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
         );
       }
     },
-    onError: err => setError(err.message),
+    onError: err => {
+      // A rejected chat key (expired, or purged by a LiteLLM redeploy) is
+      // recoverable: mint a fresh one, thread it back through props, and
+      // replay the failed send once. Anything else — or a second failure
+      // in the same run — surfaces as before.
+      if (!authRetryRef.current && isChatKeyAuthError(err.message) && lastSendRef.current) {
+        authRetryRef.current = true;
+        const replay = lastSendRef.current;
+        api
+          .mintChatKey()
+          .then(info => {
+            const next = {
+              alias: info.key_alias,
+              token: info.key,
+              expiresAt: info.expires_at ? Date.parse(info.expires_at) : undefined,
+            };
+            setThreads(prev =>
+              prev.map(t =>
+                t.id === replay.threadId
+                  ? {
+                      ...t,
+                      keyAlias: next.alias,
+                      keyToken: next.token,
+                      keyExpiresAt: next.expiresAt,
+                    }
+                  : t,
+              ),
+            );
+            onKeyChange?.(next);
+            // Replay once keyToken has propagated back through props — see
+            // the effect keyed on keyToken below (same pattern ChatPage
+            // uses for a queued send after newThread()).
+            pendingRetryRef.current = replay;
+          })
+          .catch(() => setError(err.message));
+        return;
+      }
+      setError(err.message);
+    },
     onFinish: () => {
+      authRetryRef.current = false;
       if (keyAlias) api.getKeySpend(keyAlias).then(setKeySpend).catch(() => {});
     },
   });
@@ -414,6 +500,8 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
       customSystemPrompt,
       keyAlias,
       keyToken,
+      keyExpiresAt,
+      skillId,
       createdAt: Date.now(),
       updatedAt: Date.now(),
       totalTokens: 0,
@@ -433,7 +521,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
     // in a stale empty key here meant the "restore thread settings" effect
     // read it straight back onto keyVal on the next render, wiping out the
     // just-minted key before the second message could use it.
-    (overrideKey?: { alias: string; token: string }) => {
+    (overrideKey?: { alias: string; token: string; expiresAt?: number }) => {
       const thread: Thread = {
         id: genId(),
         title: 'New chat',
@@ -443,6 +531,8 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
         customSystemPrompt,
         keyAlias: overrideKey?.alias ?? keyAlias,
         keyToken: overrideKey?.token ?? keyToken,
+        keyExpiresAt: overrideKey ? overrideKey.expiresAt : keyExpiresAt,
+        skillId,
         createdAt: Date.now(),
         updatedAt: Date.now(),
         totalTokens: 0,
@@ -453,9 +543,10 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
       setError(null);
       setCitations([]);
       setKeySpend(null);
+      authRetryRef.current = false;
       compareChat.reset();
     },
-    [model, vectorStoreIds, customSystemPrompt, keyAlias, keyToken, compareChat],
+    [model, vectorStoreIds, customSystemPrompt, keyAlias, keyToken, keyExpiresAt, skillId, compareChat],
   );
 
   const selectThread = useCallback(
@@ -501,6 +592,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
     ) => {
       if (!text.trim() || !activeThread || !keyToken) return;
 
+      lastSendRef.current = { threadId: activeThread.id, text, baseMessages, attachedUrl, files };
       setError(null);
       setCitations([]);
 
@@ -520,6 +612,8 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
                 reasoningEffort: reasoningEffort || undefined,
                 keyAlias,
                 keyToken,
+                keyExpiresAt,
+                skillId,
                 webSearch,
                 mode: 'single',
                 updatedAt: Date.now(),
@@ -547,10 +641,27 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
       verbosityId,
       reasoningEffort,
       keyAlias,
+      keyExpiresAt,
+      skillId,
       webSearch,
       chat,
     ],
   );
+
+  // Replays the last single-mode send after onError minted a replacement
+  // key — fires once keyToken (a prop, updated by ChatPage via onKeyChange)
+  // has actually changed, so runSend's closure and the transport's
+  // settingsRef both carry the new key.
+  useEffect(() => {
+    const replay = pendingRetryRef.current;
+    if (!replay || !keyToken) return;
+    pendingRetryRef.current = null;
+    // Bail if the user switched threads in the sub-second re-mint window —
+    // replaying into the wrong conversation would be worse than the error.
+    if (activeThread?.id !== replay.threadId) return;
+    runSend(replay.text, replay.baseMessages, replay.attachedUrl, replay.files);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [keyToken]);
 
   const runCompareSend = useCallback(
     (
@@ -625,6 +736,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
       files?: FileUIPart[],
     ) => {
       if (!activeThread) return;
+      authRetryRef.current = false;
       const models =
         compareModelsOverride ??
         (activeThread.mode === 'compare' ? activeThread.compareModels : undefined);
@@ -640,6 +752,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
   const regenerateFrom = useCallback(
     (messageId: string) => {
       if (!activeThread) return;
+      authRetryRef.current = false;
       const target = computeRegenerateTarget(activeThread.messages, messageId);
       if (!target) return;
       const compareModels = activeThread.compareModels;
@@ -658,6 +771,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
   const editAndResend = useCallback(
     (messageId: string, newContent: string) => {
       if (!activeThread) return;
+      authRetryRef.current = false;
       const target = computeEditTarget(activeThread.messages, messageId);
       if (!target) return;
       if (activeThread.mode === 'compare' && activeThread.compareModels?.length) {

@@ -24,6 +24,7 @@ export interface ChatRequestSettings {
   topK?: number;
   userKey: string;
   threadId: string;
+  skillId?: string;
 }
 
 const BASE_PATH = '/api/ai-conversation';
@@ -54,6 +55,7 @@ export function createAiConversationTransport(
           model: s.model,
           messages,
           thread_id: s.threadId,
+          skill_id: s.skillId || undefined,
           vector_store_ids: s.vectorStoreIds.length ? s.vectorStoreIds : undefined,
           custom_system_prompt: s.customSystemPrompt || undefined,
           tone_id: s.toneId || undefined,

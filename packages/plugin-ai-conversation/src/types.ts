@@ -234,11 +234,21 @@ export interface Thread {
   customSystemPrompt: string;
   keyAlias: string;
   keyToken: string;
+  /** Epoch ms when `keyToken` expires (LiteLLM mints chat keys with a
+   * short TTL — see mintChatKey). Used to re-mint proactively before a
+   * send rather than letting the turn fail with an upstream 401. Absent
+   * on threads created before this field, and on server-restored threads
+   * (the key itself is never persisted). */
+  keyExpiresAt?: number;
   createdAt: number;
   updatedAt: number;
   totalTokens: number;
   lastTurnUsage: UsageInfo | null;
   pinned?: boolean;
+  /** Catalog entity ref of the selected chat-skill, e.g.
+   * "component:default/data-analyst". Sent as `skill_id`; the backend
+   * resolves and prepends its system prompt. */
+  skillId?: string;
   /** 'compare' sends the same prompt to every model in compareModels in
    * parallel instead of the single selected model. Missing/'single' is
    * the default for every thread created before this field existed. */

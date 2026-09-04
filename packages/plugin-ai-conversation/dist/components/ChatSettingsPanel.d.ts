@@ -1,5 +1,5 @@
 import React from 'react';
-import type { ChatConfig, ChatTraits, ReasoningEffort } from '../types';
+import type { ChatConfig, ChatTraits, ReasoningEffort, Skill } from '../types';
 export interface ChatSettingsPanelProps {
     showSettings: boolean;
     onToggleShowSettings: () => void;
@@ -7,6 +7,9 @@ export interface ChatSettingsPanelProps {
     config: ChatConfig;
     traits: ChatTraits;
     traitsLoading: boolean;
+    skills: Skill[];
+    skillId: string;
+    onSkillChange: (id: string) => void;
     toneId: string;
     onToneChange: (id: string) => void;
     focusId: string;
