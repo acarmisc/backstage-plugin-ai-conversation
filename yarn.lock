@@ -27,6 +27,7 @@ __metadata:
     jsdom: "npm:^27.1.0"
     typescript: "npm:^5.9.3"
     winston: "npm:^3.17.0"
+    yaml: "npm:^2.3.0"
     zod: "npm:^3"
   languageName: unknown
   linkType: soft
@@ -21858,7 +21859,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"yaml@npm:^2.0.0":
+"yaml@npm:^2.0.0, yaml@npm:^2.3.0":
   version: 2.9.0
   resolution: "yaml@npm:2.9.0"
   bin:
