@@ -27,13 +27,11 @@ export interface Skill {
 export type Persona = Skill;
 
 /**
- * Legacy flat-content message shape. Still used by `ChatRequest` (the old
- * `/chat/stream` and `/chat/completions` REST calls in api.ts, which stay
- * exactly as they were — see stream.ts on the backend, untouched by the
- * AI SDK migration) and by `threadPersistence.ts`'s migration function as
- * the "old shape" it converts *from*. `Thread.messages` itself moved to
- * `AiConversationUIMessage[]` (HANDOFF-ai-sdk-migration.md Phase 20) — see
- * that type below.
+ * Legacy flat-content message shape. Kept only for `threadPersistence.ts`'s
+ * migration function, as the "old shape" it converts *from* — pre-AI-SDK
+ * threads (localStorage or `chat_threads` rows) still on disk from before
+ * the Phase 20 migration. `Thread.messages` itself moved to
+ * `AiConversationUIMessage[]` — see that type below.
  */
 export interface ChatMessage {
   id: string;
@@ -112,63 +110,10 @@ export interface ChatTraits {
  * prompt text attached, so there's nothing for the server to own here. */
 export type ReasoningEffort = 'low' | 'medium' | 'high';
 
-export interface ChatRequest {
-  model: string;
-  messages: ChatMessage[];
-  vector_store_ids?: string[];
-  top_k?: number;
-  user_key: string;
-  /** Thread id, logged server-side for usage analytics only (see
-   * chat_events / GET /usage/summary) — never used to reconstruct or
-   * persist message content. */
-  thread_id?: string;
-  persona_id?: string;
-  /** Free-text system prompt supplied by the user. Combined with the
-   * persona's system prompt (if any) rather than replacing it. */
-  custom_system_prompt?: string;
-  /** URL typed as `#https://...` in the composer, resolved server-side and
-   * injected as one-off context for this turn only. */
-  context_url?: string;
-  /** Requests LiteLLM's native web search alongside (not instead of) any
-   * selected knowledge bases. Passed through as-is — see AGENTS.md for the
-   * "verify LiteLLM has a native web_search tool first" caveat. */
-  web_search?: boolean;
-  /** Ids into ChatTraits — resolved server-side into prompt fragments. */
-  tone_id?: string;
-  focus_id?: string;
-  verbosity_id?: string;
-  /** Native passthrough — not composed into the system prompt. */
-  reasoning_effort?: ReasoningEffort;
-}
-
-export interface SearchResult {
-  filename: string;
-  score: number;
-  text: string;
-  /** 'web' for web-search results, 'kb' for vector-store hits. Inferred
-   * client-side from shape (a `url` field implies a web result) — LiteLLM
-   * doesn't currently tag these explicitly, so treat this as best-effort. */
-  source?: 'kb' | 'web';
-  url?: string;
-}
-
 export interface UsageInfo {
   prompt_tokens: number;
   completion_tokens: number;
   total_tokens: number;
-}
-
-/**
- * Normalized SSE chunk shape emitted by the backend stream and consumed
- * by the frontend. LiteLLM emits OpenAI-shaped chunks
- * `{ choices: [{ delta: { content } }], search_results?, usage? }` — the
- * api.ts SSE reader normalizes them into this shape.
- */
-export interface ChatStreamChunk {
-  delta?: string;
-  error?: string;
-  search_results?: SearchResult[];
-  usage?: UsageInfo;
 }
 
 export interface Citation {
@@ -177,11 +122,6 @@ export interface Citation {
   snippet: string;
   source?: 'kb' | 'web';
   url?: string;
-}
-
-export interface ChatResult {
-  content: string;
-  citations: Citation[];
 }
 
 export interface ChatPersistenceConfig {

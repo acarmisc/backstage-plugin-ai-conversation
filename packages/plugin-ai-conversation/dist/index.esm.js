@@ -157,26 +157,6 @@ var init_api = __esm({
         if (!res.ok) throw new Error(`usage/summary ${res.status}`);
         return res.json();
       }
-      async chatCompletions(req) {
-        const res = await this.fetchApi.fetch(`${BASE_PATH}/chat/completions`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...req, stream: false })
-        });
-        if (!res.ok) {
-          const text = await res.text().catch(() => "");
-          throw new Error(`${res.status}: ${text}`);
-        }
-        const data = await res.json();
-        const content = data.choices?.[0]?.message?.content ?? data.content ?? "";
-        const rawResults = data.search_results ?? data.citations ?? [];
-        const citations = rawResults.map((r) => ({
-          filename: r.filename ?? r.file_name ?? r.source ?? r.name ?? "",
-          score: typeof r.score === "number" ? r.score : 0,
-          snippet: r.text ?? r.snippet ?? r.content ?? ""
-        }));
-        return { content, citations };
-      }
       async mintChatKey(opts) {
         const res = await this.fetchApi.fetch(`${BASE_PATH}/chat/key`, {
           method: "POST",

@@ -1,5 +1,5 @@
 import { FetchApi } from '@backstage/core-plugin-api';
-import type { VectorStore, Skill, ChatRequest, ChatFeedbackRequest, ChatResult, ChatConfig, ChatTraits, KeySpend, UrlContextPreview, FeedbackSummary, UsageSummaryRow, PersistedThread, Thread } from './types';
+import type { VectorStore, Skill, ChatFeedbackRequest, ChatConfig, ChatTraits, KeySpend, UrlContextPreview, FeedbackSummary, UsageSummaryRow, PersistedThread, Thread } from './types';
 export interface AiConversationApiInterface {
     listVectorStores(): Promise<VectorStore[]>;
     listSkills(): Promise<Skill[]>;
@@ -11,7 +11,6 @@ export interface AiConversationApiInterface {
         model?: string;
     }): Promise<FeedbackSummary>;
     getUsageSummary(groupBy: 'skill' | 'model', range?: string): Promise<UsageSummaryRow[]>;
-    chatCompletions(req: ChatRequest): Promise<ChatResult>;
     mintChatKey(opts?: {
         models?: string[];
         max_budget?: number;
@@ -47,7 +46,6 @@ export declare class AiConversationApi implements AiConversationApiInterface {
         model?: string;
     }): Promise<FeedbackSummary>;
     getUsageSummary(groupBy: 'skill' | 'model', range?: string): Promise<UsageSummaryRow[]>;
-    chatCompletions(req: ChatRequest): Promise<ChatResult>;
     mintChatKey(opts?: {
         models?: string[];
         max_budget?: number;

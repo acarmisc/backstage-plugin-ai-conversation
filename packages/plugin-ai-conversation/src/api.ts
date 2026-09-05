@@ -2,9 +2,7 @@ import { createApiRef, FetchApi } from '@backstage/core-plugin-api';
 import type {
   VectorStore,
   Skill,
-  ChatRequest,
   ChatFeedbackRequest,
-  ChatResult,
   ChatConfig,
   ChatTraits,
   KeySpend,
@@ -24,7 +22,6 @@ export interface AiConversationApiInterface {
   fetchUrlContext(url: string): Promise<UrlContextPreview>;
   getFeedbackSummary(filters?: { skillId?: string; model?: string }): Promise<FeedbackSummary>;
   getUsageSummary(groupBy: 'skill' | 'model', range?: string): Promise<UsageSummaryRow[]>;
-  chatCompletions(req: ChatRequest): Promise<ChatResult>;
   mintChatKey(opts?: { models?: string[]; max_budget?: number }): Promise<ChatKey>;
   deleteChatKey(key: string): Promise<{ success: boolean }>;
   getKeySpend(alias: string): Promise<KeySpend | null>;
@@ -123,28 +120,6 @@ export class AiConversationApi implements AiConversationApiInterface {
     const res = await this.fetchApi.fetch(`${BASE_PATH}/usage/summary?${params.toString()}`);
     if (!res.ok) throw new Error(`usage/summary ${res.status}`);
     return res.json();
-  }
-
-  async chatCompletions(req: ChatRequest): Promise<ChatResult> {
-    const res = await this.fetchApi.fetch(`${BASE_PATH}/chat/completions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...req, stream: false }),
-    });
-    if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      throw new Error(`${res.status}: ${text}`);
-    }
-    const data = await res.json();
-    const content =
-      data.choices?.[0]?.message?.content ?? data.content ?? '';
-    const rawResults: any[] = data.search_results ?? data.citations ?? [];
-    const citations = rawResults.map(r => ({
-      filename: r.filename ?? r.file_name ?? r.source ?? r.name ?? '',
-      score: typeof r.score === 'number' ? r.score : 0,
-      snippet: r.text ?? r.snippet ?? r.content ?? '',
-    }));
-    return { content, citations };
   }
 
   async mintChatKey(opts?: { models?: string[]; max_budget?: number }): Promise<ChatKey> {

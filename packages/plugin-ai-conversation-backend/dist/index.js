@@ -14,13 +14,11 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.proxySSE = exports.createRouter = exports.default = exports.aiConversationPlugin = void 0;
+exports.createRouter = exports.default = exports.aiConversationPlugin = void 0;
 var plugin_1 = require("./plugin");
 Object.defineProperty(exports, "aiConversationPlugin", { enumerable: true, get: function () { return plugin_1.aiConversationPlugin; } });
 var plugin_2 = require("./plugin");
 Object.defineProperty(exports, "default", { enumerable: true, get: function () { return plugin_2.aiConversationPlugin; } });
 var router_1 = require("./router");
 Object.defineProperty(exports, "createRouter", { enumerable: true, get: function () { return router_1.createRouter; } });
-var stream_1 = require("./stream");
-Object.defineProperty(exports, "proxySSE", { enumerable: true, get: function () { return stream_1.proxySSE; } });
 __exportStar(require("./types"), exports);

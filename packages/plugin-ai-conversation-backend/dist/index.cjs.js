@@ -30967,7 +30967,7 @@ var require_lib2 = __commonJS({
     var whatwgUrl = _interopDefault(require_public_api2());
     var https = _interopDefault(require("https"));
     var zlib = _interopDefault(require("zlib"));
-    var Readable3 = Stream.Readable;
+    var Readable2 = Stream.Readable;
     var BUFFER = /* @__PURE__ */ Symbol("buffer");
     var TYPE = /* @__PURE__ */ Symbol("type");
     var Blob2 = class _Blob {
@@ -31019,7 +31019,7 @@ var require_lib2 = __commonJS({
         return Promise.resolve(ab);
       }
       stream() {
-        const readable = new Readable3();
+        const readable = new Readable2();
         readable._read = function() {
         };
         readable.push(this[BUFFER]);
@@ -56190,9 +56190,9 @@ var require_typeGuards_node = __commonJS({
       isWebReadableStream: () => isWebReadableStream2
     });
     module2.exports = __toCommonJS2(typeGuards_node_exports);
-    var import_stream5 = require("stream");
+    var import_stream2 = require("stream");
     function isNodeReadableStream2(x) {
-      return x instanceof import_stream5.Readable;
+      return x instanceof import_stream2.Readable;
     }
     function isWebReadableStream2(x) {
       return x instanceof ReadableStream;
@@ -56267,7 +56267,7 @@ var require_concat = __commonJS({
       concat: () => concat
     });
     module2.exports = __toCommonJS2(concat_exports);
-    var import_stream5 = require("stream");
+    var import_stream2 = require("stream");
     var import_typeGuards = require_typeGuards2();
     async function* streamAsyncIterator() {
       const reader = this.getReader();
@@ -56294,14 +56294,14 @@ var require_concat = __commonJS({
     function ensureNodeStream(stream) {
       if (stream instanceof ReadableStream) {
         makeAsyncIterable(stream);
-        return import_stream5.Readable.fromWeb(stream);
+        return import_stream2.Readable.fromWeb(stream);
       } else {
         return stream;
       }
     }
     function toStream(source) {
       if (source instanceof Uint8Array) {
-        return import_stream5.Readable.from(Buffer.from(source));
+        return import_stream2.Readable.from(Buffer.from(source));
       } else if ((0, import_typeGuards.isBlob)(source)) {
         return ensureNodeStream(source.stream());
       } else {
@@ -56311,7 +56311,7 @@ var require_concat = __commonJS({
     async function concat(sources) {
       return function() {
         const streams = sources.map((x) => typeof x === "function" ? x() : x).map(toStream);
-        return import_stream5.Readable.from(
+        return import_stream2.Readable.from(
           (async function* () {
             for (const stream of streams) {
               for await (const chunk of stream) {
@@ -81232,8 +81232,7 @@ __export(index_exports, {
   CHAT_SKILL_TYPE: () => CHAT_SKILL_TYPE,
   aiConversationPlugin: () => aiConversationPlugin,
   createRouter: () => createRouter,
-  default: () => aiConversationPlugin,
-  proxySSE: () => proxySSE
+  default: () => aiConversationPlugin
 });
 module.exports = __toCommonJS(index_exports);
 
@@ -81247,72 +81246,8 @@ var import_backend_plugin_api = require("@backstage/backend-plugin-api");
 var import_integration = __toESM(require_index_cjs5());
 var import_backstage_plugin_litellm_backend = require("@acarmisc/backstage-plugin-litellm-backend");
 
-// src/stream.ts
-var import_stream = require("stream");
-async function proxySSE(opts) {
-  const { upstreamUrl, upstreamBody, userKey, res, logger, prelude } = opts;
-  const controller = new AbortController();
-  res.on("close", () => controller.abort());
-  const headers = {
-    "Content-Type": "text/event-stream",
-    "Cache-Control": "no-cache, no-transform",
-    "X-Accel-Buffering": "no",
-    Connection: "keep-alive"
-  };
-  const fetchUpstream = async (url, body) => {
-    const upstream = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${userKey}`,
-        Accept: "text/event-stream"
-      },
-      body: JSON.stringify(body),
-      signal: controller.signal
-    });
-    if (!upstream.ok || !upstream.body) {
-      const text2 = await upstream.text().catch(() => "");
-      const err = new Error(`upstream ${upstream.status}: ${text2 || upstream.statusText}`);
-      err.status = upstream.status;
-      throw err;
-    }
-    return import_stream.Readable.fromWeb(upstream.body);
-  };
-  try {
-    const stream = await fetchUpstream(upstreamUrl, upstreamBody);
-    res.writeHead(200, headers);
-    res.flushHeaders();
-    for (const event of prelude ?? []) {
-      res.write(`data: ${JSON.stringify(event)}
-
-`);
-    }
-    stream.on("data", (chunk) => {
-      res.write(chunk);
-    });
-    await new Promise((resolve3, reject) => {
-      stream.on("end", resolve3);
-      stream.on("error", reject);
-    });
-    res.end();
-  } catch (err) {
-    if (err.name === "AbortError") {
-      logger.debug("SSE client disconnected");
-      return;
-    }
-    logger.error("SSE proxy error", err);
-    if (!res.headersSent) {
-      res.writeHead(200, headers);
-    }
-    res.write(`data: ${JSON.stringify({ error: err.message || "stream error" })}
-
-`);
-    res.end();
-  }
-}
-
 // src/uiMessageStream.ts
-var import_stream2 = require("stream");
+var import_stream = require("stream");
 
 // ../../node_modules/@ai-sdk/provider/dist/index.js
 var marker = "vercel.ai.error";
@@ -90940,7 +90875,7 @@ async function proxyUIMessageStream(opts) {
         writer.write({ type: "finish" });
         return;
       }
-      const nodeStream = import_stream2.Readable.fromWeb(upstream.body);
+      const nodeStream = import_stream.Readable.fromWeb(upstream.body);
       const decoder = new TextDecoder();
       let buffer = "";
       try {
@@ -92120,143 +92055,6 @@ async function createRouter(options) {
       res.status(500).json({ error: err.message });
     }
   });
-  router.post("/chat/completions", async (req, res) => {
-    try {
-      const body = req.body;
-      if (!body?.model || !body?.messages || !body?.user_key) {
-        res.status(400).json({
-          error: "model, messages, user_key required"
-        });
-        return;
-      }
-      const tokenEntityRef = await (0, import_backstage_plugin_litellm_backend.resolveUserId)(req, auth);
-      if (!tokenEntityRef) {
-        res.status(401).json({ error: "unauthenticated" });
-        return;
-      }
-      (0, import_backstage_plugin_litellm_backend.toLiteLLMUserId)(tokenEntityRef, userIdDomain);
-      recordChatEvent({
-        threadId: body.thread_id ?? "",
-        userRef: tokenEntityRef,
-        model: body.model,
-        skillId: body.skill_id,
-        grounded: !!body.vector_store_ids?.length
-      });
-      let messages = await composeSystemPrompt(
-        body.skill_id,
-        body.tone_id,
-        body.focus_id,
-        body.verbosity_id,
-        body.custom_system_prompt,
-        body.messages
-      );
-      messages = await applyUrlContext(body.context_url, messages);
-      const searchResults = body.vector_store_ids?.length ? await retrieveContext({
-        baseUrl: chatConfig.baseUrl,
-        userKey: body.user_key,
-        vectorStoreIds: body.vector_store_ids,
-        query: lastUserText(messages),
-        topK: body.top_k ?? 5
-      }) : [];
-      const payload = {
-        model: body.model,
-        messages: searchResults.length ? [buildContextMessage(searchResults), ...messages] : messages,
-        stream: false
-      };
-      if (body.web_search) {
-        payload.web_search_options = {};
-      }
-      if (body.reasoning_effort) {
-        payload.reasoning_effort = body.reasoning_effort;
-      }
-      const upstream = await fetch(
-        `${chatConfig.baseUrl}/v1/chat/completions`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${body.user_key}`
-          },
-          body: JSON.stringify(payload)
-        }
-      );
-      const data = await upstream.json();
-      if (!upstream.ok) {
-        res.status(upstream.status).json(data);
-        return;
-      }
-      res.json({ ...data, search_results: searchResults });
-    } catch (err) {
-      logger.error("chat/completions failed", err);
-      res.status(err.status ?? 500).json({ error: err.message });
-    }
-  });
-  router.post("/chat/stream", async (req, res) => {
-    try {
-      const body = req.body;
-      if (!body?.model || !body?.messages || !body?.user_key) {
-        res.status(400).json({
-          error: "model, messages, user_key required"
-        });
-        return;
-      }
-      const tokenEntityRef = await (0, import_backstage_plugin_litellm_backend.resolveUserId)(req, auth);
-      if (!tokenEntityRef) {
-        res.status(401).json({ error: "unauthenticated" });
-        return;
-      }
-      (0, import_backstage_plugin_litellm_backend.toLiteLLMUserId)(tokenEntityRef, userIdDomain);
-      recordChatEvent({
-        threadId: body.thread_id ?? "",
-        userRef: tokenEntityRef,
-        model: body.model,
-        skillId: body.skill_id,
-        grounded: !!body.vector_store_ids?.length
-      });
-      let messages = await composeSystemPrompt(
-        body.skill_id,
-        body.tone_id,
-        body.focus_id,
-        body.verbosity_id,
-        body.custom_system_prompt,
-        body.messages
-      );
-      messages = await applyUrlContext(body.context_url, messages);
-      const base = chatConfig.baseUrl;
-      const searchResults = body.vector_store_ids?.length ? await retrieveContext({
-        baseUrl: base,
-        userKey: body.user_key,
-        vectorStoreIds: body.vector_store_ids,
-        query: lastUserText(messages),
-        topK: body.top_k ?? 5
-      }) : [];
-      const chatBody = {
-        model: body.model,
-        messages: searchResults.length ? [buildContextMessage(searchResults), ...messages] : messages,
-        stream: true,
-        stream_options: { include_usage: true }
-      };
-      if (body.web_search) {
-        chatBody.web_search_options = {};
-      }
-      if (body.reasoning_effort) {
-        chatBody.reasoning_effort = body.reasoning_effort;
-      }
-      await proxySSE({
-        upstreamUrl: `${base}/v1/chat/completions`,
-        upstreamBody: chatBody,
-        userKey: body.user_key,
-        res,
-        logger,
-        prelude: searchResults.length ? [{ search_results: searchResults }] : void 0
-      });
-    } catch (err) {
-      logger.error("chat/stream failed", err);
-      if (!res.headersSent) {
-        res.status(err.status ?? 500).json({ error: err.message });
-      }
-    }
-  });
   router.post("/chat/stream/v2", async (req, res) => {
     try {
       const body = req.body;
@@ -92404,8 +92202,7 @@ var aiConversationPlugin = (0, import_backend_plugin_api2.createBackendPlugin)({
   CHAT_SKILL_ANNOTATION_PREFIX,
   CHAT_SKILL_TYPE,
   aiConversationPlugin,
-  createRouter,
-  proxySSE
+  createRouter
 });
 /*! Bundled license information:
 

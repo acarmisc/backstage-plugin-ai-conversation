@@ -82,9 +82,7 @@ The chat plugin reuses all of this by **importing from the govai package**, not 
 | `/vector_stores` | GET | Lists LiteLLM vector stores for the KB picker. Calls `GET /v1/vector_stores` on LiteLLM. |
 | `/personas` | GET | Lists `chat-persona` catalog entities (metadata only — id/title/description/defaultModel/defaultVectorStoreIds/tags). No system-prompt text. |
 | `/chat/traits` | GET | Static tone/focus/verbosity option lists for the pickers (id/label only — see `traits.ts`). |
-| `/chat/stream` | POST | Streaming chat proxy. The one new piece of engineering. Accepts optional `persona_id`, `tone_id`, `focus_id`, `verbosity_id` (composed server-side into one system message, in that order, persona first — see `composeSystemPrompt` in `router.ts`), and `reasoning_effort` (`low`\|`medium`\|`high`, forwarded to LiteLLM as-is, not composed into the prompt). |
-| `/chat/stream/v2` | POST | Opt-in AI SDK UI Message Stream Protocol response (Phase 17) — not yet consumed by the frontend, parallel to /chat/stream, zero behavior change to existing clients. |
-| `/chat/completions` | POST | Non-streaming chat variant. |
+| `/chat/stream/v2` | POST | Streaming chat proxy, AI SDK UI Message Stream Protocol response (Phase 17-19). The sole chat-streaming route — the pre-migration raw-SSE `/chat/stream` and non-streaming `/chat/completions` routes were removed as dead code (Phase 22 cleanup) once the frontend fully moved onto this one. Accepts optional `persona_id`, `tone_id`, `focus_id`, `verbosity_id` (composed server-side into one system message, in that order, persona first — see `composeSystemPrompt` in `router.ts`), and `reasoning_effort` (`low`\|`medium`\|`high`, forwarded to LiteLLM as-is, not composed into the prompt). |
 | `/threads` | GET | (phase16) Lists the authenticated user's persisted threads. 404 when `litellm.aiConversation.persistence.enabled` is false. |
 | `/threads/:id` | PUT | (phase16) Upserts a thread (title/pinned/data — `data` is opaque JSON, size-capped at 1MB). 404 when persistence is disabled. |
 | `/threads/:id` | DELETE | (phase16) Deletes one persisted thread, scoped to the authenticated user. 404 when persistence is disabled. |
@@ -179,7 +177,7 @@ Replaced the original hand-rolled `useChat.ts` (manual SSE reader, abort-per-mes
 
 - `threads: Thread[]` in `useState`, persisted to `localStorage` under `ai-conversation:threads:<userId>` (or server-side via `chat_threads` when `litellm.aiConversation.persistence.enabled`).
 - `Thread.messages` is now `AiConversationUIMessage[]` (the AI SDK's `UIMessage` shape — typed `parts`: text/file/tool-call/`data-citations`/`data-usage` — not a flat `content: string`), enabling attachments and per-message citations/usage.
-- One `@ai-sdk/react` `useChat` instance per active thread, pointed at `POST /api/ai-conversation/chat/stream` (adapted server-side to the AI SDK's UI Message Stream Protocol — see `uiMessageStream.ts`). Compare mode runs N concurrent instances, one per selected model, coordinated by `runCompareSend`.
+- One `@ai-sdk/react` `useChat` instance per active thread, pointed at `POST /api/ai-conversation/chat/stream/v2` (server-side AI SDK UI Message Stream Protocol — see `uiMessageStream.ts`). Compare mode runs N concurrent instances, one per selected model, coordinated by `runCompareSend`.
 - `useThreads` exposes: `threads`, `activeThread`, `newThread()`, `selectThread(id)`, `deleteThread(id)`, `sendMessage(text, attachedUrl?, compareModelsOverride?, files?)`, `regenerateFrom(id)`, `editAndResend(id, text)`, `stopGeneration()`, `exportThread`/`importThread`, `togglePin`, `submitFeedback`.
 - Attachments: the composer converts a `FileList` to `FileUIPart[]` via the SDK's `convertFileListToFileUIParts` and passes it through `sendMessage`'s `files` parameter; the backend (`attachments.ts`) validates mime/size/count and rejects non-multimodal models before forwarding to LiteLLM as `image_url` content parts.
 

@@ -102,9 +102,6 @@ export interface FetchContextResult {
     snippet: string;
     charCount: number;
 }
-export interface ChatCompletionsRequest extends ChatStreamRequest {
-    stream?: false;
-}
 export interface SearchResult {
     filename: string;
     score: number;
@@ -116,20 +113,6 @@ export interface UsageInfo {
     prompt_tokens: number;
     completion_tokens: number;
     total_tokens: number;
-}
-export interface ChatStreamChunk {
-    delta?: string;
-    error?: string;
-    search_results?: SearchResult[];
-    usage?: UsageInfo;
-}
-export interface ChatResult {
-    content: string;
-    citations: Array<{
-        filename: string;
-        score: number;
-        snippet: string;
-    }>;
 }
 export interface FeedbackSummary {
     up: number;
