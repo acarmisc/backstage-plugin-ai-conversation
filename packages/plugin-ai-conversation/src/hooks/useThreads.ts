@@ -158,6 +158,7 @@ export interface UseChatResult {
   regenerateFrom: (messageId: string) => void;
   editAndResend: (messageId: string, newContent: string) => void;
   stopGeneration: () => void;
+  clearError: () => void;
   submitFeedback: (messageId: string, vote: 'up' | 'down') => void;
   togglePin: (id: string) => void;
   exportThread: (id: string) => void;
@@ -582,6 +583,8 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
     compareChat.stopAll();
   }, [chat, compareChat]);
 
+  const clearError = useCallback(() => setError(null), []);
+
   // Shared core for sendMessage/regenerateFrom/editAndResend — single mode.
   const runSend = useCallback(
     (
@@ -923,6 +926,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
     regenerateFrom,
     editAndResend,
     stopGeneration,
+    clearError,
     submitFeedback,
     togglePin,
     exportThread,

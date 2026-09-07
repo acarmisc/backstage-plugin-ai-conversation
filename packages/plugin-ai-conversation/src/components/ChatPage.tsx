@@ -41,6 +41,7 @@ import type { FileUIPart } from 'ai';
 import { useApi, identityApiRef } from '@backstage/core-plugin-api';
 import { aiConversationApiRef } from '../api';
 import { useThreads } from '../hooks/useThreads';
+import { useResizablePanel } from '../hooks/useResizablePanel';
 import { extractText } from '../hooks/messageShape';
 import { injectDesignSystemAssets } from '../theme';
 import { ChatSettingsPanel } from './ChatSettingsPanel';
@@ -53,6 +54,8 @@ import type { ChatConfig, ChatTraits, ReasoningEffort, Skill, Thread, UrlContext
 const SIDEBAR_WIDTH = 280;
 const SIDEBAR_RAIL_WIDTH = 48;
 const RIGHT_RAIL_WIDTH = 300;
+const RIGHT_RAIL_MIN_WIDTH = 240;
+const RIGHT_RAIL_MAX_WIDTH = 640;
 const CHAT_MAX_WIDTH = 900;
 const URL_TOKEN_RE = /#(https:\/\/\S+)/;
 const URL_PREVIEW_DEBOUNCE_MS = 500;
@@ -112,6 +115,13 @@ export const ChatPage: React.FC = () => {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
+  const rightPanel = useResizablePanel({
+    storageKey: 'ai-conversation.rightPanelWidth',
+    defaultWidth: RIGHT_RAIL_WIDTH,
+    minWidth: RIGHT_RAIL_MIN_WIDTH,
+    maxWidth: RIGHT_RAIL_MAX_WIDTH,
+    side: 'left',
+  });
   const [threadMenuAnchor, setThreadMenuAnchor] = useState<HTMLElement | null>(null);
   const [threadMenuTarget, setThreadMenuTarget] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -723,7 +733,7 @@ export const ChatPage: React.FC = () => {
           {/* Error banner */}
           {chat.error && (
             <Box sx={{ px: 2, pt: 1 }}>
-              <ErrorBanner error={chat.error} onDismiss={() => {}} />
+              <ErrorBanner error={chat.error} onDismiss={chat.clearError} />
             </Box>
           )}
 
@@ -862,25 +872,44 @@ export const ChatPage: React.FC = () => {
 
       {/* ─── Right sidebar: sources + usage ─── */}
       {!rightPanelCollapsed && (
-        <Box
-          sx={{
-            width: RIGHT_RAIL_WIDTH,
-            flexShrink: 0,
-            borderLeft: 1,
-            borderColor: 'divider',
-            display: 'flex',
-            flexDirection: 'column',
-            overflowY: 'auto',
-          }}
-        >
-          <SourcesPanel citations={chat.citations} />
-          <Divider />
-          <UsagePanel
-            lastTurnUsage={lastTurnUsage}
-            totalTokens={totalTokens}
-            keySpend={chat.keySpend}
+        <>
+          {/* Drag handle — resize; double-click to reset */}
+          <Box
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize context panel"
+            onPointerDown={rightPanel.onPointerDown}
+            onDoubleClick={rightPanel.reset}
+            sx={{
+              width: '6px',
+              flexShrink: 0,
+              cursor: 'col-resize',
+              bgcolor: 'transparent',
+              transition: 'background-color 0.15s',
+              '&:hover, &:active': { bgcolor: 'primary.main' },
+            }}
           />
-        </Box>
+          <Box
+            sx={{
+              width: rightPanel.width,
+              flexShrink: 0,
+              borderLeft: 1,
+              borderColor: 'divider',
+              display: 'flex',
+              flexDirection: 'column',
+              overflowY: 'auto',
+              overflowX: 'hidden',
+            }}
+          >
+            <SourcesPanel citations={chat.citations} />
+            <Divider />
+            <UsagePanel
+              lastTurnUsage={lastTurnUsage}
+              totalTokens={totalTokens}
+              keySpend={chat.keySpend}
+            />
+          </Box>
+        </>
       )}
     </Box>
   );

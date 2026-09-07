@@ -760,6 +760,7 @@ function useThreads(opts) {
     });
     compareChat.stopAll();
   }, [chat, compareChat]);
+  const clearError = useCallback2(() => setError(null), []);
   const runSend = useCallback2(
     (text, baseMessages, attachedUrl, files) => {
       if (!text.trim() || !activeThread || !keyToken) return;
@@ -1033,6 +1034,7 @@ function useThreads(opts) {
     regenerateFrom,
     editAndResend,
     stopGeneration,
+    clearError,
     submitFeedback,
     togglePin,
     exportThread,
@@ -1058,6 +1060,64 @@ var init_useThreads = __esm({
     THREAD_EXPORT_VERSION = 2;
     STORAGE_PREFIX = "ai-conversation:threads";
     SAVE_DEBOUNCE_MS = 400;
+  }
+});
+
+// src/hooks/useResizablePanel.ts
+import { useCallback as useCallback3, useEffect as useEffect2, useRef as useRef3, useState as useState2 } from "react";
+function readStoredWidth(key, fallback, min, max) {
+  if (typeof window === "undefined") return fallback;
+  const stored = Number(window.localStorage.getItem(key));
+  return Number.isFinite(stored) && stored >= min && stored <= max ? stored : fallback;
+}
+function useResizablePanel({
+  storageKey,
+  defaultWidth,
+  minWidth,
+  maxWidth,
+  side
+}) {
+  const [width, setWidth] = useState2(
+    () => readStoredWidth(storageKey, defaultWidth, minWidth, maxWidth)
+  );
+  useEffect2(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(storageKey, String(Math.round(width)));
+    }
+  }, [storageKey, width]);
+  const dragging = useRef3(false);
+  const onPointerDown = useCallback3(
+    (e) => {
+      e.preventDefault();
+      dragging.current = true;
+      const startX = e.clientX;
+      const startWidth = width;
+      const onMove = (ev) => {
+        if (!dragging.current) return;
+        const delta = ev.clientX - startX;
+        const next = side === "left" ? startWidth - delta : startWidth + delta;
+        setWidth(Math.min(maxWidth, Math.max(minWidth, next)));
+      };
+      const onUp = () => {
+        dragging.current = false;
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+      };
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+    },
+    [width, minWidth, maxWidth, side]
+  );
+  const reset = useCallback3(() => setWidth(defaultWidth), [defaultWidth]);
+  return { width, onPointerDown, reset };
+}
+var init_useResizablePanel = __esm({
+  "src/hooks/useResizablePanel.ts"() {
+    "use strict";
   }
 });
 
@@ -1089,7 +1149,7 @@ var init_theme = __esm({
 });
 
 // src/components/ModelPicker.tsx
-import React, { useEffect as useEffect2, useState as useState2 } from "react";
+import React, { useEffect as useEffect3, useState as useState3 } from "react";
 import { Autocomplete, TextField, Typography, Box } from "@mui/material";
 import { useApi as useApi2 } from "@backstage/core-plugin-api";
 import { liteLlmApiRef } from "@acarmisc/backstage-plugin-litellm";
@@ -1103,10 +1163,10 @@ var init_ModelPicker = __esm({
       defaultModel
     }) => {
       const liteLlmApi = useApi2(liteLlmApiRef);
-      const [models, setModels] = useState2([]);
-      const [loading, setLoading] = useState2(true);
-      const [error, setError] = useState2(null);
-      useEffect2(() => {
+      const [models, setModels] = useState3([]);
+      const [loading, setLoading] = useState3(true);
+      const [error, setError] = useState3(null);
+      useEffect3(() => {
         let alive = true;
         liteLlmApi.listModels().then((all) => {
           if (!alive) return;
@@ -1119,7 +1179,7 @@ var init_ModelPicker = __esm({
           alive = false;
         };
       }, [liteLlmApi]);
-      useEffect2(() => {
+      useEffect3(() => {
         if (value || models.length === 0) return;
         const def = defaultModel && models.find((x) => x.model_name === defaultModel)?.model_name || models[0].model_name;
         onChange(def);
@@ -1163,7 +1223,7 @@ var init_ModelPicker = __esm({
 });
 
 // src/components/VectorStorePicker.tsx
-import React2, { useEffect as useEffect3, useState as useState3 } from "react";
+import React2, { useEffect as useEffect4, useState as useState4 } from "react";
 import { Autocomplete as Autocomplete2, Box as Box2, Checkbox, Chip, TextField as TextField2, Typography as Typography2 } from "@mui/material";
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
@@ -1179,10 +1239,10 @@ var init_VectorStorePicker = __esm({
       defaultVectorStoreIds
     }) => {
       const chatApi = useApi3(aiConversationApiRef);
-      const [stores, setStores] = useState3([]);
-      const [loading, setLoading] = useState3(true);
-      const [error, setError] = useState3(null);
-      useEffect3(() => {
+      const [stores, setStores] = useState4([]);
+      const [loading, setLoading] = useState4(true);
+      const [error, setError] = useState4(null);
+      useEffect4(() => {
         let alive = true;
         chatApi.listVectorStores().then((s) => {
           if (!alive) return;
@@ -1525,7 +1585,7 @@ var init_PersonaAvatar = __esm({
 });
 
 // src/components/CodeBlock.tsx
-import React7, { useState as useState4 } from "react";
+import React7, { useState as useState5 } from "react";
 import { Box as Box6, IconButton, Tooltip } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import CheckIcon from "@mui/icons-material/Check";
@@ -1548,7 +1608,7 @@ var init_CodeBlock = __esm({
       children,
       ...props
     }) => {
-      const [copied, setCopied] = useState4(false);
+      const [copied, setCopied] = useState5(false);
       const isBlock = /language-/.test(className ?? "");
       if (!isBlock) {
         return /* @__PURE__ */ React7.createElement("code", { className, style: { fontFamily: MONO_FONT_STACK }, ...props }, children);
@@ -1584,7 +1644,7 @@ var init_CodeBlock = __esm({
 });
 
 // src/components/AssistantMessage.tsx
-import React8, { useState as useState5 } from "react";
+import React8, { useState as useState6 } from "react";
 import { Box as Box7, Chip as Chip3, IconButton as IconButton2, Tooltip as Tooltip2 } from "@mui/material";
 import ThumbUpIcon from "@mui/icons-material/ThumbUp";
 import ThumbUpOutlinedIcon from "@mui/icons-material/ThumbUpOutlined";
@@ -1676,7 +1736,7 @@ var init_AssistantMessage = __esm({
       onFeedback,
       onRegenerate
     }) => {
-      const [copied, setCopied] = useState5(false);
+      const [copied, setCopied] = useState6(false);
       const text = extractText(message);
       const showActions = !!text && !isStreaming;
       const handleCopy = () => {
@@ -1810,7 +1870,7 @@ var init_safeUrl = __esm({
 });
 
 // src/components/UserMessage.tsx
-import React9, { useState as useState6 } from "react";
+import React9, { useState as useState7 } from "react";
 import { Box as Box8, Button, Chip as Chip4, IconButton as IconButton3, TextField as TextField4, Tooltip as Tooltip3 } from "@mui/material";
 import ContentCopyIcon3 from "@mui/icons-material/ContentCopy";
 import CheckIcon3 from "@mui/icons-material/Check";
@@ -1827,9 +1887,9 @@ var init_UserMessage = __esm({
       const fileParts = message.parts.filter(
         (p) => p.type === "file"
       );
-      const [editing, setEditing] = useState6(false);
-      const [draft, setDraft] = useState6(text);
-      const [copied, setCopied] = useState6(false);
+      const [editing, setEditing] = useState7(false);
+      const [draft, setDraft] = useState7(text);
+      const [copied, setCopied] = useState7(false);
       const handleCopy = () => {
         navigator.clipboard?.writeText(text).then(() => {
           setCopied(true);
@@ -2003,13 +2063,25 @@ var init_MessageList = __esm({
 // src/components/ErrorBanner.tsx
 import React11 from "react";
 import { Alert, AlertTitle } from "@mui/material";
+function readableError(error) {
+  if (/upstream 401|token_not_found_in_db|expired token/i.test(error)) {
+    return "Your chat session expired. Please send the message again.";
+  }
+  if (/aborted|timeout|timed out|upstream fetch failed/i.test(error)) {
+    return "The model took too long to respond. Please try again.";
+  }
+  if (/too many clients|database connection/i.test(error)) {
+    return "The chat service is temporarily busy. Please try again in a moment.";
+  }
+  return error;
+}
 var ErrorBanner;
 var init_ErrorBanner = __esm({
   "src/components/ErrorBanner.tsx"() {
     "use strict";
     ErrorBanner = ({ error, onDismiss }) => {
       if (!error) return null;
-      return /* @__PURE__ */ React11.createElement(Alert, { severity: "error", onClose: onDismiss, sx: { mb: 1 } }, /* @__PURE__ */ React11.createElement(AlertTitle, null, "Chat error"), error);
+      return /* @__PURE__ */ React11.createElement(Alert, { severity: "error", onClose: onDismiss, sx: { mb: 1 } }, /* @__PURE__ */ React11.createElement(AlertTitle, null, "Chat error"), readableError(error));
     };
   }
 });
@@ -2088,9 +2160,17 @@ var init_SourcesPanel = __esm({
           AccordionSummary2,
           {
             expandIcon: /* @__PURE__ */ React12.createElement(ExpandMoreIcon2, { fontSize: "small" }),
-            sx: { minHeight: 0, "& .MuiAccordionSummary-content": { my: 0.75, mr: 1 } }
+            sx: {
+              minHeight: 0,
+              "& .MuiAccordionSummary-content": {
+                my: 0.75,
+                mr: 1,
+                minWidth: 0,
+                overflow: "hidden"
+              }
+            }
           },
-          /* @__PURE__ */ React12.createElement(Box10, { sx: { display: "flex", flexDirection: "column", gap: 0.25, minWidth: 0 } }, /* @__PURE__ */ React12.createElement(
+          /* @__PURE__ */ React12.createElement(Box10, { sx: { display: "flex", flexDirection: "column", gap: 0.25, minWidth: 0, width: "100%" } }, /* @__PURE__ */ React12.createElement(Tooltip4, { title: source.filename }, /* @__PURE__ */ React12.createElement(
             Typography6,
             {
               variant: "body2",
@@ -2098,14 +2178,19 @@ var init_SourcesPanel = __esm({
               sx: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }
             },
             source.filename
-          ), /* @__PURE__ */ React12.createElement(Typography6, { variant: "caption", color: "text.secondary" }, /* @__PURE__ */ React12.createElement(Tooltip4, { title: `Score ${source.bestScore.toFixed(3)}` }, /* @__PURE__ */ React12.createElement("span", null, rel, " relevance")), passages > 1 ? ` \xB7 ${passages} passages` : ""))
+          )), /* @__PURE__ */ React12.createElement(Typography6, { variant: "caption", color: "text.secondary" }, /* @__PURE__ */ React12.createElement(Tooltip4, { title: `Score ${source.bestScore.toFixed(3)}` }, /* @__PURE__ */ React12.createElement("span", null, rel, " relevance")), passages > 1 ? ` \xB7 ${passages} passages` : ""))
         ),
         /* @__PURE__ */ React12.createElement(AccordionDetails2, { sx: { pt: 0 } }, href && /* @__PURE__ */ React12.createElement(Typography6, { variant: "caption", sx: { display: "block", mb: 1 } }, /* @__PURE__ */ React12.createElement("a", { href, target: "_blank", rel: "noopener noreferrer" }, "Open source")), source.snippets.map((snippet, i) => /* @__PURE__ */ React12.createElement(Box10, { key: i }, i > 0 && /* @__PURE__ */ React12.createElement(Divider, { sx: { my: 1 } }), /* @__PURE__ */ React12.createElement(
           Typography6,
           {
             variant: "body2",
             color: "text.secondary",
-            sx: { whiteSpace: "pre-wrap", maxHeight: 220, overflow: "auto" }
+            sx: {
+              whiteSpace: "pre-wrap",
+              overflowWrap: "anywhere",
+              maxHeight: 220,
+              overflow: "auto"
+            }
           },
           snippet
         ))), source.snippets.length === 0 && /* @__PURE__ */ React12.createElement(Typography6, { variant: "body2", color: "text.secondary" }, "No excerpt available."))
@@ -2114,7 +2199,7 @@ var init_SourcesPanel = __esm({
     SourcesPanel = ({ citations }) => {
       const groups = groupSources(citations);
       const total = groups.reduce((n, g) => n + g.items.length, 0);
-      return /* @__PURE__ */ React12.createElement(Box10, { sx: { p: 1.5 } }, /* @__PURE__ */ React12.createElement(Box10, { sx: { display: "flex", alignItems: "center", gap: 1 } }, /* @__PURE__ */ React12.createElement(Typography6, { variant: "overline", color: "text.secondary" }, "Sources"), total > 0 && /* @__PURE__ */ React12.createElement(Chip5, { size: "small", label: total, variant: "outlined" })), total === 0 ? /* @__PURE__ */ React12.createElement(Typography6, { variant: "body2", color: "text.secondary", sx: { mt: 0.5 } }, "No sources for the latest reply yet.") : groups.map((group) => /* @__PURE__ */ React12.createElement(Box10, { key: group.key, sx: { mt: 1 } }, /* @__PURE__ */ React12.createElement(
+      return /* @__PURE__ */ React12.createElement(Box10, { sx: { p: 1.5, minWidth: 0, overflow: "hidden" } }, /* @__PURE__ */ React12.createElement(Box10, { sx: { display: "flex", alignItems: "center", gap: 1 } }, /* @__PURE__ */ React12.createElement(Typography6, { variant: "overline", color: "text.secondary" }, "Sources"), total > 0 && /* @__PURE__ */ React12.createElement(Chip5, { size: "small", label: total, variant: "outlined" })), total === 0 ? /* @__PURE__ */ React12.createElement(Typography6, { variant: "body2", color: "text.secondary", sx: { mt: 0.5 } }, "No sources for the latest reply yet.") : groups.map((group) => /* @__PURE__ */ React12.createElement(Box10, { key: group.key, sx: { mt: 1 } }, /* @__PURE__ */ React12.createElement(
         Typography6,
         {
           variant: "caption",
@@ -2165,7 +2250,7 @@ var ChatPage_exports = {};
 __export(ChatPage_exports, {
   ChatPage: () => ChatPage
 });
-import React14, { useEffect as useEffect4, useMemo as useMemo3, useRef as useRef3, useState as useState7 } from "react";
+import React14, { useEffect as useEffect5, useMemo as useMemo3, useRef as useRef4, useState as useState8 } from "react";
 import {
   Box as Box12,
   Button as Button2,
@@ -2217,12 +2302,13 @@ function sortThreads(threads) {
     return b.updatedAt - a.updatedAt;
   });
 }
-var SIDEBAR_WIDTH, SIDEBAR_RAIL_WIDTH, RIGHT_RAIL_WIDTH, CHAT_MAX_WIDTH, URL_TOKEN_RE, URL_PREVIEW_DEBOUNCE_MS, KEY_REMINT_SKEW_MS, MAX_ATTACHMENTS_PER_MESSAGE, ALLOWED_ATTACHMENT_MEDIA_TYPES, ChatPage;
+var SIDEBAR_WIDTH, SIDEBAR_RAIL_WIDTH, RIGHT_RAIL_WIDTH, RIGHT_RAIL_MIN_WIDTH, RIGHT_RAIL_MAX_WIDTH, CHAT_MAX_WIDTH, URL_TOKEN_RE, URL_PREVIEW_DEBOUNCE_MS, KEY_REMINT_SKEW_MS, MAX_ATTACHMENTS_PER_MESSAGE, ALLOWED_ATTACHMENT_MEDIA_TYPES, ChatPage;
 var init_ChatPage = __esm({
   "src/components/ChatPage.tsx"() {
     "use strict";
     init_api();
     init_useThreads();
+    init_useResizablePanel();
     init_messageShape();
     init_theme();
     init_ChatSettingsPanel();
@@ -2233,6 +2319,8 @@ var init_ChatPage = __esm({
     SIDEBAR_WIDTH = 280;
     SIDEBAR_RAIL_WIDTH = 48;
     RIGHT_RAIL_WIDTH = 300;
+    RIGHT_RAIL_MIN_WIDTH = 240;
+    RIGHT_RAIL_MAX_WIDTH = 640;
     CHAT_MAX_WIDTH = 900;
     URL_TOKEN_RE = /#(https:\/\/\S+)/;
     URL_PREVIEW_DEBOUNCE_MS = 500;
@@ -2242,51 +2330,58 @@ var init_ChatPage = __esm({
     ChatPage = () => {
       const chatApi = useApi4(aiConversationApiRef);
       const identityApi = useApi4(identityApiRef);
-      const [userId, setUserId] = useState7("default");
-      const [config, setConfig] = useState7({
+      const [userId, setUserId] = useState8("default");
+      const [config, setConfig] = useState8({
         defaultModel: null,
         defaultVectorStoreIds: null,
         maxRequestBudget: null,
         persistence: { enabled: false, ttlDays: 30 }
       });
-      const [model, setModel] = useState7("");
-      const [vectorStoreIds, setVectorStoreIds] = useState7([]);
-      const [webSearch, setWebSearch] = useState7(false);
-      const [customSystemPrompt, setCustomSystemPrompt] = useState7("");
-      const [toneId, setToneId] = useState7("");
-      const [focusId, setFocusId] = useState7("");
-      const [verbosityId, setVerbosityId] = useState7("");
-      const [reasoningEffort, setReasoningEffort] = useState7("");
-      const [keyVal, setKeyVal] = useState7({
+      const [model, setModel] = useState8("");
+      const [vectorStoreIds, setVectorStoreIds] = useState8([]);
+      const [webSearch, setWebSearch] = useState8(false);
+      const [customSystemPrompt, setCustomSystemPrompt] = useState8("");
+      const [toneId, setToneId] = useState8("");
+      const [focusId, setFocusId] = useState8("");
+      const [verbosityId, setVerbosityId] = useState8("");
+      const [reasoningEffort, setReasoningEffort] = useState8("");
+      const [keyVal, setKeyVal] = useState8({
         alias: "",
         token: ""
       });
-      const [skillId, setSkillId] = useState7("");
-      const [skills, setSkills] = useState7([]);
-      const [showSettings, setShowSettings] = useState7(true);
-      const [input, setInput] = useState7("");
-      const [configError, setConfigError] = useState7(null);
-      const [searchQuery, setSearchQuery] = useState7("");
-      const [historyOpen, setHistoryOpen] = useState7(false);
-      const [sidebarCollapsed, setSidebarCollapsed] = useState7(false);
-      const [rightPanelCollapsed, setRightPanelCollapsed] = useState7(false);
-      const [threadMenuAnchor, setThreadMenuAnchor] = useState7(null);
-      const [threadMenuTarget, setThreadMenuTarget] = useState7(null);
-      const [importError, setImportError] = useState7(null);
-      const [urlPreview, setUrlPreview] = useState7(null);
-      const [urlPreviewLoading, setUrlPreviewLoading] = useState7(false);
-      const [urlPreviewError, setUrlPreviewError] = useState7(null);
-      const [dismissedUrl, setDismissedUrl] = useState7(null);
-      const [traits, setTraits] = useState7({ tones: [], focuses: [], verbosities: [] });
-      const [traitsLoading, setTraitsLoading] = useState7(true);
-      const [stagedFiles, setStagedFiles] = useState7([]);
-      const [attachError, setAttachError] = useState7(null);
-      const messagesEndRef = useRef3(null);
-      const messagesContainerRef = useRef3(null);
-      const importInputRef = useRef3(null);
-      const attachInputRef = useRef3(null);
-      const pendingSendRef = useRef3(null);
-      useEffect4(() => {
+      const [skillId, setSkillId] = useState8("");
+      const [skills, setSkills] = useState8([]);
+      const [showSettings, setShowSettings] = useState8(true);
+      const [input, setInput] = useState8("");
+      const [configError, setConfigError] = useState8(null);
+      const [searchQuery, setSearchQuery] = useState8("");
+      const [historyOpen, setHistoryOpen] = useState8(false);
+      const [sidebarCollapsed, setSidebarCollapsed] = useState8(false);
+      const [rightPanelCollapsed, setRightPanelCollapsed] = useState8(false);
+      const rightPanel = useResizablePanel({
+        storageKey: "ai-conversation.rightPanelWidth",
+        defaultWidth: RIGHT_RAIL_WIDTH,
+        minWidth: RIGHT_RAIL_MIN_WIDTH,
+        maxWidth: RIGHT_RAIL_MAX_WIDTH,
+        side: "left"
+      });
+      const [threadMenuAnchor, setThreadMenuAnchor] = useState8(null);
+      const [threadMenuTarget, setThreadMenuTarget] = useState8(null);
+      const [importError, setImportError] = useState8(null);
+      const [urlPreview, setUrlPreview] = useState8(null);
+      const [urlPreviewLoading, setUrlPreviewLoading] = useState8(false);
+      const [urlPreviewError, setUrlPreviewError] = useState8(null);
+      const [dismissedUrl, setDismissedUrl] = useState8(null);
+      const [traits, setTraits] = useState8({ tones: [], focuses: [], verbosities: [] });
+      const [traitsLoading, setTraitsLoading] = useState8(true);
+      const [stagedFiles, setStagedFiles] = useState8([]);
+      const [attachError, setAttachError] = useState8(null);
+      const messagesEndRef = useRef4(null);
+      const messagesContainerRef = useRef4(null);
+      const importInputRef = useRef4(null);
+      const attachInputRef = useRef4(null);
+      const pendingSendRef = useRef4(null);
+      useEffect5(() => {
         injectDesignSystemAssets();
         chatApi.getChatConfig().then(setConfig).catch((err) => setConfigError(err.message ?? "Failed to reach the chat backend"));
         chatApi.getChatTraits().then((t) => {
@@ -2320,7 +2415,7 @@ var init_ChatPage = __esm({
         onKeyChange: setKeyVal
       });
       const activeThreadId = chat.activeThread?.id ?? null;
-      useEffect4(() => {
+      useEffect5(() => {
         if (!chat.activeThread) return;
         setModel(chat.activeThread.model);
         setVectorStoreIds(chat.activeThread.vectorStoreIds);
@@ -2337,7 +2432,7 @@ var init_ChatPage = __esm({
         setSkillId(chat.activeThread.skillId ?? "");
         setWebSearch(!!chat.activeThread.webSearch);
       }, [activeThreadId]);
-      useEffect4(() => {
+      useEffect5(() => {
         if (!pendingSendRef.current || !activeThreadId) return;
         const pending = pendingSendRef.current;
         pendingSendRef.current = null;
@@ -2347,10 +2442,10 @@ var init_ChatPage = __esm({
         chat.activeThread
       ]);
       const isStreaming = chat.isStreaming;
-      useEffect4(() => {
+      useEffect5(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
       }, [messages, isStreaming]);
-      useEffect4(() => {
+      useEffect5(() => {
         const match = input.match(URL_TOKEN_RE);
         const url = match?.[1];
         if (!url) {
@@ -2719,8 +2814,7 @@ var init_ChatPage = __esm({
             /* @__PURE__ */ React14.createElement(Typography8, { variant: "subtitle2", noWrap: true, sx: { flex: 1 } }, chat.activeThread?.title ?? "AI Chat"),
             /* @__PURE__ */ React14.createElement(Tooltip5, { title: rightPanelCollapsed ? "Show context panel" : "Hide context panel" }, /* @__PURE__ */ React14.createElement(IconButton4, { size: "small", onClick: () => setRightPanelCollapsed((v) => !v) }, rightPanelCollapsed ? /* @__PURE__ */ React14.createElement(ChevronLeftIcon, { fontSize: "small" }) : /* @__PURE__ */ React14.createElement(ChevronRightIcon, { fontSize: "small" })))
           ),
-          chat.error && /* @__PURE__ */ React14.createElement(Box12, { sx: { px: 2, pt: 1 } }, /* @__PURE__ */ React14.createElement(ErrorBanner, { error: chat.error, onDismiss: () => {
-          } })),
+          chat.error && /* @__PURE__ */ React14.createElement(Box12, { sx: { px: 2, pt: 1 } }, /* @__PURE__ */ React14.createElement(ErrorBanner, { error: chat.error, onDismiss: chat.clearError })),
           /* @__PURE__ */ React14.createElement(
             Box12,
             {
@@ -2825,17 +2919,35 @@ var init_ChatPage = __esm({
           ),
           statusParts.length > 0 && /* @__PURE__ */ React14.createElement(Box12, { sx: { px: 2, pb: 1 } }, /* @__PURE__ */ React14.createElement(Typography8, { variant: "caption", color: "text.secondary" }, statusParts.join(" \xB7 ")))
         )
-      ), !rightPanelCollapsed && /* @__PURE__ */ React14.createElement(
+      ), !rightPanelCollapsed && /* @__PURE__ */ React14.createElement(React14.Fragment, null, /* @__PURE__ */ React14.createElement(
+        Box12,
+        {
+          role: "separator",
+          "aria-orientation": "vertical",
+          "aria-label": "Resize context panel",
+          onPointerDown: rightPanel.onPointerDown,
+          onDoubleClick: rightPanel.reset,
+          sx: {
+            width: "6px",
+            flexShrink: 0,
+            cursor: "col-resize",
+            bgcolor: "transparent",
+            transition: "background-color 0.15s",
+            "&:hover, &:active": { bgcolor: "primary.main" }
+          }
+        }
+      ), /* @__PURE__ */ React14.createElement(
         Box12,
         {
           sx: {
-            width: RIGHT_RAIL_WIDTH,
+            width: rightPanel.width,
             flexShrink: 0,
             borderLeft: 1,
             borderColor: "divider",
             display: "flex",
             flexDirection: "column",
-            overflowY: "auto"
+            overflowY: "auto",
+            overflowX: "hidden"
           }
         },
         /* @__PURE__ */ React14.createElement(SourcesPanel, { citations: chat.citations }),
@@ -2848,7 +2960,7 @@ var init_ChatPage = __esm({
             keySpend: chat.keySpend
           }
         )
-      ));
+      )));
     };
   }
 });
@@ -2885,7 +2997,7 @@ var AnalyticsPage_exports = {};
 __export(AnalyticsPage_exports, {
   AnalyticsPage: () => AnalyticsPage
 });
-import React16, { useEffect as useEffect5, useState as useState8 } from "react";
+import React16, { useEffect as useEffect6, useState as useState9 } from "react";
 import { Box as Box14, Paper, Select as Select3, MenuItem as MenuItem4, Typography as Typography10, Alert as Alert2 } from "@mui/material";
 import { useApi as useApi5 } from "@backstage/core-plugin-api";
 var RANGES, AnalyticsPage;
@@ -2902,13 +3014,13 @@ var init_AnalyticsPage = __esm({
     ];
     AnalyticsPage = () => {
       const chatApi = useApi5(aiConversationApiRef);
-      const [range, setRange] = useState8("30d");
-      const [bySkill, setBySkill] = useState8([]);
-      const [byModel, setByModel] = useState8([]);
-      const [feedback, setFeedback] = useState8(null);
-      const [error, setError] = useState8(null);
-      const [loading, setLoading] = useState8(true);
-      useEffect5(() => {
+      const [range, setRange] = useState9("30d");
+      const [bySkill, setBySkill] = useState9([]);
+      const [byModel, setByModel] = useState9([]);
+      const [feedback, setFeedback] = useState9(null);
+      const [error, setError] = useState9(null);
+      const [loading, setLoading] = useState9(true);
+      useEffect6(() => {
         let alive = true;
         setLoading(true);
         setError(null);

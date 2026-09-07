@@ -89,16 +89,26 @@ const SourceRow: React.FC<{ source: DedupedSource }> = ({ source }) => {
     >
       <AccordionSummary
         expandIcon={<ExpandMoreIcon fontSize="small" />}
-        sx={{ minHeight: 0, '& .MuiAccordionSummary-content': { my: 0.75, mr: 1 } }}
+        sx={{
+          minHeight: 0,
+          '& .MuiAccordionSummary-content': {
+            my: 0.75,
+            mr: 1,
+            minWidth: 0,
+            overflow: 'hidden',
+          },
+        }}
       >
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25, minWidth: 0 }}>
-          <Typography
-            variant="body2"
-            fontWeight={500}
-            sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-          >
-            {source.filename}
-          </Typography>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25, minWidth: 0, width: '100%' }}>
+          <Tooltip title={source.filename}>
+            <Typography
+              variant="body2"
+              fontWeight={500}
+              sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+            >
+              {source.filename}
+            </Typography>
+          </Tooltip>
           <Typography variant="caption" color="text.secondary">
             <Tooltip title={`Score ${source.bestScore.toFixed(3)}`}>
               <span>{rel} relevance</span>
@@ -121,7 +131,12 @@ const SourceRow: React.FC<{ source: DedupedSource }> = ({ source }) => {
             <Typography
               variant="body2"
               color="text.secondary"
-              sx={{ whiteSpace: 'pre-wrap', maxHeight: 220, overflow: 'auto' }}
+              sx={{
+                whiteSpace: 'pre-wrap',
+                overflowWrap: 'anywhere',
+                maxHeight: 220,
+                overflow: 'auto',
+              }}
             >
               {snippet}
             </Typography>
@@ -142,7 +157,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({ citations }) => {
   const total = groups.reduce((n, g) => n + g.items.length, 0);
 
   return (
-    <Box sx={{ p: 1.5 }}>
+    <Box sx={{ p: 1.5, minWidth: 0, overflow: 'hidden' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <Typography variant="overline" color="text.secondary">
           Sources

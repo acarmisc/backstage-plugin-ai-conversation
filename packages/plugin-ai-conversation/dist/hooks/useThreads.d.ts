@@ -53,6 +53,7 @@ export interface UseChatResult {
     regenerateFrom: (messageId: string) => void;
     editAndResend: (messageId: string, newContent: string) => void;
     stopGeneration: () => void;
+    clearError: () => void;
     submitFeedback: (messageId: string, vote: 'up' | 'down') => void;
     togglePin: (id: string) => void;
     exportThread: (id: string) => void;

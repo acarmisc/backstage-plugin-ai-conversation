@@ -344,13 +344,10 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
   // (messages + model + key). The SSE *response* stream is not affected
   // by the request body parser. Backstage's HttpRouterService does not
   // add compression by default, so the response stream is not buffered.
-  // Limit matters: the default 100kb body-parser cap would silently reject
-  // a persisted thread whose payload is well under our own 1MB cap (see
-  // MAX_THREAD_PAYLOAD_BYTES in persistence.ts) — the raw body wraps the
-  // data JSON in title/pinned, so give ~50% headroom over that cap and let
-  // serializeThreadPayload enforce the real 1MB data limit with a proper
-  // 413.
-  router.use(express.json({ limit: '1.5mb' }));
+  // The request also carries base64 image data URLs. Attachment validation
+  // allows up to four 6MB URLs, so the parser must not reject valid images
+  // before validateAttachments can apply the per-file limits.
+  router.use(express.json({ limit: '30mb' }));
 
   router.get('/health', (_req: Request, res: Response) => {
     res.json({ status: 'ok' });
@@ -800,15 +797,22 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       ];
 
       const base = chatConfig.baseUrl;
-      const searchResults = body.vector_store_ids?.length
-        ? await retrieveContext({
+      let searchResults = [] as Awaited<ReturnType<typeof retrieveContext>>;
+      if (body.vector_store_ids?.length) {
+        try {
+          searchResults = await retrieveContext({
             baseUrl: base,
             userKey: body.user_key,
             vectorStoreIds: body.vector_store_ids,
             query: lastUserText(withSystemPrompt),
             topK: body.top_k ?? 5,
-          })
-        : [];
+          });
+        } catch (err: any) {
+          // A KB outage must not take down plain chat. The turn remains
+          // usable, but the absence of grounding is visible in server logs.
+          logger.warn(`Knowledge-base retrieval failed; continuing without grounding: ${err.message}`);
+        }
+      }
 
       const chatBody: Record<string, unknown> = {
         model: body.model,

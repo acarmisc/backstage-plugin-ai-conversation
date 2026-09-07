@@ -5,6 +5,7 @@ exports.toUIMessageChunks = toUIMessageChunks;
 exports.proxyUIMessageStream = proxyUIMessageStream;
 const stream_1 = require("stream");
 const ai_1 = require("ai");
+const UPSTREAM_TIMEOUT_MS = 120000;
 /**
  * Parses one LiteLLM OpenAI-shaped `data:` JSON payload. Returns `null` for
  * chunks with nothing worth emitting (e.g. role-only deltas) — same
@@ -94,6 +95,7 @@ async function proxyUIMessageStream(opts) {
             for (const chunk of prelude ?? []) {
                 writer.write(chunk);
             }
+            const upstreamTimeout = AbortSignal.timeout(UPSTREAM_TIMEOUT_MS);
             let upstream;
             try {
                 upstream = await fetch(upstreamUrl, {
@@ -104,12 +106,17 @@ async function proxyUIMessageStream(opts) {
                         Accept: 'text/event-stream',
                     },
                     body: JSON.stringify(upstreamBody),
-                    signal: controller.signal,
+                    signal: AbortSignal.any([controller.signal, upstreamTimeout]),
                 });
             }
             catch (err) {
-                if (err.name === 'AbortError')
+                if (err.name === 'AbortError' && !upstreamTimeout.aborted)
                     return;
+                if (upstreamTimeout.aborted) {
+                    writer.write({ type: 'error', errorText: 'upstream request timed out' });
+                    writer.write({ type: 'finish' });
+                    return;
+                }
                 writer.write({ type: 'error', errorText: err.message || 'upstream fetch failed' });
                 writer.write({ type: 'finish' });
                 return;
@@ -157,6 +164,9 @@ async function proxyUIMessageStream(opts) {
             catch (err) {
                 if (err.name !== 'AbortError') {
                     writer.write({ type: 'error', errorText: err.message || 'stream read failed' });
+                }
+                else if (upstreamTimeout.aborted) {
+                    writer.write({ type: 'error', errorText: 'upstream stream timed out' });
                 }
             }
             if (state.textStarted) {
