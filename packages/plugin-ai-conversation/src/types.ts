@@ -8,6 +8,29 @@ export interface VectorStore {
 }
 
 /**
+ * The subset of a LiteLLM team this plugin consumes. Declared structurally
+ * rather than imported from `@acarmisc/backstage-plugin-litellm` because the
+ * two plugins version independently and this repo may be installed against a
+ * govai release older than the one that added `object_permission` /
+ * `access_groups`. Fields beyond the ones below are ignored, and the
+ * team-scoping degrades gracefully when they're absent (the model picker
+ * falls back to unrestricted, no KBs are preselected) rather than failing to
+ * compile or render.
+ */
+export interface ChatTeamInfo {
+  team_id: string;
+  team_alias?: string;
+  /** Model allowlist — literal names, `access_groups` names, or the
+   * `all-proxy-models` sentinel. See modelFilter.ts. */
+  models?: string[];
+  /** Knowledge bases / MCP servers attached to the team. */
+  object_permission?: {
+    vector_stores?: string[];
+    mcp_servers?: string[];
+  };
+}
+
+/**
  * Skill metadata for the picker, sourced from `chat-skill` catalog
  * entities. Deliberately excludes the system prompt text — the backend
  * resolves it server-side from `skill_id` so it never round-trips through
@@ -140,6 +163,11 @@ export interface ChatConfig {
    * `excludedModels` config. Null when unset. */
   excludedModels: string[] | null;
   persistence: ChatPersistenceConfig;
+  /** Whether a team must be selected before a chat key can be minted —
+   * mirrors govai's `litellm.keyGeneration.teamRequired` (default true).
+   * Read from this plugin's own backend so the two surfaces stay
+   * independent of which govai version is installed. */
+  teamRequired: boolean;
 }
 
 /** A thread as persisted server-side (see `litellm.aiConversation.persistence` config).
@@ -194,6 +222,12 @@ export interface Thread {
    * "component:default/data-analyst". Sent as `skill_id`; the backend
    * resolves and prepends its system prompt. */
   skillId?: string;
+  /** LiteLLM team the thread's chat key was minted against. Budget, rate
+   * limits and model access are inherited from this team. Unlike
+   * keyToken/keyAlias this is not a credential, so it IS persisted with the
+   * thread — but the key it was minted for is not, so a thread restored from
+   * another device re-mints against this team on its next turn. */
+  teamId?: string;
   /** 'compare' sends the same prompt to every model in compareModels in
    * parallel instead of the single selected model. Missing/'single' is
    * the default for every thread created before this field existed. */

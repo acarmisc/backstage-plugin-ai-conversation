@@ -22,7 +22,11 @@ export interface AiConversationApiInterface {
   fetchUrlContext(url: string): Promise<UrlContextPreview>;
   getFeedbackSummary(filters?: { skillId?: string; model?: string }): Promise<FeedbackSummary>;
   getUsageSummary(groupBy: 'skill' | 'model', range?: string): Promise<UsageSummaryRow[]>;
-  mintChatKey(opts?: { models?: string[]; max_budget?: number }): Promise<ChatKey>;
+  mintChatKey(opts?: {
+    models?: string[];
+    max_budget?: number;
+    team_id?: string;
+  }): Promise<ChatKey>;
   deleteChatKey(key: string): Promise<{ success: boolean }>;
   getKeySpend(alias: string): Promise<KeySpend | null>;
   sendFeedback(req: ChatFeedbackRequest): Promise<{ success: boolean }>;
@@ -72,6 +76,7 @@ export class AiConversationApi implements AiConversationApiInterface {
         maxRequestBudget: null,
         excludedModels: null,
         persistence: { enabled: false, ttlDays: 30 },
+        teamRequired: true,
       };
     }
     const data = await res.json();
@@ -85,6 +90,7 @@ export class AiConversationApi implements AiConversationApiInterface {
       // backend's own default, see readChatConfig in router.ts) so ChatPage
       // never reads `config.persistence.enabled` off undefined.
       persistence: data.persistence ?? { enabled: false, ttlDays: 30 },
+      teamRequired: data.teamRequired ?? true,
     };
   }
 
@@ -124,7 +130,11 @@ export class AiConversationApi implements AiConversationApiInterface {
     return res.json();
   }
 
-  async mintChatKey(opts?: { models?: string[]; max_budget?: number }): Promise<ChatKey> {
+  async mintChatKey(opts?: {
+    models?: string[];
+    max_budget?: number;
+    team_id?: string;
+  }): Promise<ChatKey> {
     const res = await this.fetchApi.fetch(`${BASE_PATH}/chat/key`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

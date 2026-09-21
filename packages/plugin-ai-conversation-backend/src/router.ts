@@ -338,6 +338,13 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
     }));
   }
 
+  /** Whether a chat key must be bound to a team. Mirrors govai's
+   * `litellm.keyGeneration.teamRequired` (default true) but is read here so
+   * the chat plugin doesn't depend on the installed govai version's /config
+   * shape. Also gates the frontend picker via GET /config. */
+  const teamRequired =
+    config.getOptionalBoolean('litellm.aiConversation.teamRequired') ?? true;
+
   const router = Router();
 
   // JSON parser for request bodies. The request bodies are small JSON
@@ -360,6 +367,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       maxRequestBudget: chatConfig.maxRequestBudget ?? null,
       excludedModels: chatConfig.excludedModels ?? null,
       persistence: chatConfig.persistence,
+      teamRequired,
     });
   });
 
@@ -459,6 +467,13 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
   // Mint a dedicated chat key for the authenticated user. The real sk- key
   // is returned ONCE and stored client-side in the thread. LiteLLM only
   // stores hashed keys — listKeys cannot recover it.
+  //
+  // The key is bound to a team (`team_id`), which is what gives the chat
+  // turn its budget, rate limits and model ACL. Mirrors govai's
+  // /keys/generate + its opencode-connect team guard (router.ts:598-609
+  // there): the requested team must be one the caller is actually a member
+  // of, so the endpoint can never be used to mint a key billed to someone
+  // else's team.
   router.post('/chat/key', async (req: Request, res: Response) => {
     try {
       const tokenEntityRef = await resolveUserId(req, auth);
@@ -469,7 +484,46 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       const userId = toLiteLLMUserId(tokenEntityRef, userIdDomain);
       const client = new LiteLLMClient({ baseUrl: chatConfig.baseUrl, masterKey });
 
-      const body = (req.body ?? {}) as { models?: string[]; max_budget?: number };
+      const body = (req.body ?? {}) as {
+        models?: string[];
+        max_budget?: number;
+        team_id?: string;
+      };
+
+      const teamId = body.team_id?.trim() || undefined;
+      if (teamRequired && !teamId) {
+        res.status(400).json({ error: 'team_id is required for chat keys' });
+        return;
+      }
+      if (teamId) {
+        // Membership check reads the caller's own LiteLLM user record — the
+        // same `teams` list govai's /teams route (and its picker) is built
+        // from. A user who isn't provisioned yet has no teams, which fails
+        // closed here; the chat flow never provisions (see AGENTS.md).
+        let memberOf: string[] = [];
+        try {
+          const userInfo = await client.getUserInfo(userId);
+          memberOf = userInfo?.teams ?? [];
+        } catch (err: any) {
+          logger.warn(`Failed to resolve teams for ${userId}: ${err.message}`);
+        }
+        if (!memberOf.includes(teamId)) {
+          if (memberOf.length === 0) {
+            // Distinguish "not provisioned yet" from "wrong team" — the
+            // former is usually a provisioning gap, not an authorization
+            // decision, and the message should say so.
+            logger.warn(
+              `Chat key requested for team ${teamId} by ${userId}, but that user has no teams in LiteLLM — is litellm.provisioning.enabled set?`,
+            );
+          }
+          res.status(403).json({
+            error: 'Access denied: team is not one of your teams',
+            team: teamId,
+          });
+          return;
+        }
+      }
+
       const entityName = tokenEntityRef.split('/').pop() ?? tokenEntityRef;
       const alias = `chat-${entityName}-${Date.now()}`;
       const result = await client.generateKey({
@@ -477,10 +531,14 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
         models: body.models ?? [],
         max_budget: body.max_budget,
         user_id: userId,
+        // Team binding is what carries the governance: budget, tpm/rpm and
+        // the model allowlist all resolve through it in LiteLLM.
+        ...(teamId && { team_id: teamId }),
         duration: '3h',
         metadata: {
           created_via: 'backstage-chat',
           created_by_backstage_user: tokenEntityRef,
+          ...(teamId && { chat_team: teamId }),
         },
       });
       res.json({

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Autocomplete, Box, Checkbox, Chip, TextField, Typography } from '@mui/material';
 import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
 import CheckBoxIcon from '@mui/icons-material/CheckBox';
@@ -10,12 +10,19 @@ export interface VectorStorePickerProps {
   value: string[];
   onChange: (ids: string[]) => void;
   defaultVectorStoreIds?: string[] | null;
+  /** Extra ids to surface as selected-but-unknown chips — the currently
+   * selected team's attached stores (TeamInfo.object_permission
+   * .vector_stores). They may not appear in the plugin's own store listing
+   * (that route is a different upstream call), so they're merged in as
+   * name-less options rather than silently dropped from the selection. */
+  extraStores?: string[] | null;
 }
 
 export const VectorStorePicker: React.FC<VectorStorePickerProps> = ({
   value,
   onChange,
   defaultVectorStoreIds,
+  extraStores,
 }) => {
   const chatApi = useApi(aiConversationApiRef);
   const [stores, setStores] = useState<VectorStore[]>([]);
@@ -44,15 +51,26 @@ export const VectorStorePicker: React.FC<VectorStorePickerProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const selected = stores.filter(s => value.includes(s.id));
+  // Merge in team stores the global listing doesn't know about, so selecting
+  // a team's KBs doesn't render an empty picker. Options are id-keyed; an id
+  // present in both keeps the real name.
+  const options = useMemo(() => {
+    const known = new Set(stores.map(s => s.id));
+    const extras: VectorStore[] = (extraStores ?? [])
+      .filter(id => !known.has(id))
+      .map(id => ({ id, name: id }));
+    return [...stores, ...extras];
+  }, [stores, extraStores]);
+
+  const selectedOptions = options.filter(s => value.includes(s.id));
 
   return (
     <Box>
       <Autocomplete
         multiple
         size="small"
-        options={stores}
-        value={selected}
+        options={options}
+        value={selectedOptions}
         loading={loading}
         disableCloseOnSelect
         getOptionLabel={s => s.name}

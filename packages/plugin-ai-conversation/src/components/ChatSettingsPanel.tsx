@@ -12,11 +12,13 @@ import {
 } from '@mui/material';
 import SettingsIcon from '@mui/icons-material/Settings';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+
 import { ModelPicker } from './ModelPicker';
+import { TeamPicker } from './TeamPicker';
 import { VectorStorePicker } from './VectorStorePicker';
 import { OptionPicker } from './OptionPicker';
 import { SkillPicker } from './SkillPicker';
-import type { ChatConfig, ChatTraits, ReasoningEffort, Skill } from '../types';
+import type { ChatConfig, ChatTeamInfo, ChatTraits, ReasoningEffort, Skill } from '../types';
 
 const REASONING_EFFORT_OPTIONS: { id: ReasoningEffort; label: string }[] = [
   { id: 'low', label: 'Low' },
@@ -40,10 +42,20 @@ export interface ChatSettingsPanelProps {
   onFocusChange: (id: string) => void;
   customSystemPrompt: string;
   onCustomSystemPromptChange: (value: string) => void;
+  teams: ChatTeamInfo[];
+  teamsLoading: boolean;
+  teamsError: string | null;
+  teamId: string;
+  onTeamChange: (teamId: string) => void;
+  /** Selected team's model allowlist — see ModelPicker. */
+  teamModels?: string[] | null;
   model: string;
   onModelChange: (model: string) => void;
   vectorStoreIds: string[];
   onVectorStoreIdsChange: (ids: string[]) => void;
+  /** The selected team's attached stores — surfaced as options even when the
+   * global store listing doesn't include them (see VectorStorePicker). */
+  teamVectorStores?: string[] | null;
   webSearch: boolean;
   onWebSearchChange: (enabled: boolean) => void;
   verbosityId: string;
@@ -68,10 +80,17 @@ export const ChatSettingsPanel: React.FC<ChatSettingsPanelProps> = ({
   onFocusChange,
   customSystemPrompt,
   onCustomSystemPromptChange,
+  teams,
+  teamsLoading,
+  teamsError,
+  teamId,
+  onTeamChange,
+  teamModels,
   model,
   onModelChange,
   vectorStoreIds,
   onVectorStoreIdsChange,
+  teamVectorStores,
   webSearch,
   onWebSearchChange,
   verbosityId,
@@ -114,16 +133,26 @@ export const ChatSettingsPanel: React.FC<ChatSettingsPanelProps> = ({
         {/* ── Main settings ── */}
         <Box sx={{ px: 1.5, py: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
           <SkillPicker value={skillId} skills={skills} onChange={onSkillChange} />
+          <TeamPicker
+            value={teamId}
+            onChange={onTeamChange}
+            teams={teams}
+            loading={teamsLoading}
+            error={teamsError}
+            required={config.teamRequired}
+          />
           <ModelPicker
             value={model}
             onChange={onModelChange}
             defaultModel={config.defaultModel}
             excludedModels={config.excludedModels}
+            teamModels={teamModels}
           />
           <VectorStorePicker
             value={vectorStoreIds}
             onChange={onVectorStoreIdsChange}
             defaultVectorStoreIds={config.defaultVectorStoreIds}
+            extraStores={teamVectorStores}
           />
           <TextField
             label="Extra prompt"

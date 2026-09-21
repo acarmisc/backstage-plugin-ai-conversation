@@ -4,6 +4,8 @@ import ChatIcon from '@mui/icons-material/Chat';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { useApi, identityApiRef } from '@backstage/core-plugin-api';
+import { liteLlmApiRef } from '@acarmisc/backstage-plugin-litellm';
+
 import type { FileUIPart } from 'ai';
 import { aiConversationApiRef } from '../api';
 import { useThreads } from '../hooks/useThreads';
@@ -19,6 +21,7 @@ import { SourcesPanel } from './SourcesPanel';
 import { UsagePanel } from './UsagePanel';
 import type {
   ChatConfig,
+  ChatTeamInfo,
   ChatTraits,
   ReasoningEffort,
   Skill,
@@ -38,12 +41,14 @@ const EMPTY_CONFIG: ChatConfig = {
   maxRequestBudget: null,
   excludedModels: null,
   persistence: { enabled: false, ttlDays: 30 },
+  teamRequired: true,
 };
 
 const EMPTY_TRAITS: ChatTraits = { tones: [], focuses: [], verbosities: [] };
 
 export const ChatPage: React.FC = () => {
   const chatApi = useApi(aiConversationApiRef);
+  const liteLlmApi = useApi(liteLlmApiRef);
   const identityApi = useApi(identityApiRef);
 
   const [userId, setUserId] = useState('default');
@@ -63,6 +68,11 @@ export const ChatPage: React.FC = () => {
   });
   const [skillId, setSkillId] = useState('');
   const [skills, setSkills] = useState<Skill[]>([]);
+  const [teams, setTeams] = useState<ChatTeamInfo[]>([]);
+  const [teamsLoading, setTeamsLoading] = useState(true);
+  const [teamsError, setTeamsError] = useState<string | null>(null);
+  const [teamId, setTeamId] = useState('');
+  const [keyError, setKeyError] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [configError, setConfigError] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -111,11 +121,20 @@ export const ChatPage: React.FC = () => {
       .listSkills()
       .then(setSkills)
       .catch(() => {});
+    // Teams come from govai's /api/litellm/teams, already scoped server-side
+    // to the teams the caller is a member of (via getOrProvisionUser →
+    // team memberships). No chat-backend route needed — same reuse as
+    // liteLlmApi.listModels() in ModelPicker.
+    liteLlmApi
+      .getTeams()
+      .then(setTeams)
+      .catch(err => setTeamsError(err.message ?? 'Failed to load teams'))
+      .finally(() => setTeamsLoading(false));
     identityApi
       .getCredentials()
       .then(c => setUserId(c.token ? 'oidc' : 'default'))
       .catch(() => {});
-  }, [chatApi, identityApi]);
+  }, [chatApi, identityApi, liteLlmApi]);
 
   const chat = useThreads({
     userId,
@@ -130,12 +149,23 @@ export const ChatPage: React.FC = () => {
     keyToken: keyVal.token,
     keyExpiresAt: keyVal.expiresAt,
     skillId,
+    // The selected team, with a single-team user's only team as the implicit
+    // default — so the common case needs no explicit pick but still gets a
+    // team-bound key. Multi-team users must choose.
+    teamId: teamId || (teams.length === 1 ? teams[0].team_id : ''),
     topK: 5,
     webSearch,
     persistenceEnabled: config.persistence.enabled,
     maxRequestBudget: config.maxRequestBudget,
     onKeyChange: setKeyVal,
   });
+
+  // The team record the effective key is bound to — drives the model and KB
+  // scoping below.
+  const selectedTeam = useMemo(() => {
+    const effectiveId = teamId || (teams.length === 1 ? teams[0].team_id : '');
+    return teams.find(t => t.team_id === effectiveId) ?? null;
+  }, [teams, teamId]);
 
   // Restore the selected thread's own model/KBs/key into Settings whenever
   // the active thread changes — otherwise sending a message in an older
@@ -157,6 +187,7 @@ export const ChatPage: React.FC = () => {
       expiresAt: chat.activeThread.keyExpiresAt,
     });
     setSkillId(chat.activeThread.skillId ?? '');
+    setTeamId(chat.activeThread.teamId ?? '');
     setWebSearch(!!chat.activeThread.webSearch);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeThreadId]);
@@ -192,8 +223,52 @@ export const ChatPage: React.FC = () => {
     if (skill.defaultVectorStoreIds?.length) setVectorStoreIds(skill.defaultVectorStoreIds);
   };
 
+  // Switching teams re-scopes what the key can actually reach. The ACL and
+  // budget are baked into the key at mint time, so an already-minted key can
+  // never be reused across teams — it's deleted and replaced immediately
+  // (the user's next send then uses the new one; nothing is re-minted here
+  // when no key exists yet, handleSend covers that case). Knowledge bases the
+  // team declares are pre-selected, still fully editable afterwards — the
+  // team's list is a starting point, not a lock.
+  const handleTeamChange = async (nextTeamId: string) => {
+    setTeamId(nextTeamId);
+    setKeyError(null);
+    const team = teams.find(t => t.team_id === nextTeamId);
+    const teamStores = team?.object_permission?.vector_stores;
+    if (teamStores?.length) setVectorStoreIds(teamStores);
+
+    if (!keyVal.token) return;
+    try {
+      const keyInfo = await chatApi.mintChatKey({
+        ...(config.maxRequestBudget != null ? { max_budget: config.maxRequestBudget } : {}),
+        ...(nextTeamId ? { team_id: nextTeamId } : {}),
+      });
+      const previousKey = keyVal.token;
+      setKeyVal({
+        alias: keyInfo.key_alias,
+        token: keyInfo.key,
+        expiresAt: keyInfo.expires_at ? Date.parse(keyInfo.expires_at) : undefined,
+      });
+      chatApi.deleteChatKey(previousKey).catch(() => {});
+    } catch (err: any) {
+      // Leave keyVal untouched on failure: the old (still valid) key keeps
+      // working until it expires, and the error explains why the team change
+      // didn't take effect.
+      setKeyError(err.message ?? 'Failed to mint a chat key for this team');
+    }
+  };
+
   const handleSend = async () => {
     if (!input.trim() || isStreaming) return;
+    const effectiveTeamId = teamId || (teams.length === 1 ? teams[0].team_id : '');
+    // The team is required before a key can be minted (litellm.keyGeneration
+    // .teamRequired in govai's config; this plugin's own /config mirrors it).
+    // Without one there is nothing to bill the turn to, so surface it rather
+    // than silently minting a teamless key.
+    if (config.teamRequired && !effectiveTeamId) {
+      setKeyError('Select a team before sending a message.');
+      return;
+    }
     let currentKey = keyVal;
     // Mint a chat key on the first message, or re-mint an expired one when
     // starting a fresh thread (no active thread to attach a retry to). A key
@@ -203,17 +278,20 @@ export const ChatPage: React.FC = () => {
       !!currentKey.expiresAt && currentKey.expiresAt - Date.now() < KEY_REMINT_SKEW_MS;
     if (!currentKey.token || (expired && !chat.activeThread)) {
       try {
-        const keyInfo = await chatApi.mintChatKey(
-          config.maxRequestBudget != null ? { max_budget: config.maxRequestBudget } : undefined,
-        );
+        const keyInfo = await chatApi.mintChatKey({
+          ...(config.maxRequestBudget != null ? { max_budget: config.maxRequestBudget } : {}),
+          ...(effectiveTeamId ? { team_id: effectiveTeamId } : {}),
+        });
         currentKey = {
           alias: keyInfo.key_alias,
           token: keyInfo.key,
           expiresAt: keyInfo.expires_at ? Date.parse(keyInfo.expires_at) : undefined,
         };
         setKeyVal(currentKey);
-      } catch {
-        return; // key mint failed — silently abort
+        setKeyError(null);
+      } catch (err: any) {
+        setKeyError(err.message ?? 'Failed to mint a chat key');
+        return;
       }
     }
     const text = input.trim();
@@ -299,10 +377,17 @@ export const ChatPage: React.FC = () => {
         onVerbosityChange={setVerbosityId}
         customSystemPrompt={customSystemPrompt}
         onCustomSystemPromptChange={setCustomSystemPrompt}
+        teams={teams}
+        teamsLoading={teamsLoading}
+        teamsError={teamsError}
+        teamId={teamId}
+        onTeamChange={handleTeamChange}
+        teamModels={selectedTeam?.models}
         model={model}
         onModelChange={setModel}
         vectorStoreIds={vectorStoreIds}
         onVectorStoreIdsChange={setVectorStoreIds}
+        teamVectorStores={selectedTeam?.object_permission?.vector_stores}
         webSearch={webSearch}
         onWebSearchChange={setWebSearch}
         reasoningEffort={reasoningEffort}
@@ -361,6 +446,12 @@ export const ChatPage: React.FC = () => {
           {chat.error && (
             <Box sx={{ px: 2, pt: 1 }}>
               <ErrorBanner error={chat.error} onDismiss={chat.clearError} />
+            </Box>
+          )}
+
+          {keyError && (
+            <Box sx={{ px: 2, pt: 1 }}>
+              <ErrorBanner error={keyError} onDismiss={() => setKeyError(null)} />
             </Box>
           )}
 

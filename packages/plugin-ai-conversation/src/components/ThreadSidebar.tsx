@@ -31,7 +31,8 @@ import SearchIcon from '@mui/icons-material/Search';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { extractText } from '../hooks/messageShape';
 import { ChatSettingsPanel } from './ChatSettingsPanel';
-import type { ChatConfig, ChatTraits, ReasoningEffort, Skill, Thread } from '../types';
+
+import type { ChatConfig, ChatTeamInfo, ChatTraits, ReasoningEffort, Skill, Thread } from '../types';
 
 export const SIDEBAR_WIDTH = 280;
 export const SIDEBAR_RAIL_WIDTH = 48;
@@ -82,10 +83,17 @@ export interface ThreadSidebarProps {
   onVerbosityChange: (id: string) => void;
   customSystemPrompt: string;
   onCustomSystemPromptChange: (value: string) => void;
+  teams: ChatTeamInfo[];
+  teamsLoading: boolean;
+  teamsError: string | null;
+  teamId: string;
+  onTeamChange: (teamId: string) => void;
+  teamModels?: string[] | null;
   model: string;
   onModelChange: (model: string) => void;
   vectorStoreIds: string[];
   onVectorStoreIdsChange: (ids: string[]) => void;
+  teamVectorStores?: string[] | null;
   webSearch: boolean;
   onWebSearchChange: (enabled: boolean) => void;
   reasoningEffort: ReasoningEffort | '';
@@ -125,10 +133,17 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   onVerbosityChange,
   customSystemPrompt,
   onCustomSystemPromptChange,
+  teams,
+  teamsLoading,
+  teamsError,
+  teamId,
+  onTeamChange,
+  teamModels,
   model,
   onModelChange,
   vectorStoreIds,
   onVectorStoreIdsChange,
+  teamVectorStores,
   webSearch,
   onWebSearchChange,
   reasoningEffort,
@@ -233,10 +248,17 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
             onFocusChange={onFocusChange}
             customSystemPrompt={customSystemPrompt}
             onCustomSystemPromptChange={onCustomSystemPromptChange}
+            teams={teams}
+            teamsLoading={teamsLoading}
+            teamsError={teamsError}
+            teamId={teamId}
+            onTeamChange={onTeamChange}
+            teamModels={teamModels}
             model={model}
             onModelChange={onModelChange}
             vectorStoreIds={vectorStoreIds}
             onVectorStoreIdsChange={onVectorStoreIdsChange}
+            teamVectorStores={teamVectorStores}
             webSearch={webSearch}
             onWebSearchChange={onWebSearchChange}
             verbosityId={verbosityId}

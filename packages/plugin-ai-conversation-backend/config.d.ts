@@ -42,6 +42,19 @@ export interface Config {
       maxRequestBudget?: number;
 
       /**
+       * Whether a team must be selected before a chat key can be minted.
+       * Mirrors govai's `litellm.keyGeneration.teamRequired` (also default
+       * true), but read from this plugin's own config so the chat surface
+       * is independent of the installed govai version. When true, the chat
+       * key is minted with the selected team's id and inherits its budget,
+       * rate limits and model allowlist. Set to false to allow personal,
+       * team-less chat keys.
+       * @visibility backend
+       * @default true
+       */
+      teamRequired?: boolean;
+
+      /**
        * Server-side chat history (thread) persistence. Off by default —
        * threads stay client-side-only (React state + localStorage) unless
        * explicitly opted in here.

@@ -29,7 +29,7 @@ The chat plugin reuses all of this by **importing from the govai package**, not 
 | Packaging | Separate plugin pair (`plugin-ai-conversation` + `plugin-ai-conversation-backend`) | Independently versionable; keeps governance and chat concerns decoupled; matches govai's monorepo pattern. |
 | Thread persistence | Client-side ephemeral by default (React state + localStorage); **opt-in server-side persistence** via `litellm.aiConversation.persistence.enabled` (phase16) | LiteLLM is stateless — each turn resends full history anyway, so DB persistence was deferred until users actually asked for cross-device/durable history. Now available as an operator-controlled toggle: `chat_threads` table (`plugin-ai-conversation-backend/migrations/20260819130000_chat_threads.js`), `GET/PUT/DELETE /api/ai-conversation/threads[/:id]`, gated 404 when disabled. When enabled, the backend becomes authoritative — `useChat` loads the server's thread list on mount and syncs the active thread + create/delete/pin/import mutations back; localStorage is kept as a fast local cache/offline fallback either way. Auto-deletion after `ttlDays` (default 30, `0` = unlimited) runs via `coreServices.scheduler` (not a plain interval — DB-backed leader coordination matters here since the target deployment runs 2 Backstage replicas, see "Target environment" below). Message feedback (thumbs up/down) remains its own separate `chat_message_feedback` table/mechanism, a snapshotted event rather than full thread history. |
 | RAG endpoint | `/v1/rag/query` primary, `/v1/chat/completions` + `vector_store_ids` fallback | `/v1/rag/query` is model-agnostic (prepend-context, not provider-native tool). Fallback handles LiteLLM versions where `/rag/query` isn't mounted. |
-| Chat key strategy | Backend auto-mints a dedicated `sk-` key per thread via the master key (`POST /chat/key`), returned to the browser once and stored in that thread's state; deleted on thread delete | Superseded the original "user picks an existing key from a dropdown" plan — LiteLLM's `listKeys` only returns hashed/masked tokens, unusable for auth. See `HANDOFF.md` decision #3. |
+| Chat key strategy | Backend auto-mints a dedicated `sk-` key per thread via the master key (`POST /chat/key`), **bound to the user's selected LiteLLM team** (`team_id` — required when `litellm.aiConversation.teamRequired`, default true; validated against the caller's memberships), returned to the browser once and stored in that thread's state; deleted on thread delete or team switch | Superseded the original "user picks an existing key from a dropdown" plan — LiteLLM's `listKeys` only returns hashed/masked tokens, unusable for auth. See `HANDOFF.md` decision #3. Team binding is what makes budget/rate-limit/model-ACL work: LiteLLM resolves all three from `team_id`, so Backstage never has to mirror the governance rules — it only filters the pickers so users can't select something the proxy will reject. Mirrors govai's own key-generation flow (`KeyFormDialog` + `/teams` + opencode-connect's team guard). |
 | UI surfaces | Full chat page at `/ai-conversation` | v1 ships the page. Sidebar modal and home widget are future work. |
 | Cross-package reuse | Import `LiteLLMClient`, `resolveUserId`, `toLiteLLMUserId`, `getOrProvisionUser`, `ProvisioningError`, types from govai backend; import `LiteLlmApi`, `liteLlmApiRef`, types from govai frontend | Govai is the single source of truth for identity, key management, and the LiteLLM client. Chat plugin adds only chat-specific routes and components. |
 | Skill source | Backstage catalog `Component` entities (`spec.type: chat-skill`), own type — not `app-config.yaml`, not the sibling `ai-agent` type. Bundled SKILL.md directories are the zero-config fallback. | Self-service authoring (any team commits a `catalog-info.yaml`), ownership/RBAC/tags for free. `ai-agent` models externally-invocable, health-probed agents; a skill has no endpoint to probe and would pollute that inventory with permanent `unknown` status. Skill authoring lives in `git@gitlab.az.abssrv.it:innovation/ces-ai-personas.git` (legacy repo name), auto-discovered by the existing GitLab catalog provider — no host app-config change needed. |
@@ -79,11 +79,11 @@ The chat plugin reuses all of this by **importing from the govai package**, not 
 | Route | Method | Purpose |
 |---|---|---|
 | `/health` | GET | `{ status: 'ok' }` |
-| `/config` | GET | Chat defaults for the UI: `defaultModel`, `defaultVectorStoreIds`, `maxRequestBudget`, `excludedModels`, `persistence`. |
+| `/config` | GET | Chat defaults for the UI: `defaultModel`, `defaultVectorStoreIds`, `maxRequestBudget`, `excludedModels`, `persistence`, `teamRequired`. |
 | `/vector_stores` | GET | Lists LiteLLM vector stores for the KB picker. Calls LiteLLM's `/v1/vector_store/list`. |
 | `/skills` | GET | Lists chat skills (metadata only — id/title/description/defaultModel/defaultVectorStoreIds/tags). No system-prompt text. |
 | `/chat/traits` | GET | Static tone/focus/verbosity option lists for the pickers (id/label only — see `traits.ts`). |
-| `/chat/key` | POST/DELETE | Mints / deletes a per-thread `sk-` chat key via the master key. |
+| `/chat/key` | POST/DELETE | Mints / deletes a per-thread `sk-` chat key via the master key. Bound to a `team_id` (required when `teamRequired`; validated against the caller's own LiteLLM teams → 403 otherwise) so budget, rate limits and model ACL are inherited from the team. |
 | `/chat/key/:alias/spend` | GET | Current spend/budget for a chat key, looked up by alias. |
 | `/fetch-context` | POST | SSRF-guarded fetch + extract for the composer's `#url` chip (title/snippet only). |
 | `/feedback` | POST | Upserts a thumbs-up/down vote (with a Q&A snapshot) on an assistant message. |
@@ -150,6 +150,7 @@ litellm:
     defaultModel: claude-3-5-sonnet        # optional, pre-selected in UI
     defaultVectorStoreIds: []               # optional, pre-selected in UI
     maxRequestBudget: 5                     # optional, USD cap applied to each minted chat key
+    teamRequired: true                      # optional, default true — chat keys must bind to a team
     excludedModels: ["claude-*"]            # optional, hidden from the model picker (prefix: *)
     multimodalModels:                       # optional, overrides the vision heuristic
       - gpt-4o
@@ -215,11 +216,12 @@ Replaced the original hand-rolled `useChat.ts` (manual SSE reader, abort-per-mes
 | `ChatPage` | Page shell at `/ai-conversation`. Owns settings/thread/key state; composes the sidebar, message area and right rail. |
 | `ThreadSidebar` | Left rail: collapsible settings panel (via `ChatSettingsPanel`), new/import actions, searchable thread history with per-thread menu (pin/export/delete). |
 | `ChatComposer` | Attachment button, staged-file / `#url` chips, textarea, send/stop button. |
-| `ChatSettingsPanel` | Skill/Model/KB pickers, extra prompt, and the Advanced accordion (Tone/Focus/Verbosity/Reasoning effort/Web search). |
+| `ChatSettingsPanel` | Skill/Team/Model/KB pickers, extra prompt, and the Advanced accordion (Tone/Focus/Verbosity/Reasoning effort/Web search). |
 | `SkillPicker` | Dropdown of `chat-skill` catalog entities (or bundled skills) from `listSkills()`. Selecting one prefills `ModelPicker`/`VectorStorePicker` from its defaults and sends `skill_id` with the request. |
 | `OptionPicker` | Generic small Select (label + options + onChange), shared by Tone/Focus/Verbosity (options from `getChatTraits()`) and Reasoning effort (fixed `low`/`medium`/`high`, no backend call). |
-| `ModelPicker` | Dropdown from `liteLlmApiRef.listModels()`. Preselects `config.defaultModel`; hides `config.excludedModels` (see `modelFilter.ts`). |
-| `VectorStorePicker` | Multi-select from `listVectorStores()`. Empty selection = no grounding. Preselects `config.defaultVectorStoreIds`. |
+| `TeamPicker` | Dropdown from `liteLlmApiRef.getTeams()` (govai's route, already scoped to the caller's teams). Required when `config.teamRequired`. Selecting a team re-mints the chat key bound to it, prefills the team's KBs, and re-scopes `ModelPicker` to the team's model allowlist. |
+| `ModelPicker` | Dropdown from `liteLlmApiRef.listModels()` (the global catalogue, master-key-backed — same as govai). Preselects `config.defaultModel`; hides `config.excludedModels`; when a team is selected, narrows to that team's `models` allowlist (literal names, `access_groups`, or the `all-proxy-models` sentinel) via `filterModelsByTeam` in `modelFilter.ts`. |
+| `VectorStorePicker` | Multi-select from `listVectorStores()`. Empty selection = no grounding. Preselects `config.defaultVectorStoreIds`, then the selected team's `object_permission.vector_stores` (still editable). Team stores absent from the global listing are merged in as id-labeled options. |
 | `MessageList` | Groups messages into turns; renders compare-mode turns as side-by-side columns. |
 | `AssistantMessage` / `UserMessage` | Per-role rendering, markdown, message actions (feedback/regenerate/copy, edit-and-resend). |
 | `SourcesPanel` | Right-rail. Latest turn's citations, deduped and grouped KB vs Web. |
@@ -292,6 +294,7 @@ backstage-plugin-ai-conversation/
     │           ├── AssistantMessage.tsx
     │           ├── UserMessage.tsx
     │           ├── ModelPicker.tsx
+    │           ├── TeamPicker.tsx
     │           ├── VectorStorePicker.tsx
     │           ├── SkillPicker.tsx
     │           ├── OptionPicker.tsx
@@ -351,6 +354,9 @@ backstage-plugin-ai-conversation/
 
 ## Known gaps (phase10-16)
 
+- **Team scoping degrades silently against an old govai release.** The frontend consumes `TeamInfo.object_permission.vector_stores` and `ModelInfo.access_groups` structurally (see `ChatTeamInfo` in `types.ts`) rather than importing govai's types, because this repo's `^0.4.0` dependency predates both fields (govai's sibling repo is at 0.26.0). On an old govai: the model picker simply doesn't narrow by team (models are still enforced by LiteLLM via `team_id` at request time — the picker just offers more than the team can call) and no KBs are preselected. Bumping the govai dependency would let the types be imported directly; the structural shim is what keeps the two packages independently installable meanwhile.
+- **`teamRequired` is a separate knob from govai's.** `litellm.aiConversation.teamRequired` (default true) mirrors govai's `litellm.keyGeneration.teamRequired` but is read from this plugin's own config, so the two must be kept aligned by the operator — setting one and not the other leaves the chat and governance surfaces disagreeing about whether a team is mandatory.
+
 - **`/ai-conversation/analytics` is not actually admin-gated.** The endpoints it reads (`GET /feedback/summary`, `GET /usage/summary`) only ever return aggregate counts — no message content, no per-user breakdown — so the exposure is low, but nothing in this repo restricts the *page* to admins. That requires a permission-policy in the target Backstage app (same category of change as the sidebar nav entry / route registration already documented under "Files changed in target Backstage" in HANDOFF.md), which this repo doesn't own.
 - **`web_search` (phase14) assumes LiteLLM has a native web-search-capable model/tool** reachable via `web_search_options` on `/v1/chat/completions`. Unverified against the live proxy — if the target deployment doesn't have one, the flag is a silent no-op upstream rather than an error. If that turns out to be the case, the fallback plan (self-hosted SearXNG, integrated server-side with its own citations) is a materially bigger job — see the original feature plan's phase14 estimate split (~2 days vs ~1-1.5 weeks).
 - **The `#url` SSRF guard checks addresses at DNS-resolution time, not at connect time.** `assertPublicHostname` resolves the host and rejects private/loopback/link-local/metadata addresses (re-checked on every redirect hop), but the `fetch()` that follows resolves the name again independently — a host that answers with a public address on the first lookup and an internal one on the second would slip through. Closing that means pinning the vetted address for the actual connection (an undici `Agent` with a custom `connect.lookup`), deferred. The straightforward attacks — an internal hostname, an IP literal in any of its textual spellings, or a redirect to either — are blocked, and `isBlockedAddress` is unit-tested against the non-canonical IPv6 forms specifically.
@@ -392,8 +398,8 @@ CI verifies tag version matches `package.json`, builds, publishes to npm, create
 ## Reference repos
 
 - **govai plugin** (sibling): `/Users/andrea/Projects/personal/backstage-plugin-litellm-govai`
-  - Frontend: `packages/plugin-litellm/` (`@acarmisc/backstage-plugin-litellm@0.4.0`)
-  - Backend: `packages/plugin-litellm-backend/` (`@acarmisc/backstage-plugin-litellm-backend@0.3.3`)
+  - Frontend: `packages/plugin-litellm/` — this plugin's dependency range is `^0.4.0`, but the sibling repo has moved on to `0.26.0` (see the team-scoping gap above)
+  - Backend: `packages/plugin-litellm-backend/` — dependency range `^0.3.4`, sibling at `0.15.0`
 - **This plugin**: `/Users/andrea/Projects/personal/backstage-plugin-ai-conversation`
 
 ## Open questions to verify during phase 2

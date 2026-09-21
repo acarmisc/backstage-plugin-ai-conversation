@@ -100,6 +100,11 @@ export interface UseChatOptions {
   topK?: number;
   webSearch?: boolean;
   persistenceEnabled?: boolean;
+  /** LiteLLM team the chat key is minted against — budget, rate limits and
+   * model access are inherited from it. Required when the backend reports
+   * `teamRequired` (see ChatConfig); the re-mint path uses it too so a key
+   * recovered after an upstream 401 keeps its team binding. */
+  teamId?: string;
   /** Soft USD cap applied to every freshly minted chat key — from
    * `litellm.aiConversation.maxRequestBudget`. Omitted means no cap is sent
    * and LiteLLM's own default applies. */
@@ -161,6 +166,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
     webSearch,
     persistenceEnabled,
     maxRequestBudget,
+    teamId,
     onKeyChange,
   } = opts;
   const api = useApi(aiConversationApiRef) as InstanceType<typeof AiConversationApi>;
@@ -179,6 +185,9 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
     baseMessages: AiConversationUIMessage[];
     attachedUrl?: { url: string; title: string };
     files?: FileUIPart[];
+    /** Team the failed key was minted against, so the replacement key stays
+     * bound to it (see the onError re-mint below). */
+    teamId?: string;
   } | null>(null);
   const pendingRetryRef = useRef<typeof lastSendRef.current>(null);
 
@@ -271,9 +280,13 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
         authRetryRef.current = true;
         const replay = lastSendRef.current;
         api
-          .mintChatKey(
-            maxRequestBudget != null ? { max_budget: maxRequestBudget } : undefined,
-          )
+          .mintChatKey({
+            ...(maxRequestBudget != null ? { max_budget: maxRequestBudget } : {}),
+            // Keep the replacement key on the same team as the thread it is
+            // replacing — otherwise a recovered key silently drops the team
+            // binding and the next turn runs against the user's own ACL.
+            ...(replay.teamId ? { team_id: replay.teamId } : {}),
+          })
           .then(info => {
             const next = {
               alias: info.key_alias,
@@ -409,6 +422,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
       keyToken,
       keyExpiresAt,
       skillId,
+      teamId,
       createdAt: Date.now(),
       updatedAt: Date.now(),
       totalTokens: 0,
@@ -440,6 +454,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
         keyToken: overrideKey?.token ?? keyToken,
         keyExpiresAt: overrideKey ? overrideKey.expiresAt : keyExpiresAt,
         skillId,
+        teamId,
         createdAt: Date.now(),
         updatedAt: Date.now(),
         totalTokens: 0,
@@ -453,7 +468,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
       authRetryRef.current = false;
       compareChat.reset();
     },
-    [model, vectorStoreIds, customSystemPrompt, keyAlias, keyToken, keyExpiresAt, skillId, compareChat],
+    [model, vectorStoreIds, customSystemPrompt, keyAlias, keyToken, keyExpiresAt, skillId, teamId, compareChat],
   );
 
   const selectThread = useCallback(
@@ -501,7 +516,17 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
     ) => {
       if (!text.trim() || !activeThread || !keyToken) return;
 
-      lastSendRef.current = { threadId: activeThread.id, text, baseMessages, attachedUrl, files };
+      lastSendRef.current = {
+        threadId: activeThread.id,
+        text,
+        baseMessages,
+        attachedUrl,
+        files,
+        // ChatPage re-syncs `teamId` from the active thread on select, so this
+        // is already that thread's team. Captured here so the re-mint below
+        // can keep the replacement key on the same team.
+        teamId,
+      };
       setError(null);
       setCitations([]);
 
@@ -523,6 +548,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
                 keyToken,
                 keyExpiresAt,
                 skillId,
+                teamId,
                 webSearch,
                 mode: 'single',
                 updatedAt: Date.now(),
@@ -552,6 +578,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
       keyAlias,
       keyExpiresAt,
       skillId,
+      teamId,
       webSearch,
       chat,
     ],
@@ -612,6 +639,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
                 keyAlias,
                 keyToken,
                 webSearch,
+                teamId,
                 mode: 'compare',
                 compareModels: models,
                 updatedAt: Date.now(),
@@ -633,6 +661,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
       reasoningEffort,
       keyAlias,
       webSearch,
+      teamId,
       compareChat,
     ],
   );
@@ -775,6 +804,10 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
         typeof src.customSystemPrompt === 'string' ? src.customSystemPrompt : '',
       keyAlias: '',
       keyToken: '',
+      // Portable: the team is a non-secret setting, so it travels with the
+      // export. The key itself does not (see ThreadExport), so the next turn
+      // re-mints against this team.
+      teamId: typeof src.teamId === 'string' ? src.teamId : undefined,
       createdAt: Date.now(),
       updatedAt: Date.now(),
       totalTokens: typeof src.totalTokens === 'number' ? src.totalTokens : 0,
