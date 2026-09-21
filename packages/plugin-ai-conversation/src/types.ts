@@ -23,9 +23,6 @@ export interface Skill {
   tags?: string[];
 }
 
-/** @deprecated Use Skill instead */
-export type Persona = Skill;
-
 /**
  * Legacy flat-content message shape. Kept only for `threadPersistence.ts`'s
  * migration function, as the "old shape" it converts *from* — pre-AI-SDK
@@ -86,7 +83,12 @@ export interface ChatFeedbackRequest {
   question: string;
   answer: string;
   model: string;
-  personaId?: string;
+  /** Must match the backend's ChatFeedbackRequest field name — it is written
+   * to the `persona_id` column (a legacy name kept for migration
+   * compatibility) and read back by `/usage/summary?groupBy=skill`. A
+   * mismatch here silently nulls the whole skill breakdown on the analytics
+   * page, which is exactly what used to happen (`personaId` vs `skillId`). */
+  skillId?: string;
   vectorStoreIds?: string[];
   toneId?: string;
   focusId?: string;
@@ -134,6 +136,9 @@ export interface ChatConfig {
   defaultModel: string | null;
   defaultVectorStoreIds: string[] | null;
   maxRequestBudget: number | null;
+  /** Model ids/prefixes hidden from the picker — see the backend's
+   * `excludedModels` config. Null when unset. */
+  excludedModels: string[] | null;
   persistence: ChatPersistenceConfig;
 }
 

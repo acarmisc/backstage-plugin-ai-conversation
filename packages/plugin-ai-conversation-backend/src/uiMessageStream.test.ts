@@ -1,4 +1,5 @@
 import {
+  errorToString,
   parseLiteLLMChunk,
   toUIMessageChunks,
 } from './uiMessageStream';
@@ -207,12 +208,17 @@ describe('parseLiteLLMChunk', () => {
       expect(result).toEqual({ error: 'Something went wrong' });
     });
 
-    it('coerces non-string error to string', () => {
+    it('unwraps a nested error object instead of stringifying it', () => {
       const raw = {
         error: { message: 'Error object' },
       };
       const result = parseLiteLLMChunk(raw);
-      expect(result.error).toBe('[object Object]');
+      expect(result.error).toBe('Error object');
+    });
+
+    it('falls back to a generic message for an unrecognized error shape', () => {
+      const result = parseLiteLLMChunk({ error: { code: 500 } });
+      expect(result.error).toBe('upstream error');
     });
 
     it('returns early with error, ignoring other fields', () => {
@@ -256,6 +262,30 @@ describe('parseLiteLLMChunk', () => {
       };
       const result = parseLiteLLMChunk(raw);
       expect(result).toEqual({ delta: 'hello' });
+    });
+  });
+
+  describe('errorToString', () => {
+    it('passes a plain string through', () => {
+      expect(errorToString('boom')).toBe('boom');
+    });
+
+    it('reads a nested { error: { message } } envelope', () => {
+      expect(errorToString({ error: { message: 'nested' } })).toBe('nested');
+    });
+
+    it('reads a { message } object', () => {
+      expect(errorToString({ message: 'direct' })).toBe('direct');
+    });
+
+    it('reads a { error: "..." } object', () => {
+      expect(errorToString({ error: 'wrapped' })).toBe('wrapped');
+    });
+
+    it('falls back for shapes it cannot interpret', () => {
+      expect(errorToString({ code: 500 })).toBe('upstream error');
+      expect(errorToString(null)).toBe('upstream error');
+      expect(errorToString(undefined)).toBe('upstream error');
     });
   });
 });

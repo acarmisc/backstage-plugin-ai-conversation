@@ -7,14 +7,20 @@ import {
 } from 'ai';
 import type { SearchResult, UsageInfo } from './types';
 
-const UPSTREAM_TIMEOUT_MS = 120_000;
+/** Bounds how long the *connection* (and first byte) may take. Deliberately
+ * not applied to the whole response: attaching a timeout signal to `fetch`
+ * makes it abort the body stream too, so a single long generation (or a
+ * slow-to-first-token model) would be killed mid-answer at this mark. See
+ * IDLE_TIMEOUT_MS for the between-tokens guard. */
+const UPSTREAM_CONNECT_TIMEOUT_MS = 30_000;
+
+/** Bounds the gap *between* stream chunks, so a wedged upstream is still
+ * detected without capping total generation length. Reset on every chunk. */
+const IDLE_TIMEOUT_MS = 120_000;
 
 /**
  * LiteLLM's OpenAI-shaped SSE `data:` payload, normalized down to the
- * fields this adapter turns into UI Message Stream Protocol chunks. Mirrors
- * the frontend's `normalizeChunk` in api.ts — HANDOFF-ai-sdk-migration.md
- * Phase 17 moves that parsing server-side so it can be shared by both the
- * legacy `/chat/stream` passthrough and this protocol adapter.
+ * fields this adapter turns into UI Message Stream Protocol chunks.
  */
 export interface NormalizedLiteLLMChunk {
   delta?: string;
@@ -23,14 +29,29 @@ export interface NormalizedLiteLLMChunk {
   error?: string;
 }
 
+/** LiteLLM reports errors in several shapes — a string, `{ message }`, or a
+ * full OpenAI error envelope. `String(err)` on the object form yields the
+ * useless "[object Object]", hiding the actual reason from the user. */
+export function errorToString(error: unknown): string {
+  if (typeof error === 'string') return error;
+  if (error && typeof error === 'object') {
+    const e = error as Record<string, any>;
+    const nested = e.error ?? e;
+    if (typeof nested === 'string') return nested;
+    if (nested && typeof nested === 'object' && typeof nested.message === 'string') {
+      return nested.message;
+    }
+  }
+  return 'upstream error';
+}
+
 /**
  * Parses one LiteLLM OpenAI-shaped `data:` JSON payload. Returns `null` for
- * chunks with nothing worth emitting (e.g. role-only deltas) — same
- * skip-empty-chunks behavior as the frontend's `normalizeChunk`.
+ * chunks with nothing worth emitting (e.g. role-only deltas).
  */
 export function parseLiteLLMChunk(raw: any): NormalizedLiteLLMChunk | null {
   if (raw && typeof raw === 'object' && 'error' in raw) {
-    return { error: String(raw.error) };
+    return { error: errorToString(raw.error) };
   }
 
   const chunk: NormalizedLiteLLMChunk = {};
@@ -66,9 +87,7 @@ export interface UIMessageStreamState {
 /**
  * Turns one normalized LiteLLM chunk into the AI SDK `UIMessageChunk`(s) it
  * maps to, given running stream state (whether the text part has been
- * opened yet). Pure and independently unit-testable — the one piece of new
- * wire-protocol logic in this adapter, and the part most likely to get
- * subtly wrong per HANDOFF-ai-sdk-migration.md Phase 17. Mutates `state` to
+ * opened yet). Pure and independently unit-testable. Mutates `state` to
  * track whether `text-start` has already been emitted.
  */
 export function toUIMessageChunks(
@@ -116,20 +135,31 @@ export interface ProxyUIMessageStreamOptions {
   /** UIMessageChunks written right after `start`, before the upstream is
    * contacted — e.g. this turn's retrieval results as `data-citations`. */
   prelude?: UIMessageChunk[];
+  /** Injectable for tests; defaults to UPSTREAM_CONNECT_TIMEOUT_MS. */
+  connectTimeoutMs?: number;
+  /** Injectable for tests; defaults to IDLE_TIMEOUT_MS. */
+  idleTimeoutMs?: number;
 }
 
 /**
  * Fetches LiteLLM's OpenAI-shaped SSE stream and re-emits it to the client
- * as an AI SDK UI Message Stream Protocol response (HANDOFF-ai-sdk-migration.md
- * Phase 17). Additive by design: this is a new response shape served from a
- * new opt-in route — the existing `/chat/stream` byte-for-byte passthrough
- * (`stream.ts`'s `proxySSE`) is untouched, so no existing frontend behavior
- * changes until something is deliberately migrated to consume this instead.
+ * as an AI SDK UI Message Stream Protocol response. The sole streaming path
+ * — the pre-migration raw-SSE `/chat/stream` passthrough was removed once
+ * the frontend moved fully onto `@ai-sdk/react`.
  */
 export async function proxyUIMessageStream(
   opts: ProxyUIMessageStreamOptions,
 ): Promise<void> {
-  const { upstreamUrl, upstreamBody, userKey, res, logger, prelude } = opts;
+  const {
+    upstreamUrl,
+    upstreamBody,
+    userKey,
+    res,
+    logger,
+    prelude,
+    connectTimeoutMs = UPSTREAM_CONNECT_TIMEOUT_MS,
+    idleTimeoutMs = IDLE_TIMEOUT_MS,
+  } = opts;
   const controller = new AbortController();
   res.on('close', () => controller.abort());
 
@@ -146,7 +176,16 @@ export async function proxyUIMessageStream(
         writer.write(chunk);
       }
 
-      const upstreamTimeout = AbortSignal.timeout(UPSTREAM_TIMEOUT_MS);
+      // A manual, cancellable timer rather than AbortSignal.timeout(): the
+      // latter can't be cleared, so it would abort the (now open) response
+      // body 30s in, reintroducing the very cap this change removes.
+      const connectController = new AbortController();
+      let connectTimedOut = false;
+      const connectTimer = setTimeout(() => {
+        connectTimedOut = true;
+        connectController.abort();
+      }, connectTimeoutMs);
+
       let upstream: globalThis.Response;
       try {
         upstream = await fetch(upstreamUrl, {
@@ -157,18 +196,21 @@ export async function proxyUIMessageStream(
             Accept: 'text/event-stream',
           },
           body: JSON.stringify(upstreamBody),
-          signal: AbortSignal.any([controller.signal, upstreamTimeout]),
+          signal: AbortSignal.any([controller.signal, connectController.signal]),
         });
       } catch (err: any) {
-        if (err.name === 'AbortError' && !upstreamTimeout.aborted) return;
-        if (upstreamTimeout.aborted) {
-          writer.write({ type: 'error', errorText: 'upstream request timed out' });
-          writer.write({ type: 'finish' });
-          return;
-        }
-        writer.write({ type: 'error', errorText: err.message || 'upstream fetch failed' });
+        // Client went away — nothing to report, and writing would throw.
+        if (err.name === 'AbortError' && !connectTimedOut) return;
+        const message = connectTimedOut
+          ? 'upstream request timed out'
+          : err.message || 'upstream fetch failed';
+        writer.write({ type: 'error', errorText: message });
         writer.write({ type: 'finish' });
         return;
+      } finally {
+        // Headers are in (or the fetch failed) — the body read is governed
+        // by the idle timer from here on.
+        clearTimeout(connectTimer);
       }
 
       if (!upstream.ok || !upstream.body) {
@@ -184,9 +226,23 @@ export async function proxyUIMessageStream(
       const nodeStream = Readable.fromWeb(upstream.body as any);
       const decoder = new TextDecoder();
       let buffer = '';
+      // One idle timer for the whole read loop, reset after every chunk.
+      // Aborting it ends the loop via the same AbortError path below; the
+      // flag distinguishes "upstream went quiet" from "client disconnected".
+      let idleTimedOut = false;
+      let idleTimer: ReturnType<typeof setTimeout> | undefined;
+      const resetIdleTimer = () => {
+        if (idleTimer) clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+          idleTimedOut = true;
+          nodeStream.destroy(new Error('upstream stream idle'));
+        }, idleTimeoutMs);
+      };
 
       try {
+        resetIdleTimer();
         for await (const chunkBuf of nodeStream) {
+          resetIdleTimer();
           buffer += decoder.decode(chunkBuf as Buffer, { stream: true });
           const lines = buffer.split('\n');
           buffer = lines.pop() ?? '';
@@ -212,11 +268,13 @@ export async function proxyUIMessageStream(
           }
         }
       } catch (err: any) {
-        if (err.name !== 'AbortError') {
-          writer.write({ type: 'error', errorText: err.message || 'stream read failed' });
-        } else if (upstreamTimeout.aborted) {
+        if (idleTimedOut) {
           writer.write({ type: 'error', errorText: 'upstream stream timed out' });
+        } else if (err.name !== 'AbortError') {
+          writer.write({ type: 'error', errorText: err.message || 'stream read failed' });
         }
+      } finally {
+        if (idleTimer) clearTimeout(idleTimer);
       }
 
       if (state.textStarted) {

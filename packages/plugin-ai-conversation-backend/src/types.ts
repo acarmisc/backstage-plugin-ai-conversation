@@ -13,10 +13,6 @@ export const CHAT_SKILL_TYPE = 'chat-skill';
 /** Annotation namespace for skill-specific fields on a catalog entity. */
 export const CHAT_SKILL_ANNOTATION_PREFIX = 'chat-skill.acarmisc.org';
 
-/** Backwards compatibility: old persona type/annotation names. */
-export const CHAT_PERSONA_TYPE = CHAT_SKILL_TYPE;
-export const CHAT_PERSONA_ANNOTATION_PREFIX = CHAT_SKILL_ANNOTATION_PREFIX;
-
 /**
  * Public skill metadata returned to the frontend picker. Deliberately
  * excludes the system prompt text — that's resolved server-side by
@@ -32,9 +28,6 @@ export interface SkillSummary {
   defaultVectorStoreIds?: string[];
   tags?: string[];
 }
-
-/** Backwards compatibility: old persona interface name. */
-export type PersonaSummary = SkillSummary;
 
 export interface ChatMessage {
   id: string;
@@ -157,6 +150,9 @@ export interface AiConversationConfig {
    * naming-pattern heuristic (see `attachments.ts`) when set — see that
    * file's comment on why there's no authoritative source for this. */
   multimodalModels?: string[];
+  /** Model ids hidden from the picker — case-insensitive exact match, or a
+   * prefix when the entry ends in `*`. See config.d.ts. */
+  excludedModels?: string[];
 }
 
 /** Body of `PUT /threads/:id`. `data` is stored and returned opaquely — the

@@ -13,7 +13,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
-import { PersonaAvatar } from './PersonaAvatar';
+import { StreamingAvatar } from './StreamingAvatar';
 import { CodeBlock } from './CodeBlock';
 import { extractText } from '../hooks/messageShape';
 import type { AiConversationUIMessage } from '../types';
@@ -169,7 +169,7 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
         maxWidth: '85%',
       }}
     >
-      <PersonaAvatar label={avatarLabel.slice(0, 2).toUpperCase()} isStreaming={isStreaming} size={28} />
+      <StreamingAvatar label={avatarLabel.slice(0, 2).toUpperCase()} isStreaming={isStreaming} size={28} />
       <Box sx={{ minWidth: 0, flex: 1 }}>
         <Box
           sx={{

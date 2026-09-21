@@ -6,7 +6,8 @@ import { useChat as useAiSdkChat } from '@ai-sdk/react';
 import type { FileUIPart } from 'ai';
 import { aiConversationApiRef, AiConversationApi } from '../api';
 import { computeRegenerateTarget, computeEditTarget } from './chatTruncation';
-import { fromPersisted, migrateThreadMessages } from './threadPersistence';
+import { migrateThreadMessages } from './threadPersistence';
+import { useThreadPersistence, loadThreads } from './useThreadPersistence';
 import { createAiConversationTransport, type ChatRequestSettings } from './aiSdkTransport';
 import { extractText } from './messageShape';
 import { useCompareChat } from './useCompareChat';
@@ -52,42 +53,8 @@ import type {
 
 const THREAD_EXPORT_VERSION = 2 as const;
 
-const STORAGE_PREFIX = 'ai-conversation:threads';
-
-/** Threads written to localStorage before Phase 20 have flat
- * `ChatMessage[]`-shaped `messages` — migrate each one on load. See
- * `migrateThreadMessages`'s doc comment for why this is safe to do
- * per-thread without a version marker. */
-function loadThreads(userId: string): Thread[] {
-  try {
-    const raw = localStorage.getItem(`${STORAGE_PREFIX}:${userId}`);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as Array<Thread & { messages: unknown }>;
-    return parsed.map(t => ({ ...t, messages: migrateThreadMessages(t.messages) }));
-  } catch {
-    return [];
-  }
-}
-
-function saveThreads(userId: string, threads: Thread[]) {
-  try {
-    localStorage.setItem(`${STORAGE_PREFIX}:${userId}`, JSON.stringify(threads));
-  } catch {
-    // quota or disabled — ignore
-  }
-}
-
 function genId(): string {
   return `t_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
-/** Entries from `incoming` not already present (by id) in `prev` — shared by
- * every effect that merges a second source of threads (userId-keyed
- * localStorage, server persistence) into local state without clobbering or
- * duplicating anything already loaded. */
-function newThreadsOnly(prev: Thread[], incoming: Thread[]): Thread[] {
-  const existingIds = new Set(prev.map(t => t.id));
-  return incoming.filter(t => !existingIds.has(t.id));
 }
 
 function findQuestionFor(
@@ -98,8 +65,6 @@ function findQuestionFor(
   if (idx <= 0) return undefined;
   return messages[idx - 1];
 }
-
-const SAVE_DEBOUNCE_MS = 400;
 
 /** True when a stream error is LiteLLM rejecting the chat key — expired,
  * purged (proxy DB reset), or otherwise absent from its token table. The
@@ -135,6 +100,10 @@ export interface UseChatOptions {
   topK?: number;
   webSearch?: boolean;
   persistenceEnabled?: boolean;
+  /** Soft USD cap applied to every freshly minted chat key — from
+   * `litellm.aiConversation.maxRequestBudget`. Omitted means no cap is sent
+   * and LiteLLM's own default applies. */
+  maxRequestBudget?: number | null;
   /** Called when the hook mints a replacement chat key after an upstream
    * 401 (expired/purged key). Lets the owner (ChatPage) update the state
    * it holds `keyAlias`/`keyToken` in, so subsequent sends and the
@@ -165,6 +134,9 @@ export interface UseChatResult {
   importThread: (file: File) => Promise<void>;
   setCompareMode: (enabled: boolean, models?: string[]) => void;
   isStreaming: boolean;
+  /** True when compare mode can't run because the installed AI SDK no longer
+   * exposes the internals it relies on (see useCompareChat). */
+  compareUnavailable: boolean;
   streamingMessageIds: Set<string>;
   error: string | null;
   citations: Citation[];
@@ -188,6 +160,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
     topK,
     webSearch,
     persistenceEnabled,
+    maxRequestBudget,
     onKeyChange,
   } = opts;
   const api = useApi(aiConversationApiRef) as InstanceType<typeof AiConversationApi>;
@@ -214,26 +187,6 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
   const [error, setError] = useState<string | null>(null);
   const [citations, setCitations] = useState<Citation[]>([]);
   const [keySpend, setKeySpend] = useState<KeySpend | null>(null);
-
-  // `userId` starts as the 'default' placeholder and only resolves to the
-  // real identity (e.g. 'oidc') asynchronously, after this hook has already
-  // mounted and loaded threads for the placeholder key. Without this, every
-  // reload reads the wrong localStorage bucket and the sidebar looks empty
-  // until a new message is sent (which saves — but never loads — under the
-  // resolved key). Re-load once userId settles and merge in anything found,
-  // rather than replacing state and risking dropping an in-flight thread.
-  const loadedUserIdRef = useRef(userId);
-  useEffect(() => {
-    if (userId === loadedUserIdRef.current) return;
-    loadedUserIdRef.current = userId;
-    const stored = loadThreads(userId);
-    if (stored.length === 0) return;
-    setThreads(prev => {
-      const fresh = newThreadsOnly(prev, stored);
-      return fresh.length ? [...prev, ...fresh] : prev;
-    });
-    setActiveId(prev => prev ?? stored[0]?.id ?? null);
-  }, [userId]);
 
   const activeThread = threads.find(t => t.id === activeId) ?? null;
   const isCompareThread = activeThread?.mode === 'compare';
@@ -318,7 +271,9 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
         authRetryRef.current = true;
         const replay = lastSendRef.current;
         api
-          .mintChatKey()
+          .mintChatKey(
+            maxRequestBudget != null ? { max_budget: maxRequestBudget } : undefined,
+          )
           .then(info => {
             const next = {
               alias: info.key_alias,
@@ -428,67 +383,18 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
   }, [isCompareThread, compareChat.columns, chat.messages, isStreaming]);
 
   // --- Thread list persistence (localStorage + optional server sync) ---
-  // Unchanged from the pre-migration implementation — this is orthogonal
-  // to which streaming engine is active.
-
-  const threadsRef = useRef<Thread[]>(threads);
-  threadsRef.current = threads;
-  const activeIdRef = useRef<string | null>(activeId);
-  activeIdRef.current = activeId;
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const syncActiveThreadToBackend = useCallback(() => {
-    if (!persistenceEnabled) return;
-    const active = threadsRef.current.find(t => t.id === activeIdRef.current);
-    if (active) api.saveThread(active).catch(() => {});
-  }, [persistenceEnabled, api]);
-
-  useEffect(() => {
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(() => {
-      saveTimeoutRef.current = null;
-      saveThreads(userId, threadsRef.current);
-      syncActiveThreadToBackend();
-    }, SAVE_DEBOUNCE_MS);
-  }, [userId, threads, syncActiveThreadToBackend]);
-
-  useEffect(() => {
-    const flush = () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-        saveTimeoutRef.current = null;
-      }
-      saveThreads(userId, threadsRef.current);
-      syncActiveThreadToBackend();
-    };
-    window.addEventListener('beforeunload', flush);
-    return () => {
-      window.removeEventListener('beforeunload', flush);
-      flush();
-    };
-  }, [userId, syncActiveThreadToBackend]);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (persistenceEnabled) {
-      api
-        .listThreads()
-        .then(persisted => {
-          if (cancelled) return;
-          setThreads(prev => {
-            const fresh = newThreadsOnly(prev, persisted.map(fromPersisted));
-            return fresh.length ? [...fresh, ...prev] : prev;
-          });
-        })
-        .catch(err => {
-          if (!cancelled) setError(err.message);
-        });
-    }
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [persistenceEnabled]);
+  // All the debounced-write / unload-flush / server-load plumbing lives in
+  // useThreadPersistence; this hook only owns the state it mirrors.
+  useThreadPersistence({
+    userId,
+    threads,
+    activeId,
+    setThreads,
+    setActiveId,
+    api,
+    persistenceEnabled: !!persistenceEnabled,
+    onError: setError,
+  });
 
   useEffect(() => {
     if (!keyToken || activeId) return;
@@ -807,14 +713,16 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
 
   const togglePin = useCallback(
     (id: string) => {
-      setThreads(prev => prev.map(t => (t.id === id ? { ...t, pinned: !t.pinned } : t)));
-      if (!persistenceEnabled) return;
-      const current = threadsRef.current.find(t => t.id === id);
+      const current = threads.find(t => t.id === id);
       if (!current) return;
-      if (current.id === activeIdRef.current) return;
-      api.saveThread({ ...current, pinned: !current.pinned }).catch(() => {});
+      const next = { ...current, pinned: !current.pinned };
+      setThreads(prev => prev.map(t => (t.id === id ? next : t)));
+      // Pin state should stick immediately rather than waiting out the
+      // debounce — the thread list is sorted pinned-first, so a delayed write
+      // would reorder on reload only.
+      if (persistenceEnabled) api.saveThread(next).catch(() => {});
     },
-    [persistenceEnabled, api],
+    [threads, persistenceEnabled, api],
   );
 
   const exportThread = useCallback(
@@ -906,6 +814,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
           question: question ? extractText(question) : '',
           answer: extractText(message),
           model: activeThread.model,
+          skillId: activeThread.skillId || undefined,
           vectorStoreIds: activeThread.vectorStoreIds,
           toneId: activeThread.toneId || undefined,
           focusId: activeThread.focusId || undefined,
@@ -933,6 +842,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
     importThread,
     setCompareMode,
     isStreaming,
+    compareUnavailable: compareChat.sdkIncompatible,
     streamingMessageIds,
     error,
     citations,

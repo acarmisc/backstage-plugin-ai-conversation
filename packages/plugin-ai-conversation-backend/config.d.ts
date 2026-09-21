@@ -94,6 +94,16 @@ export interface Config {
        * @visibility backend
        */
       multimodalModels?: string[];
+
+      /**
+       * Model ids hidden from the model picker. Case-insensitive exact
+       * match against the LiteLLM model name; entries ending in `*` are
+       * treated as prefixes. Use this to hide models that are registered in
+       * LiteLLM but can't actually be called through Backstage (e.g. ones
+       * needing a credential only the vendor CLI injects).
+       * @visibility backend
+       */
+      excludedModels?: string[];
     };
   };
 }

@@ -3,6 +3,12 @@ import type { SaveThreadRequest, ThreadRecord } from './types';
 
 export const CHAT_THREADS_TABLE = 'chat_threads';
 
+/** Default and maximum number of threads returned by `listThreads` in one
+ * page. Without a cap a user with thousands of persisted threads would have
+ * the entire history serialized and shipped to the browser on every load. */
+export const DEFAULT_THREAD_LIST_LIMIT = 200;
+export const MAX_THREAD_LIST_LIMIT = 500;
+
 /** Generous but bounded — a thread's JSON payload (messages, KB ids, usage,
  * etc.) shouldn't need more than this; caps abuse/runaway row growth. */
 export const MAX_THREAD_PAYLOAD_BYTES = 1_000_000;
@@ -72,10 +78,29 @@ export function computeExpiryCutoff(ttlDays: number, now: Date = new Date()): Da
   return new Date(now.getTime() - ttlDays * 24 * 60 * 60 * 1000);
 }
 
-export async function listThreads(db: Knex, userRef: string): Promise<ThreadRecord[]> {
+/** Normalizes an untrusted `limit` query param into a sane page size. */
+export function normalizeThreadListLimit(raw: unknown): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return DEFAULT_THREAD_LIST_LIMIT;
+  return Math.min(Math.floor(n), MAX_THREAD_LIST_LIMIT);
+}
+
+/** Lists a user's threads, newest first, at most `limit` rows. `offset`
+ * pages past the first batch — threads are sorted by `updated_at desc`, so
+ * the offset is only stable while nothing is being written concurrently,
+ * which is acceptable for a history list the client re-fetches on mount. */
+export async function listThreads(
+  db: Knex,
+  userRef: string,
+  opts: { limit?: number; offset?: number } = {},
+): Promise<ThreadRecord[]> {
+  const limit = opts.limit ?? DEFAULT_THREAD_LIST_LIMIT;
+  const offset = opts.offset && opts.offset > 0 ? opts.offset : 0;
   const rows: ThreadRow[] = await db(CHAT_THREADS_TABLE)
     .where('user_ref', userRef)
-    .orderBy('updated_at', 'desc');
+    .orderBy('updated_at', 'desc')
+    .limit(limit)
+    .offset(offset);
   return rows.map(mapThreadRow);
 }
 

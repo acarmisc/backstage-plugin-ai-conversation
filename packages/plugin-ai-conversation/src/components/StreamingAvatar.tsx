@@ -2,7 +2,7 @@ import React from 'react';
 import { Avatar, Box } from '@mui/material';
 import { ACCENT_CONIC_GRADIENT } from '../theme';
 
-export interface PersonaAvatarProps {
+export interface StreamingAvatarProps {
   label: string;
   isStreaming?: boolean;
   size?: number;
@@ -10,11 +10,11 @@ export interface PersonaAvatarProps {
 
 /**
  * The design system's one persistent animated element: a thin ring around
- * the persona/model avatar that shows the accent gradient rotating while
+ * the model avatar that shows the accent gradient rotating while
  * that column is actively streaming, and a neutral divider color at rest.
  * Reused identically per-column in multi-model compare mode (phase13).
  */
-export const PersonaAvatar: React.FC<PersonaAvatarProps> = ({
+export const StreamingAvatar: React.FC<StreamingAvatarProps> = ({
   label,
   isStreaming = false,
   size = 32,

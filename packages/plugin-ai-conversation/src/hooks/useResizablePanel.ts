@@ -50,10 +50,21 @@ export function useResizablePanel({
   }, [storageKey, width]);
 
   const dragging = useRef(false);
+  // Holds the teardown for the in-flight drag so an unmount mid-drag (or a
+  // second pointerdown without a pointerup) removes the window listeners
+  // instead of leaking them.
+  const endDragRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    return () => endDragRef.current?.();
+  }, []);
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
       e.preventDefault();
+      // A pointerdown without a preceding pointerup (e.g. the browser
+      // swallowed it) would otherwise stack a second set of listeners.
+      endDragRef.current?.();
       dragging.current = true;
       const startX = e.clientX;
       const startWidth = width;
@@ -70,7 +81,9 @@ export function useResizablePanel({
         window.removeEventListener('pointerup', onUp);
         document.body.style.cursor = '';
         document.body.style.userSelect = '';
+        endDragRef.current = null;
       };
+      endDragRef.current = onUp;
 
       window.addEventListener('pointermove', onMove);
       window.addEventListener('pointerup', onUp);

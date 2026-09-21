@@ -3,17 +3,21 @@ import { Autocomplete, TextField, Typography, Box } from '@mui/material';
 import { useApi } from '@backstage/core-plugin-api';
 import { liteLlmApiRef } from '@acarmisc/backstage-plugin-litellm';
 import type { ModelInfo } from '@acarmisc/backstage-plugin-litellm';
+import { filterModels } from './modelFilter';
 
 export interface ModelPickerProps {
   value: string;
   onChange: (model: string) => void;
   defaultModel?: string | null;
+  /** Operator-configured ids/prefixes to hide — see modelFilter.ts. */
+  excludedModels?: string[] | null;
 }
 
 export const ModelPicker: React.FC<ModelPickerProps> = ({
   value,
   onChange,
   defaultModel,
+  excludedModels,
 }) => {
   const liteLlmApi = useApi(liteLlmApiRef);
   const [models, setModels] = useState<ModelInfo[]>([]);
@@ -25,21 +29,14 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
     liteLlmApi
       .listModels()
       .then(all => {
-        if (!alive) return;
-        // Filter out Anthropic/claude-* models: they require a per-user
-        // Anthropic Max OAuth token that Claude Code injects client-side.
-        // Backstage only forwards a LiteLLM virtual key, so the gateway has
-        // no Anthropic credential and every claude-* call 401s. Hide them
-        // rather than offer a model that always fails.
-        const m = all.filter(x => !x.model_name.startsWith('claude'));
-        setModels(m);
+        if (alive) setModels(filterModels(all, m => m.model_name, excludedModels));
       })
       .catch(err => {
         if (alive) setError(err.message ?? 'Failed to load models');
       })
       .finally(() => alive && setLoading(false));
     return () => { alive = false; };
-  }, [liteLlmApi]);
+  }, [liteLlmApi, excludedModels]);
 
   useEffect(() => {
     if (value || models.length === 0) return;

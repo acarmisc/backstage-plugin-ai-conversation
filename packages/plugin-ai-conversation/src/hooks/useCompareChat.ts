@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useSyncExternalStore } from 'react';
+import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Chat } from '@ai-sdk/react';
 import type { ChatStatus, ChatTransport } from 'ai';
 import type { AiConversationUIMessage } from '../types';
@@ -40,6 +40,10 @@ export interface UseCompareChatOptions {
 export interface UseCompareChatResult {
   columns: CompareColumn[];
   isStreaming: boolean;
+  /** True when the installed `@ai-sdk/react` no longer exposes the internal
+   * `Chat` subscription callbacks this hook depends on. The UI should show a
+   * message instead of an empty compare view. */
+  sdkIncompatible: boolean;
   /** Starts every model in `models` on the same prompt, replacing whatever
    * columns previously existed. `baseMessages` is the conversation so far
    * (shared across all columns); each column appends its own reply to it. */
@@ -56,6 +60,39 @@ interface ColumnEntry {
   unsubscribe: () => void;
 }
 
+/**
+ * `Chat` exposes no public subscription API — `useChat` itself wires these
+ * three internal callbacks. They're reached through computed string keys so
+ * TypeScript doesn't see the private access, which means a future SDK rename
+ * fails at runtime rather than at build time. This probes for them once and
+ * returns null when any is missing, so callers can degrade (single-mode
+ * only) instead of throwing on an SDK upgrade.
+ */
+function getRegisterCallbacks(chat: Chat<AiConversationUIMessage>):
+  | {
+      messages: (cb: () => void) => () => void;
+      status: (cb: () => void) => () => void;
+      error: (cb: () => void) => () => void;
+    }
+  | null {
+  const c = chat as unknown as Record<string, unknown>;
+  const messages = c['~registerMessagesCallback'];
+  const status = c['~registerStatusCallback'];
+  const error = c['~registerErrorCallback'];
+  if (
+    typeof messages !== 'function' ||
+    typeof status !== 'function' ||
+    typeof error !== 'function'
+  ) {
+    return null;
+  }
+  return {
+    messages: messages as (cb: () => void) => () => void,
+    status: status as (cb: () => void) => () => void,
+    error: error as (cb: () => void) => () => void,
+  };
+}
+
 export function useCompareChat(options: UseCompareChatOptions): UseCompareChatResult {
   const { createTransport, onFinishColumn } = options;
 
@@ -64,6 +101,8 @@ export function useCompareChat(options: UseCompareChatOptions): UseCompareChatRe
   // one manages its own subscriber list and re-renders happen via
   // useSyncExternalStore below, not via this Map changing identity.
   const columnsRef = useRef<Map<string, ColumnEntry>>(new Map());
+
+  const [sdkIncompatible, setSdkIncompatible] = useState(false);
 
   // A single external-store snapshot standing in for "any column changed"
   // — good enough here since sendToAll/stopAll touch every column at once
@@ -119,9 +158,20 @@ export function useCompareChat(options: UseCompareChatOptions): UseCompareChatRe
           transport,
           messages: baseMessages,
         });
-        const unsubMessages = chat['~registerMessagesCallback'](notify);
-        const unsubStatus = chat['~registerStatusCallback'](notify);
-        const unsubError = chat['~registerErrorCallback'](notify);
+        const callbacks = getRegisterCallbacks(chat);
+        if (!callbacks) {
+          // The SDK's internal subscription hooks moved. Fail loudly rather
+          // than rendering columns that will never update.
+          // eslint-disable-next-line no-console
+          console.error(
+            '[ai-conversation] @ai-sdk/react Chat subscription internals not found — compare mode is unavailable',
+          );
+          setSdkIncompatible(true);
+          return;
+        }
+        const unsubMessages = callbacks.messages(notify);
+        const unsubStatus = callbacks.status(notify);
+        const unsubError = callbacks.error(notify);
         const entry: ColumnEntry = {
           model,
           chat,
@@ -164,5 +214,5 @@ export function useCompareChat(options: UseCompareChatOptions): UseCompareChatRe
 
   const isStreaming = columns.some(c => c.status === 'submitted' || c.status === 'streaming');
 
-  return { columns, isStreaming, sendToAll, stopAll, reset };
+  return { columns, isStreaming, sdkIncompatible, sendToAll, stopAll, reset };
 }

@@ -7,7 +7,7 @@ import type { ReasoningEffort, AiConversationUIMessage } from '../types';
  * the same request fields the old `api.ts` `chatStream` built (see
  * ChatStreamRequest in the backend's types.ts). Read fresh on every send
  * via `getSettings()` rather than baked into the Transport at construction
- * time, since these change on every render (model picker, persona picker,
+ * time, since these change on every render (model picker, skill picker,
  * etc.) but the Transport instance itself should stay stable — recreating
  * it on every settings change would tear down and rebuild the underlying
  * `useChat` machinery for no reason.

@@ -20,6 +20,11 @@ const LOCATION_ANNOTATION = 'backstage.io/managed-by-location';
  * whitespace tolerated) is transcluded in place. */
 const INCLUDE_RE = /^[ \t]*\{\{include:\s*(.+?)\s*\}\}[ \t]*$/;
 
+/** Hard ceiling on `{{include}}` nesting. Cycle detection already stops an
+ * infinite loop, but a wide, deep include tree (or a diamond-shaped one that
+ * isn't a cycle) could still fan out into an unbounded number of reads. */
+const MAX_INCLUDE_DEPTH = 16;
+
 export interface SkillPromptDeps {
   reader: UrlReaderService;
   scm: ScmIntegrationRegistry;
@@ -99,6 +104,9 @@ async function expandFile(
 ): Promise<string> {
   if (ancestors.includes(url)) {
     throw new Error(`include cycle: ${[...ancestors, url].join(' -> ')}`);
+  }
+  if (ancestors.length >= MAX_INCLUDE_DEPTH) {
+    throw new Error(`include nesting too deep (max ${MAX_INCLUDE_DEPTH}) at ${url}`);
   }
   const chain = [...ancestors, url];
   const response = await deps.reader.readUrl(url);
@@ -213,6 +221,9 @@ async function expandLocalFile(
 ): Promise<string> {
   if (ancestors.includes(filePath)) {
     throw new Error(`include cycle: ${[...ancestors, filePath].join(' -> ')}`);
+  }
+  if (ancestors.length >= MAX_INCLUDE_DEPTH) {
+    throw new Error(`include nesting too deep (max ${MAX_INCLUDE_DEPTH}) at ${filePath}`);
   }
   const chain = [...ancestors, filePath];
   const raw = await fs.readFile(filePath, 'utf8');

@@ -1,10 +1,13 @@
 import {
   computeExpiryCutoff,
+  DEFAULT_THREAD_LIST_LIMIT,
   deleteThread,
   listThreads,
   mapThreadRow,
+  MAX_THREAD_LIST_LIMIT,
   MAX_THREAD_PAYLOAD_BYTES,
   MAX_THREAD_TITLE_LENGTH,
+  normalizeThreadListLimit,
   purgeExpiredThreads,
   saveThread,
   serializeThreadPayload,
@@ -22,6 +25,8 @@ function makeFakeDb(rows: unknown[] = []) {
     table: [],
     where: [],
     orderBy: [],
+    limit: [],
+    offset: [],
     insert: [],
     onConflict: [],
     merge: [],
@@ -34,6 +39,14 @@ function makeFakeDb(rows: unknown[] = []) {
     },
     orderBy: (...args: unknown[]) => {
       calls.orderBy.push(args);
+      return builder;
+    },
+    limit: (...args: unknown[]) => {
+      calls.limit.push(args);
+      return builder;
+    },
+    offset: (...args: unknown[]) => {
+      calls.offset.push(args);
       return Promise.resolve(rows);
     },
     insert: (...args: unknown[]) => {
@@ -179,6 +192,8 @@ describe('listThreads', () => {
     expect(db.__calls.table).toEqual([[CHAT_TABLE]]);
     expect(db.__calls.where).toEqual([['user_ref', 'user:default/jane']]);
     expect(db.__calls.orderBy).toEqual([['updated_at', 'desc']]);
+    expect(db.__calls.limit).toEqual([[DEFAULT_THREAD_LIST_LIMIT]]);
+    expect(db.__calls.offset).toEqual([[0]]);
     expect(result).toEqual([
       {
         id: 't1',
@@ -189,6 +204,37 @@ describe('listThreads', () => {
         updatedAt: '2026-01-02T00:00:00.000Z',
       },
     ]);
+  });
+
+  it('honours an explicit limit and offset', async () => {
+    const db = makeFakeDb();
+    await listThreads(db, 'u', { limit: 5, offset: 20 });
+    expect(db.__calls.limit).toEqual([[5]]);
+    expect(db.__calls.offset).toEqual([[20]]);
+  });
+
+  it('clamps a negative offset back to 0', async () => {
+    const db = makeFakeDb();
+    await listThreads(db, 'u', { offset: -5 });
+    expect(db.__calls.offset).toEqual([[0]]);
+  });
+});
+
+describe('normalizeThreadListLimit', () => {
+  it.each([
+    [undefined, DEFAULT_THREAD_LIST_LIMIT],
+    ['', DEFAULT_THREAD_LIST_LIMIT],
+    ['abc', DEFAULT_THREAD_LIST_LIMIT],
+    ['0', DEFAULT_THREAD_LIST_LIMIT],
+    ['-3', DEFAULT_THREAD_LIST_LIMIT],
+    ['50', 50],
+    ['50.9', 50],
+  ])('maps %p -> %p', (input, expected) => {
+    expect(normalizeThreadListLimit(input)).toBe(expected);
+  });
+
+  it('caps at MAX_THREAD_LIST_LIMIT', () => {
+    expect(normalizeThreadListLimit(999999)).toBe(MAX_THREAD_LIST_LIMIT);
   });
 });
 

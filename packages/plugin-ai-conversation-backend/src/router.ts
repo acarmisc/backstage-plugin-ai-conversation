@@ -3,7 +3,6 @@ import { Config } from '@backstage/config';
 import {
   AuthService,
   DatabaseService,
-  DiscoveryService,
   SchedulerService,
   UrlReaderService,
   resolvePackagePath,
@@ -34,6 +33,7 @@ import { TONE_OPTIONS, FOCUS_OPTIONS, VERBOSITY_OPTIONS, resolveTrait } from './
 import {
   deleteThread as deletePersistedThread,
   listThreads as listPersistedThreads,
+  normalizeThreadListLimit,
   purgeExpiredThreads,
   saveThread as savePersistedThread,
 } from './persistence';
@@ -53,7 +53,6 @@ export interface RouterOptions {
   config: Config;
   logger: any;
   auth: AuthService;
-  discovery: DiscoveryService;
   catalog: CatalogService;
   database: DatabaseService;
   urlReader: UrlReaderService;
@@ -85,6 +84,7 @@ function readChatConfig(config: Config): AiConversationConfig {
         DEFAULT_PERSISTENCE_TTL_DAYS,
     },
     multimodalModels: config.getOptionalStringArray('litellm.aiConversation.multimodalModels'),
+    excludedModels: config.getOptionalStringArray('litellm.aiConversation.excludedModels'),
   };
 }
 
@@ -358,6 +358,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       defaultModel: chatConfig.defaultModel ?? null,
       defaultVectorStoreIds: chatConfig.defaultVectorStoreIds ?? null,
       maxRequestBudget: chatConfig.maxRequestBudget ?? null,
+      excludedModels: chatConfig.excludedModels ?? null,
       persistence: chatConfig.persistence,
     });
   });
@@ -428,7 +429,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
   // Preview for the composer's `#url` chip: fetches (SSRF-guarded) and
   // returns title + a short snippet only, never the full extracted text —
   // the full text is re-resolved (cache-hit, same guarded fetch) server-side
-  // when the chat turn is actually sent, same pattern as personas never
+  // when the chat turn is actually sent, same pattern as skills never
   // sending their system prompt to the browser.
   router.post('/fetch-context', async (req: Request, res: Response) => {
     try {
@@ -683,9 +684,12 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       });
   }
 
-  router.get('/threads', requirePersistenceUser, async (_req: Request, res: Response) => {
+  router.get('/threads', requirePersistenceUser, async (req: Request, res: Response) => {
     try {
-      const threads = await listPersistedThreads(dbClient, res.locals.threadUserRef);
+      const threads = await listPersistedThreads(dbClient, res.locals.threadUserRef, {
+        limit: normalizeThreadListLimit(req.query.limit),
+        offset: Number(req.query.offset) || 0,
+      });
       res.json(threads);
     } catch (err: any) {
       logger.error('Failed to list persisted threads', err);
@@ -718,11 +722,9 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
     }
   });
 
-  // AI SDK UI Message Stream Protocol response (HANDOFF-ai-sdk-migration.md
-  // Phase 17-19). The sole chat-streaming route since the frontend's Phase 19
-  // migration to `@ai-sdk/react` — the pre-migration raw-SSE `/chat/stream`
-  // and non-streaming `/chat/completions` routes were removed as dead code
-  // (Phase 22 cleanup) once nothing called them anymore.
+  // AI SDK UI Message Stream Protocol response — the sole chat-streaming
+  // route. The pre-migration raw-SSE `/chat/stream` and non-streaming
+  // `/chat/completions` routes were removed once nothing called them.
   router.post('/chat/stream/v2', async (req: Request, res: Response) => {
     try {
       const body = req.body as ChatStreamRequestV2;
@@ -738,7 +740,6 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
         res.status(401).json({ error: 'unauthenticated' });
         return;
       }
-      toLiteLLMUserId(tokenEntityRef, userIdDomain);
 
       try {
         validateAttachments(body.messages);
@@ -770,8 +771,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       // already there. Feeding them a flattened text-only view of the
       // conversation and then diffing the tail back off recovers exactly
       // the system-prompt layer they'd add, without needing those shared
-      // functions (used by the proven /chat/stream route too) to know
-      // anything about UIMessage or attachments.
+      // functions to know anything about UIMessage or attachments.
       const textOnlyMessages: ChatMessage[] = body.messages.map(m => ({
         id: m.id,
         role: m.role,

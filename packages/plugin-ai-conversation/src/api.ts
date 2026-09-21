@@ -70,6 +70,7 @@ export class AiConversationApi implements AiConversationApiInterface {
         defaultModel: null,
         defaultVectorStoreIds: null,
         maxRequestBudget: null,
+        excludedModels: null,
         persistence: { enabled: false, ttlDays: 30 },
       };
     }
@@ -78,6 +79,7 @@ export class AiConversationApi implements AiConversationApiInterface {
       defaultModel: data.defaultModel ?? null,
       defaultVectorStoreIds: data.defaultVectorStoreIds ?? null,
       maxRequestBudget: data.maxRequestBudget ?? null,
+      excludedModels: data.excludedModels ?? null,
       // The two plugins version independently — an older backend's /config
       // may predate the persistence flag. Fall back to off-by-default (the
       // backend's own default, see readChatConfig in router.ts) so ChatPage

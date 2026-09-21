@@ -114,7 +114,12 @@ export const ChatSettingsPanel: React.FC<ChatSettingsPanelProps> = ({
         {/* ── Main settings ── */}
         <Box sx={{ px: 1.5, py: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
           <SkillPicker value={skillId} skills={skills} onChange={onSkillChange} />
-          <ModelPicker value={model} onChange={onModelChange} defaultModel={config.defaultModel} />
+          <ModelPicker
+            value={model}
+            onChange={onModelChange}
+            defaultModel={config.defaultModel}
+            excludedModels={config.excludedModels}
+          />
           <VectorStorePicker
             value={vectorStoreIds}
             onChange={onVectorStoreIdsChange}

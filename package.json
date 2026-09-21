@@ -9,10 +9,11 @@
   ],
   "scripts": {
     "build": "yarn workspace @acarmisc/backstage-plugin-ai-conversation build && yarn workspace @acarmisc/backstage-plugin-ai-conversation-backend build",
-    "test": "echo 'Use from Backstage monorepo: yarn workspace @acarmisc/backstage-plugin-ai-conversation test'",
+    "test": "yarn workspace @acarmisc/backstage-plugin-ai-conversation test --watch=false && yarn workspace @acarmisc/backstage-plugin-ai-conversation-backend test --watch=false",
     "lint": "yarn workspace @acarmisc/backstage-plugin-ai-conversation lint && yarn workspace @acarmisc/backstage-plugin-ai-conversation-backend lint"
   },
   "devDependencies": {
+    "@backstage/cli-defaults": "^0.1.0",
     "typescript": "^5.0.0"
   }
 }

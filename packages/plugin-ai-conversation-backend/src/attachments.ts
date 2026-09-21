@@ -107,7 +107,7 @@ export function validateAttachments(messages: IncomingUIMessage[]): void {
 
 /** Extracts the plain-text content of a message (its text parts joined),
  * ignoring file/tool/reasoning parts — used to feed the existing
- * persona/tone/#url system-prompt composition helpers, which only care
+ * skill/tone/#url system-prompt composition helpers, which only care
  * about role/content structure, never attachment content. */
 export function extractText(message: IncomingUIMessage): string {
   return message.parts

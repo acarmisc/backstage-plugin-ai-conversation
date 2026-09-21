@@ -32,9 +32,9 @@ The chat plugin reuses all of this by **importing from the govai package**, not 
 | Chat key strategy | Backend auto-mints a dedicated `sk-` key per thread via the master key (`POST /chat/key`), returned to the browser once and stored in that thread's state; deleted on thread delete | Superseded the original "user picks an existing key from a dropdown" plan — LiteLLM's `listKeys` only returns hashed/masked tokens, unusable for auth. See `HANDOFF.md` decision #3. |
 | UI surfaces | Full chat page at `/ai-conversation` | v1 ships the page. Sidebar modal and home widget are future work. |
 | Cross-package reuse | Import `LiteLLMClient`, `resolveUserId`, `toLiteLLMUserId`, `getOrProvisionUser`, `ProvisioningError`, types from govai backend; import `LiteLlmApi`, `liteLlmApiRef`, types from govai frontend | Govai is the single source of truth for identity, key management, and the LiteLLM client. Chat plugin adds only chat-specific routes and components. |
-| Persona source | Backstage catalog `Component` entities (`spec.type: chat-persona`), own type — not `app-config.yaml`, not the sibling `ai-agent` type | Self-service authoring (any team commits a `catalog-info.yaml`), ownership/RBAC/tags for free. `ai-agent` models externally-invocable, health-probed agents; a persona has no endpoint to probe and would pollute that inventory with permanent `unknown` status. Personas live in `git@gitlab.az.abssrv.it:innovation/ces-ai-personas.git`, auto-discovered by the existing GitLab catalog provider — no host app-config change needed. |
-| Persona system-prompt resolution | Server-side, by `persona_id` (catalog entity ref) | `/personas` returns picker metadata only (title/description/defaults) — never the system-prompt text. The backend resolves the full entity and prepends the prompt as a system message inside `/chat/stream` and `/chat/completions`, so the prompt never round-trips through the browser and can't be edited via localStorage tampering. The prompt comes from either an inline `chat-persona.acarmisc.org/system-prompt` annotation (legacy, one-liners) or a `system-prompt-ref` pointing at a Markdown `SKILL.md` — fetched via `UrlReaderService` relative to the entity's `backstage.io/managed-by-location`, frontmatter stripped, and `{{include: <path>}}` directives expanded recursively (cycle-guarded) into one composed prompt (`ref` wins over inline). Composed prompts are cached in-memory for 5 min. See `persona.ts`. |
-| Tone / Focus / Verbosity / Reasoning effort | Fixed in-code option lists (`traits.ts`), not catalog entities; composed as extra system-prompt layers via `composeSystemPrompt`, orthogonal to persona/model/KB (same as those, defaults can be prefilled but never locked) | Persona bundling tone+focus+knowledge into one opaque prompt forces a combinatorial catalog (`formal-hr-expert`, `casual-hr-expert`, …) to cover every combination a user might want. Splitting tone/focus out as independently-selectable layers avoids that, mirroring the same "persona-prompt + custom-prompt" layering `composeSystemPrompt` already did (now: persona → tone → focus → verbosity → custom, each layer optional, with the ad-hoc `#url` context inserted after all of them — see `applyUrlContext`). Unlike personas, these are a small (~5 option), slowly-changing, curated vocabulary — same shape as ChatGPT's "custom instructions" traits — so a catalog entity kind would be over-engineering; a static list is proportionate and still only ever exposes `id`/`label` to the browser via `/chat/traits`, with the prompt text resolved server-side by id (same anti-tampering reasoning as the persona prompt). Reasoning effort is different in kind — a native `reasoning_effort` param forwarded as-is to LiteLLM (not composed into the prompt), since it's a real API parameter, not a style instruction; only sent when the user picks a level, so models that don't support it see no change in behavior. |
+| Skill source | Backstage catalog `Component` entities (`spec.type: chat-skill`), own type — not `app-config.yaml`, not the sibling `ai-agent` type. Bundled SKILL.md directories are the zero-config fallback. | Self-service authoring (any team commits a `catalog-info.yaml`), ownership/RBAC/tags for free. `ai-agent` models externally-invocable, health-probed agents; a skill has no endpoint to probe and would pollute that inventory with permanent `unknown` status. Skill authoring lives in `git@gitlab.az.abssrv.it:innovation/ces-ai-personas.git` (legacy repo name), auto-discovered by the existing GitLab catalog provider — no host app-config change needed. |
+| Skill system-prompt resolution | Server-side, by `skill_id` (catalog entity ref, or a `skill:bundled/<slug>` id) | `/skills` returns picker metadata only (title/description/defaults) — never the system-prompt text. The backend resolves the full entity and prepends the prompt as a system message inside `/chat/stream/v2`, so the prompt never round-trips through the browser and can't be edited via localStorage tampering. The prompt comes from either an inline `chat-skill.acarmisc.org/system-prompt` annotation (legacy, one-liners) or a `system-prompt-ref` pointing at a Markdown `SKILL.md` — fetched via `UrlReaderService` relative to the entity's `backstage.io/managed-by-location`, frontmatter stripped, and `{{include: <path>}}` directives expanded recursively (cycle- and depth-guarded) into one composed prompt (`ref` wins over inline). Composed prompts are cached in-memory for 5 min. See `skills.ts`. |
+| Tone / Focus / Verbosity / Reasoning effort | Fixed in-code option lists (`traits.ts`), not catalog entities; composed as extra system-prompt layers via `composeSystemPrompt`, orthogonal to skill/model/KB (same as those, defaults can be prefilled but never locked) | A skill bundling tone+focus+knowledge into one opaque prompt would force a combinatorial catalog (`formal-hr-expert`, `casual-hr-expert`, …) to cover every combination a user might want. Splitting tone/focus out as independently-selectable layers avoids that (order: skill → tone → focus → verbosity → custom, each layer optional, with the ad-hoc `#url` context inserted after all of them — see `applyUrlContext`). Unlike skills, these are a small (~5 option), slowly-changing, curated vocabulary — same shape as ChatGPT's "custom instructions" traits — so a catalog entity kind would be over-engineering; a static list is proportionate and still only ever exposes `id`/`label` to the browser via `/chat/traits`, with the prompt text resolved server-side by id (same anti-tampering reasoning as the skill prompt). Reasoning effort is different in kind — a native `reasoning_effort` param forwarded as-is to LiteLLM (not composed into the prompt), since it's a real API parameter, not a style instruction; only sent when the user picks a level, so models that don't support it see no change in behavior. |
 
 ## Target environment (GKE)
 
@@ -79,42 +79,66 @@ The chat plugin reuses all of this by **importing from the govai package**, not 
 | Route | Method | Purpose |
 |---|---|---|
 | `/health` | GET | `{ status: 'ok' }` |
-| `/vector_stores` | GET | Lists LiteLLM vector stores for the KB picker. Calls `GET /v1/vector_stores` on LiteLLM. |
-| `/personas` | GET | Lists `chat-persona` catalog entities (metadata only — id/title/description/defaultModel/defaultVectorStoreIds/tags). No system-prompt text. |
+| `/config` | GET | Chat defaults for the UI: `defaultModel`, `defaultVectorStoreIds`, `maxRequestBudget`, `excludedModels`, `persistence`. |
+| `/vector_stores` | GET | Lists LiteLLM vector stores for the KB picker. Calls LiteLLM's `/v1/vector_store/list`. |
+| `/skills` | GET | Lists chat skills (metadata only — id/title/description/defaultModel/defaultVectorStoreIds/tags). No system-prompt text. |
 | `/chat/traits` | GET | Static tone/focus/verbosity option lists for the pickers (id/label only — see `traits.ts`). |
-| `/chat/stream/v2` | POST | Streaming chat proxy, AI SDK UI Message Stream Protocol response (Phase 17-19). The sole chat-streaming route — the pre-migration raw-SSE `/chat/stream` and non-streaming `/chat/completions` routes were removed as dead code (Phase 22 cleanup) once the frontend fully moved onto this one. Accepts optional `persona_id`, `tone_id`, `focus_id`, `verbosity_id` (composed server-side into one system message, in that order, persona first — see `composeSystemPrompt` in `router.ts`), and `reasoning_effort` (`low`\|`medium`\|`high`, forwarded to LiteLLM as-is, not composed into the prompt). |
-| `/threads` | GET | (phase16) Lists the authenticated user's persisted threads. 404 when `litellm.aiConversation.persistence.enabled` is false. |
-| `/threads/:id` | PUT | (phase16) Upserts a thread (title/pinned/data — `data` is opaque JSON, size-capped at 1MB). 404 when persistence is disabled. |
-| `/threads/:id` | DELETE | (phase16) Deletes one persisted thread, scoped to the authenticated user. 404 when persistence is disabled. |
+| `/chat/key` | POST/DELETE | Mints / deletes a per-thread `sk-` chat key via the master key. |
+| `/chat/key/:alias/spend` | GET | Current spend/budget for a chat key, looked up by alias. |
+| `/fetch-context` | POST | SSRF-guarded fetch + extract for the composer's `#url` chip (title/snippet only). |
+| `/feedback` | POST | Upserts a thumbs-up/down vote (with a Q&A snapshot) on an assistant message. |
+| `/feedback/summary` | GET | Aggregate up/down counts for the analytics page. |
+| `/usage/summary` | GET | Turn counts grouped by skill or model (`?groupBy=skill|model&range=`). |
+| `/chat/stream/v2` | POST | Streaming chat proxy, AI SDK UI Message Stream Protocol response. The sole chat-streaming route — the pre-migration raw-SSE `/chat/stream` and non-streaming `/chat/completions` routes were removed once the frontend fully moved onto this one. Accepts optional `skill_id`, `tone_id`, `focus_id`, `verbosity_id` (composed server-side into one system message, in that order, skill first — see `composeSystemPrompt` in `router.ts`), and `reasoning_effort` (`low`\|`medium`\|`high`, forwarded to LiteLLM as-is, not composed into the prompt). |
+| `/threads` | GET | Lists the authenticated user's persisted threads (`?limit=&offset=`, capped at 500). 404 when `litellm.aiConversation.persistence.enabled` is false. |
+| `/threads/:id` | PUT | Upserts a thread (title/pinned/data — `data` is opaque JSON, size-capped at 1MB). 404 when persistence is disabled. |
+| `/threads/:id` | DELETE | Deletes one persisted thread, scoped to the authenticated user. 404 when persistence is disabled. |
 
-### `/chat/stream` request body (from browser)
+### `/chat/stream/v2` request body (from browser)
 
 ```json
 {
   "model": "claude-3-5-sonnet",
-  "messages": [{ "role": "user", "content": "..." }],
+  "messages": [{ "id": "m1", "role": "user", "parts": [{ "type": "text", "text": "..." }] }],
   "vector_store_ids": ["vs_pgvec_xxx"],
   "top_k": 5,
+  "skill_id": "component:default/data-analyst",
+  "tone_id": "friendly",
+  "reasoning_effort": "medium",
   "user_key": "sk-..."
 }
 ```
 
-### `/chat/stream` backend flow
+`messages` is AI SDK `UIMessage[]`-shaped (parts, not a flat `content`
+string) so attachments travel as `file` parts. See `attachments.ts`.
 
-1. `resolveUserId(req, auth)` → `toLiteLLMUserId(...)` — confirm identity (no provisioning required for chat; the user's key must already exist).
-2. If `vector_store_id` is present:
-   - **Primary**: `POST {LITELLM_BASE_URL}/v1/rag/query` with `{ model, messages, retrieval_config: { vector_store_id, custom_llm_provider: 'pg_vector', top_k }, stream: true }`, header `Authorization: Bearer <user_key>`.
-   - **Fallback** (if `/v1/rag/query` returns 404): `POST {LITELLM_BASE_URL}/v1/chat/completions` with `{ model, messages, vector_store_ids: [vector_store_id], stream: true }`, same auth header.
-3. If `vector_store_id` is null/empty: `POST /v1/chat/completions` with `{ model, messages, stream: true }` (plain chat, no RAG).
-4. Pipe the SSE response through to the browser:
-   - `res.setHeader('Content-Type', 'text/event-stream')`
-   - `res.setHeader('Cache-Control', 'no-cache, no-transform')`
-   - `res.setHeader('X-Accel-Buffering', 'no')`
-   - `res.flushHeaders()`
-   - `upstream.body.pipe(res)`
-   - On `req.on('close')`: abort the upstream fetch (client disconnected).
-   - On upstream error: emit `data: {"error":"..."}\n\n` then end.
-5. **No `express.json()` on this route** (or route-level skip). **No compression middleware on this path.** These buffer the stream.
+### `/chat/stream/v2` backend flow
+
+1. `resolveUserId(req, auth)` — confirm identity (no provisioning required
+   for chat; the chat key must already have been minted via `/chat/key`).
+2. Validate attachments (mime/size/count) and reject non-multimodal models
+   for image-bearing requests (`attachments.ts`).
+3. Best-effort `chat_events` insert for analytics (never blocks the turn).
+4. Compose the system-prompt layers — skill → tone → focus → verbosity →
+   custom (`composeSystemPrompt`), then prepend any `#url` context
+   (`applyUrlContext`). The user's own messages are converted to
+   OpenAI-shaped content via `toOpenAIMessageContent`.
+5. Retrieval, when `vector_store_ids` is non-empty (`rag.ts`): `POST
+   /v1/vector_stores/{id}/search` per store with the Bedrock
+   `managedSearchConfiguration` form, retried bare on a 400 for
+   non-Bedrock stores. Results are injected as one numbered system message
+   (`buildContextMessage`). A retrieval failure degrades to ungrounded chat
+   rather than failing the turn.
+6. `proxyUIMessageStream` (`uiMessageStream.ts`) fetches
+   `POST {LITELLM_BASE_URL}/v1/chat/completions` with `stream: true` and
+   re-emits it as an AI SDK UI Message Stream Protocol response. Retrieval
+   results are written as a `data-citations` prelude chunk before the first
+   token.
+
+Timeout handling is split deliberately: a 30s *connect* timer (cleared once
+headers arrive) and a 120s *idle* timer reset on every chunk. A single
+`AbortSignal.timeout` over the whole request would abort the body stream and
+cut off long generations mid-answer.
 
 ### Config schema (`config.d.ts`)
 
@@ -125,7 +149,10 @@ litellm:
   aiConversation:
     defaultModel: claude-3-5-sonnet        # optional, pre-selected in UI
     defaultVectorStoreIds: []               # optional, pre-selected in UI
-    maxRequestBudget:                       # optional, USD guard (real enforcement is per-key in LiteLLM)
+    maxRequestBudget: 5                     # optional, USD cap applied to each minted chat key
+    excludedModels: ["claude-*"]            # optional, hidden from the model picker (prefix: *)
+    multimodalModels:                       # optional, overrides the vision heuristic
+      - gpt-4o
     persistence:                            # optional (phase16), off by default
       enabled: false                        # persist chat threads server-side instead of browser-only
       ttlDays: 30                           # auto-delete threads after N days of inactivity; 0 = unlimited
@@ -138,9 +165,9 @@ createBackendPlugin({
   pluginId: 'ai-conversation',
   register(reg) {
     reg.registerInit({
-      deps: { httpRouter, config, logger, auth, discovery },
-      async init({ httpRouter, config, logger, auth, discovery }) {
-        const router = await createRouter({ config, logger, auth, discovery });
+      deps: { httpRouter, config, logger, auth, catalog, database, urlReader, scheduler },
+      async init({ httpRouter, config, logger, auth, catalog, database, urlReader, scheduler }) {
+        const router = await createRouter({ config, logger, auth, catalog, database, urlReader, scheduler });
         httpRouter.use(router);
       },
     });
@@ -185,18 +212,19 @@ Replaced the original hand-rolled `useChat.ts` (manual SSE reader, abort-per-mes
 
 | Component | Responsibility |
 |---|---|
-| `ChatPage` | Page shell at `/ai-conversation`. Left thread sidebar, main chat area. |
-| `ChatComposer` | Textarea + send button + stop button. Pickers row above it. |
-| `PersonaPicker` | Dropdown from `listPersonas()` (catalog `chat-persona` entities). Selecting one prefills `ModelPicker`/`VectorStorePicker` from its defaults (user can still override) and sends `persona_id` with the request. |
-| `OptionPicker` | Generic small Select (label + options + onChange), factored out of `PersonaPicker`/`ModelPicker`'s shared shape. Instantiated for Tone, Focus, Verbosity (options from `getChatTraits()`) and Reasoning effort (fixed `low`/`medium`/`high`, no backend call — see "Tone/Focus/Verbosity/Reasoning" below). |
-| `ModelPicker` | Dropdown from `liteLlmApiRef.listModels()`. Preselects `config.chat.defaultModel`. |
-| `VectorStorePicker` | Multi-select from `listVectorStores()`. Empty selection = no grounding. Preselects `config.chat.defaultVectorStoreIds`. |
-| `KeyPicker` | Dropdown from `liteLlmApiRef.listKeys()`. Shows `key_alias` (fallback: masked `key_name`). Required before first send. Empty state: link to `/litellm`. |
-| `MessageList` | User messages right-aligned, assistant left. Assistant body as markdown. |
-| `SourcesPanel` | Right-rail, always-visible list of the latest turn's citations (filename + relevance score + snippet). |
+| `ChatPage` | Page shell at `/ai-conversation`. Owns settings/thread/key state; composes the sidebar, message area and right rail. |
+| `ThreadSidebar` | Left rail: collapsible settings panel (via `ChatSettingsPanel`), new/import actions, searchable thread history with per-thread menu (pin/export/delete). |
+| `ChatComposer` | Attachment button, staged-file / `#url` chips, textarea, send/stop button. |
+| `ChatSettingsPanel` | Skill/Model/KB pickers, extra prompt, and the Advanced accordion (Tone/Focus/Verbosity/Reasoning effort/Web search). |
+| `SkillPicker` | Dropdown of `chat-skill` catalog entities (or bundled skills) from `listSkills()`. Selecting one prefills `ModelPicker`/`VectorStorePicker` from its defaults and sends `skill_id` with the request. |
+| `OptionPicker` | Generic small Select (label + options + onChange), shared by Tone/Focus/Verbosity (options from `getChatTraits()`) and Reasoning effort (fixed `low`/`medium`/`high`, no backend call). |
+| `ModelPicker` | Dropdown from `liteLlmApiRef.listModels()`. Preselects `config.defaultModel`; hides `config.excludedModels` (see `modelFilter.ts`). |
+| `VectorStorePicker` | Multi-select from `listVectorStores()`. Empty selection = no grounding. Preselects `config.defaultVectorStoreIds`. |
+| `MessageList` | Groups messages into turns; renders compare-mode turns as side-by-side columns. |
+| `AssistantMessage` / `UserMessage` | Per-role rendering, markdown, message actions (feedback/regenerate/copy, edit-and-resend). |
+| `SourcesPanel` | Right-rail. Latest turn's citations, deduped and grouped KB vs Web. |
 | `UsagePanel` | Right-rail. Per-turn and session token counts, plus the thread's chat key spend/budget. |
-| `StreamingIndicator` | Pulsing cursor while tokens arrive. |
-| `ErrorBanner` | SSE error or fetch failure (e.g. 401 from LiteLLM — key out of budget). |
+| `ErrorBanner` | Stream error or fetch failure (e.g. 401 from LiteLLM — key out of budget). |
 
 ### Plugin registration
 
@@ -227,7 +255,7 @@ export const aiConversationPlugin = createFrontendPlugin({
 ## Repository structure
 
 ```
-backstage-plugin-litellm-rag-ai/
+backstage-plugin-ai-conversation/
 ├── package.json                           # monorepo root
 ├── AGENTS.md                              # this file
 ├── todo.txt                               # phased task list
@@ -242,30 +270,57 @@ backstage-plugin-litellm-rag-ai/
     │       ├── plugin.tsx
     │       ├── api.ts
     │       ├── types.ts
+    │       ├── safeUrl.ts
+    │       ├── theme.ts
     │       ├── hooks/
-    │       │   ├── useThreads.ts
-    │       │   └── threadPersistence.ts
+    │       │   ├── useThreads.ts              # thread state + streaming orchestration
+    │       │   ├── useThreadPersistence.ts    # localStorage + server sync plumbing
+    │       │   ├── useCompareChat.ts          # N parallel Chat instances (compare mode)
+    │       │   ├── useUrlContext.ts           # `#url` preview resolution
+    │       │   ├── useStagedFiles.ts          # attachment staging
+    │       │   ├── useResizablePanel.ts
+    │       │   ├── threadPersistence.ts       # shape mapping + migration
+    │       │   ├── aiSdkTransport.ts
+    │       │   ├── chatTruncation.ts
+    │       │   └── messageShape.ts
     │       └── components/
     │           ├── ChatPage.tsx
-    │           ├── ChatSettingsPanel.tsx
+    │           ├── ThreadSidebar.tsx
     │           ├── ChatComposer.tsx
+    │           ├── ChatSettingsPanel.tsx
     │           ├── MessageList.tsx
+    │           ├── AssistantMessage.tsx
+    │           ├── UserMessage.tsx
     │           ├── ModelPicker.tsx
     │           ├── VectorStorePicker.tsx
-    │           ├── KeyPicker.tsx
-    │           ├── CitationsPanel.tsx
-    │           └── ErrorBanner.tsx
+    │           ├── SkillPicker.tsx
+    │           ├── OptionPicker.tsx
+    │           ├── SourcesPanel.tsx
+    │           ├── UsagePanel.tsx
+    │           ├── AnalyticsPage.tsx
+    │           ├── BarList.tsx
+    │           ├── CodeBlock.tsx
+    │           ├── ErrorBanner.tsx
+    │           ├── StreamingAvatar.tsx
+    │           └── modelFilter.ts
     └── plugin-ai-conversation-backend/       # @acarmisc/backstage-plugin-ai-conversation-backend
         ├── package.json
         ├── build.js
         ├── config.d.ts
         ├── tsconfig.json
+        ├── migrations/
+        ├── skills/                        # bundled SKILL.md dirs
         └── src/
             ├── index.ts
             ├── plugin.ts
-            ├── router.ts
-            ├── stream.ts                  # SSE proxy helper
-            ├── persistence.ts             # chat_threads CRUD + TTL purge (phase16)
+            ├── router.ts                  # all HTTP routes
+            ├── uiMessageStream.ts         # SSE proxy + AI SDK UI Message Stream adapter
+            ├── rag.ts                     # two-step retrieval + context injection
+            ├── attachments.ts             # image validation + OpenAI content mapping
+            ├── skills.ts                  # bundled + catalog skill sources
+            ├── traits.ts                  # tone/focus/verbosity registries
+            ├── urlContext.ts              # SSRF-guarded `#url` fetch
+            ├── persistence.ts             # chat_threads CRUD + TTL purge
             └── types.ts
 ```
 
@@ -273,20 +328,20 @@ backstage-plugin-litellm-rag-ai/
 
 1. **Scaffold** — both packages, package.json, tsconfig, build.js, config.d.ts, stubs. Link in target Backstage monorepo.
 2. **Verify LLM** — confirm `/v1/rag/query` exists on v1.90.0, confirm `/v1/chat/completions` + `vector_store_ids` fallback shape, confirm `/v1/vector_stores` returns pgvector stores, verify SSE passthrough through Backstage's `HttpRouterService`.
-3. **Backend stream** — `proxySSE()` in `stream.ts`: headers, pipe, error handling, client disconnect.
-4. **Backend router** — `/health`, `/vector_stores`, `/chat/stream`, `/chat/completions`. Import govai machinery. Plugin registration.
+3. **Backend stream** — `uiMessageStream.ts`: SSE parsing, AI SDK UI Message Stream Protocol adaptation, connect/idle timeouts, client disconnect.
+4. **Backend router** — `/health`, `/vector_stores`, `/chat/stream/v2`. Import govai machinery. Plugin registration.
 5. **Frontend API** — `AiConversationApi`, types, SSE reader, `AbortController`.
 6. **Frontend hooks** — `useChat` thread state, localStorage, `sendMessage`, `stopGeneration`.
 7. **Frontend UI** — all components, pickers, plugin registration, exports.
 8. **Integration** — wire into target Backstage, deploy to GKE, verify against live pgvector.
-9. **Personas** — `GET /personas` (catalog-backed, `chat-persona` entities), `applyPersona()` server-side system-prompt injection, `PersonaPicker` frontend component, vector-store name→id resolution. See `ces-ai-personas` repo for the persona catalog data.
-10. **Design system + message actions** — accent gradient (violet→cyan) streaming ring on the persona avatar (the one persistent animated element, tied to real streaming state, `prefers-reduced-motion`-aware), JetBrains Mono for code, `AssistantMessage`/`UserMessage` split (no-bubble sunken-surface treatment for user turns), collapsible sidebar/context-panel. Regenerate/edit-and-resend (`useChat.regenerateFrom`/`editAndResend`, both truncate-and-resend through a shared `runSend`), copy message/code-block.
+9. **Skills** — `GET /skills` (catalog `chat-skill` entities + bundled SKILL.md dirs), server-side system-prompt injection, `SkillPicker` frontend component, vector-store name→id resolution. See `ces-ai-personas` repo for the catalog data.
+10. **Design system + message actions** — accent gradient (violet→cyan) streaming ring on the model avatar (the one persistent animated element, tied to real streaming state, `prefers-reduced-motion`-aware), JetBrains Mono for code, `AssistantMessage`/`UserMessage` split (no-bubble sunken-surface treatment for user turns), collapsible sidebar/context-panel. Regenerate/edit-and-resend (`useThreads.regenerateFrom`/`editAndResend`, both truncate-and-resend through a shared `runSend`), copy message/code-block.
 11. **Export/import + search/pin** — `useChat.exportThread`/`importThread` (portable JSON, deliberately excludes the live chat key), sidebar search (title + message content), `pinned` field with pinned-first sort.
 12. **LaTeX + `#url` context** — `remark-math`/`rehype-katex` in the markdown pipeline (KaTeX CSS loaded via runtime `<link>`, not bundled — the esbuild pipeline has no CSS loader). `#https://...` in the composer resolves via `POST /fetch-context` (SSRF-guarded: https-only, DNS-resolved private/loopback/link-local/metadata-address blocking re-checked on every redirect hop, timeout, response-size cap — see `urlContext.ts`); the fetched page is injected server-side as one-off context, never round-tripping the full text through the browser.
 13. **Multi-model compare** — per-thread `mode: 'single' | 'compare'`; compare mode streams the same prompt to several models in parallel (`runCompareSend`), each into its own message sharing a `turnId`, rendered as side-by-side columns. Required moving `useChat` off a single global `AbortController`/`isStreaming` flag onto a `Map<messageId, AbortController>` plus a `streamingMessageIds` set.
 14. **Web search toggle** — passes `web_search` through as LiteLLM's `web_search_options` alongside (not instead of) any selected knowledge bases; sources panel labels results Web vs Knowledge base by a `url`-field heuristic (LiteLLM doesn't tag result origin explicitly). Assumes the target LiteLLM deployment has a native web-search-capable model — **unverified against the live proxy**, see the "Known gaps" note below.
-15. **Analytics dashboard** — `chat_events` migration + best-effort per-turn logging (thread_id/user_ref/model/persona_id/grounded, not message content), `GET /feedback/summary` + `GET /usage/summary?groupBy=persona|model&range=`, `/ai-conversation/analytics` page with hand-rolled bar charts (no new charting dependency). The summary endpoints return aggregate counts only, so they're reachable by any authenticated user — genuine admin-only *page* access requires a permission-policy in the target Backstage app, which this repo doesn't own (see "Known gaps").
-16. **Opt-in server-side thread persistence** — `chat_threads` migration (`id`+`user_ref` composite PK, opaque JSON `data` column) behind `litellm.aiConversation.persistence.enabled` (default `false`). `GET/PUT/DELETE /api/ai-conversation/threads[/:id]`, each 404ing when persistence is off. `data` is never interpreted server-side — it's the frontend's `Thread` shape minus the live `keyToken`/`keyAlias` credential (same exclusion `exportThread()` already applied — see `hooks/threadPersistence.ts`'s `toSaveThreadBody`/`fromPersisted`), size-capped at 1MB per thread (`persistence.ts`). `useChat` treats the backend as authoritative once enabled: loads the server's list on mount (replacing whatever localStorage had), and syncs the active thread on the same 400ms debounce that already drives the localStorage write, plus immediate syncs on create/delete/pin/import — localStorage keeps writing regardless, as an offline cache/fallback. Auto-deletion after `ttlDays` (default 30, `0` = unlimited) runs via `coreServices.scheduler`, not a plain `setInterval` — the target deployment runs 2 Backstage replicas (see "Target environment"), and the scheduler service's DB-backed task locking is what keeps the sweep from running twice per tick.
+15. **Analytics dashboard** — `chat_events` migration + best-effort per-turn logging (thread_id/user_ref/model/persona_id/grounded, not message content), `GET /feedback/summary` + `GET /usage/summary?groupBy=skill|model&range=`, `/ai-conversation/analytics` page with hand-rolled bar charts (no new charting dependency). The summary endpoints return aggregate counts only, so they're reachable by any authenticated user — genuine admin-only *page* access requires a permission-policy in the target Backstage app, which this repo doesn't own (see "Known gaps"). Note the `persona_id` column name is legacy: the API field is `skillId` on both sides (the frontend previously sent `personaId`, which silently nulled every row — fixed).
+16. **Opt-in server-side thread persistence** — `chat_threads` migration (`id`+`user_ref` composite PK, opaque JSON `data` column) behind `litellm.aiConversation.persistence.enabled` (default `false`). `GET/PUT/DELETE /api/ai-conversation/threads[/:id]`, each 404ing when persistence is off. `data` is never interpreted server-side — it's the frontend's `Thread` shape minus the live `keyToken`/`keyAlias` credential (same exclusion `exportThread()` already applied — see `hooks/threadPersistence.ts`'s `toSaveThreadBody`/`fromPersisted`), size-capped at 1MB per thread (`persistence.ts`). `useThreads` treats the backend as authoritative once enabled: loads the server's list on mount and syncs the active thread on the same 400ms debounce that already drives the localStorage write; localStorage keeps writing regardless, as an offline cache/fallback. `GET /threads` is paginated (`?limit=&offset=`, default 200 / max 500). All the sync plumbing lives in `hooks/useThreadPersistence.ts`. Auto-deletion after `ttlDays` (default 30, `0` = unlimited) runs via `coreServices.scheduler`, not a plain `setInterval` — the target deployment runs 2 Backstage replicas (see "Target environment"), and the scheduler service's DB-backed task locking is what keeps the sweep from running twice per tick.
 
 ## Things NOT in v1
 
@@ -294,28 +349,34 @@ backstage-plugin-litellm-rag-ai/
 - **Custom chunking/reranker/hybrid search** — LiteLLM's `retrieval_config` gives `top_k` and optional rerank. If fine-grained retrieval control is needed later, build a dedicated retrieval service.
 - **Sidebar modal / home widget** — v1 ships the `/ai-conversation` page only.
 
-## Known gaps (phase10-15)
+## Known gaps (phase10-16)
 
 - **`/ai-conversation/analytics` is not actually admin-gated.** The endpoints it reads (`GET /feedback/summary`, `GET /usage/summary`) only ever return aggregate counts — no message content, no per-user breakdown — so the exposure is low, but nothing in this repo restricts the *page* to admins. That requires a permission-policy in the target Backstage app (same category of change as the sidebar nav entry / route registration already documented under "Files changed in target Backstage" in HANDOFF.md), which this repo doesn't own.
 - **`web_search` (phase14) assumes LiteLLM has a native web-search-capable model/tool** reachable via `web_search_options` on `/v1/chat/completions`. Unverified against the live proxy — if the target deployment doesn't have one, the flag is a silent no-op upstream rather than an error. If that turns out to be the case, the fallback plan (self-hosted SearXNG, integrated server-side with its own citations) is a materially bigger job — see the original feature plan's phase14 estimate split (~2 days vs ~1-1.5 weeks).
 - **The `#url` SSRF guard checks addresses at DNS-resolution time, not at connect time.** `assertPublicHostname` resolves the host and rejects private/loopback/link-local/metadata addresses (re-checked on every redirect hop), but the `fetch()` that follows resolves the name again independently — a host that answers with a public address on the first lookup and an internal one on the second would slip through. Closing that means pinning the vetted address for the actual connection (an undici `Agent` with a custom `connect.lookup`), deferred. The straightforward attacks — an internal hostname, an IP literal in any of its textual spellings, or a redirect to either — are blocked, and `isBlockedAddress` is unit-tested against the non-canonical IPv6 forms specifically.
 - **KaTeX CSS and the JetBrains Mono webfont load from public CDNs at runtime** (`theme.ts`), because the esbuild pipeline has no CSS loader. Besides the CSP entries that needs, it makes the chat page depend on `cdn.jsdelivr.net`/`fonts.googleapis.com` being reachable from the browser — worth bundling the KaTeX CSS (esbuild `text` loader → injected `<style>`) if the target deployment is ever locked down.
 - **`#url` extraction (phase12) is regex-based HTML stripping**, not a DOM parser — deliberately avoids adding `jsdom`/`@mozilla/readability` as new dependencies. Good enough for typical article/doc pages; will do worse than a real reader-mode extractor on heavily scripted or non-semantic-HTML pages.
-- **Compare mode (phase13) shares one `citations`/`lastTurnUsage` slot across all columns** — whichever model's stream reports search results or usage last "wins" in the sources/usage panels. A real per-column breakdown would need those to become keyed by message id, deferred since it's cosmetic, not a correctness issue.
+- **Compare mode (phase13) shares one `citations`/`lastTurnUsage` slot across all columns** — whichever model's stream reports search results or usage last "wins" in the sources/usage panels. A real per-column breakdown would need those to become keyed by message id, deferred since it's cosmetic, not a correctness issue. Compare mode also reaches into `@ai-sdk/react`'s private `Chat` subscription callbacks (no public API exists); `useCompareChat` probes for them and surfaces `compareUnavailable` if a future SDK renames them, rather than failing silently.
 - **Web vs Knowledge base citation labeling (phase14) is a heuristic** (`url` field present ⇒ web), not something LiteLLM tags explicitly — verify against real web-search response shapes before trusting the label in the UI.
 - **Persisted thread content (phase16) is plaintext at rest**, relying on Postgres-level protections (network policy, disk encryption if configured) rather than any application-level encryption — same trust boundary as `chat_message_feedback`/`chat_events`, but now covering full message content instead of aggregate/snapshot data. There's also no bulk "delete all my threads" endpoint yet (only per-thread `DELETE /threads/:id`); a full-account erasure request currently means either waiting out `ttlDays` or an operator running a manual `DELETE FROM chat_threads WHERE user_ref = ...`. Turning `persistence.enabled` on is a deliberate data-governance decision for the operator, not just a feature flag — see the plugin's chat-history-persistence design discussion for the full pros/cons.
 
 ## Build and test
 
 ```bash
-# Build (from target Backstage monorepo)
+# From this repo's root
+yarn build        # esbuild bundle + tsc for both packages
+yarn lint
+yarn test         # jest for both packages (--watch=false)
+
+# Or per workspace
 yarn workspace @acarmisc/backstage-plugin-ai-conversation build
 yarn workspace @acarmisc/backstage-plugin-ai-conversation-backend build
-
-# Test
 yarn workspace @acarmisc/backstage-plugin-ai-conversation test
 yarn workspace @acarmisc/backstage-plugin-ai-conversation-backend test
 ```
+
+CI runs `yarn lint`, `yarn test` and `yarn build` on every push/PR
+(`.github/workflows/ci.yml`). `dist/` is build output and is not committed.
 
 ## Release
 
@@ -333,7 +394,7 @@ CI verifies tag version matches `package.json`, builds, publishes to npm, create
 - **govai plugin** (sibling): `/Users/andrea/Projects/personal/backstage-plugin-litellm-govai`
   - Frontend: `packages/plugin-litellm/` (`@acarmisc/backstage-plugin-litellm@0.4.0`)
   - Backend: `packages/plugin-litellm-backend/` (`@acarmisc/backstage-plugin-litellm-backend@0.3.3`)
-- **This plugin** (greenfield): `/Users/andrea/Projects/personal/backstage-plugin-litellm-rag-ai`
+- **This plugin**: `/Users/andrea/Projects/personal/backstage-plugin-ai-conversation`
 
 ## Open questions to verify during phase 2
 
