@@ -1,6 +1,6 @@
 {
   "name": "@acarmisc/backstage-plugin-ai-conversation",
-  "version": "0.18.0",
+  "version": "0.18.1",
   "description": "Backstage frontend plugin for LiteLLM RAG chat — streaming UI with model/KB/key pickers.",
   "backstage": {
     "role": "frontend-plugin",
@@ -59,7 +59,10 @@
   },
   "devDependencies": {
     "@backstage/cli": "^0.36.2",
+    "@backstage/test-utils": "^1.7.0",
     "@jest/environment-jsdom-abstract": "^30.0.0",
+    "@testing-library/dom": "^10.0.0",
+    "@testing-library/react": "^16.0.0",
     "@types/jest": "^30.0.0",
     "@types/react": "^18.3.0",
     "esbuild": "^0.28.1",

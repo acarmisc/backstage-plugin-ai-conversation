@@ -57,9 +57,10 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
   useEffect(() => {
     if (loading || !value || models.length === 0) return;
     if (!visible.some(m => m.model_name === value)) onChange('');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, loading, models.length]);
+  }, [value, visible, loading, models.length, onChange]);
 
+  // Fill in a default when nothing is picked yet (first load, or after the
+  // allowlist effect above cleared a model the current team can't call).
   useEffect(() => {
     if (value || visible.length === 0) return;
     const def =
@@ -68,43 +69,40 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
     onChange(def);
   }, [value, visible, defaultModel, onChange]);
 
+  // MUI wants `value` to be one of `options` (a ModelInfo), not the bare
+  // model-name string the parent stores. Resolving it here also keeps the
+  // selection highlighted when a thread restores a model. A value the current
+  // team can't reach resolves to `null` — the allowlist effect above then
+  // clears it on the next render.
+  const selected = visible.find(m => m.model_name === value) ?? null;
+
+  let helperText: string | undefined;
+  if (error) {
+    helperText = error;
+  } else if (teamModels?.length && !loading && models.length > 0) {
+    helperText = `${visible.length} of ${models.length} models are allowed by the selected team`;
+  }
+
   return (
     <Box>
       <Autocomplete
-        freeSolo
         size="small"
         options={visible}
-        getOptionLabel={(option) => {
-          if (typeof option === 'string') return option;
-          return option.model_name;
-        }}
-        value={value}
-        inputValue={value}
+        getOptionLabel={option => option.model_name}
+        isOptionEqualToValue={(a, b) => a.model_name === b.model_name}
+        value={selected}
         loading={loading}
-        onChange={(_e, model) => {
-          if (typeof model === 'string') {
-            onChange(model);
-          } else if (model && 'model_name' in model) {
-            onChange(model.model_name);
-          }
-        }}
-        onInputChange={(_e, inputValue) => {
-          onChange(inputValue);
-        }}
+        onChange={(_e, model) => onChange(model?.model_name ?? '')}
         renderInput={params => (
           <TextField
             {...params}
             label="Model"
             error={!!error}
+            helperText={helperText}
             fullWidth
           />
         )}
       />
-      {error && (
-        <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5 }}>
-          {error}
-        </Typography>
-      )}
       {!error && !loading && visible.length === 0 && models.length > 0 && (
         <Typography variant="caption" color="warning.main" sx={{ display: 'block', mt: 0.5 }}>
           No model in the catalogue is available to this team.
