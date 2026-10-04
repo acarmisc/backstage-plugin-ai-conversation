@@ -36,8 +36,9 @@ export interface Config {
       defaultVectorStoreIds?: string[];
 
       /**
-       * Soft USD guard surfaced to the UI. Real enforcement is per-key
-       * in LiteLLM; this is advisory only.
+       * USD budget of each chat key minted for a conversation. The backend
+       * caps whatever the client requests at this value, and LiteLLM
+       * enforces it on the key (on top of the team's own budget).
        */
       maxRequestBudget?: number;
 

@@ -1,24 +1,31 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Box, Divider, IconButton, Tooltip, Typography } from '@mui/material';
-import ChatIcon from '@mui/icons-material/Chat';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Box, IconButton, Tooltip, useTheme } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { useApi, identityApiRef } from '@backstage/core-plugin-api';
 import { liteLlmApiRef } from '@acarmisc/backstage-plugin-litellm';
 
 import type { FileUIPart } from 'ai';
 import { aiConversationApiRef } from '../api';
+import { threadToMarkdown } from '../utils/threadMarkdown';
+import { citationsFromLastAssistant } from '../utils/citations';
 import { useThreads } from '../hooks/useThreads';
 import { useResizablePanel } from '../hooks/useResizablePanel';
 import { useUrlContext, URL_TOKEN_RE } from '../hooks/useUrlContext';
 import { useStagedFiles } from '../hooks/useStagedFiles';
+import { useStickToBottom } from '../hooks/useStickToBottom';
+import { useChatShortcuts } from '../hooks/useChatShortcuts';
+import { filterModels } from './modelFilter';
+import { ComparePopover } from './ComparePopover';
+import type { ModelInfo } from '@acarmisc/backstage-plugin-litellm';
 import { injectDesignSystemAssets } from '../theme';
 import { ChatComposer } from './ChatComposer';
 import { MessageList } from './MessageList';
 import { ThreadSidebar } from './ThreadSidebar';
+import { ChatHeader } from './ChatHeader';
+import { WelcomeScreen } from './WelcomeScreen';
+import { SettingsDrawer } from './SettingsDrawer';
 import { ErrorBanner } from './ErrorBanner';
-import { SourcesPanel } from './SourcesPanel';
-import { UsagePanel } from './UsagePanel';
+import { ContextPanel } from './ContextPanel';
 import type {
   ChatConfig,
   ChatTeamInfo,
@@ -30,9 +37,7 @@ import type {
 const RIGHT_RAIL_WIDTH = 300;
 const RIGHT_RAIL_MIN_WIDTH = 240;
 const RIGHT_RAIL_MAX_WIDTH = 640;
-const CHAT_MAX_WIDTH = 900;
-// Re-mint a chat key this far ahead of its expiry rather than letting the
-// send race the TTL and fail upstream.
+const CHAT_MAX_WIDTH = 820;
 const KEY_REMINT_SKEW_MS = 60_000;
 
 const EMPTY_CONFIG: ChatConfig = {
@@ -47,12 +52,15 @@ const EMPTY_CONFIG: ChatConfig = {
 const EMPTY_TRAITS: ChatTraits = { tones: [], focuses: [], verbosities: [] };
 
 export const ChatPage: React.FC = () => {
+  const theme = useTheme();
   const chatApi = useApi(aiConversationApiRef);
   const liteLlmApi = useApi(liteLlmApiRef);
   const identityApi = useApi(identityApiRef);
 
   const [userId, setUserId] = useState('default');
   const [config, setConfig] = useState<ChatConfig>(EMPTY_CONFIG);
+  const [configError, setConfigError] = useState<string | null>(null);
+  const [teamsError, setTeamsError] = useState<string | null>(null);
 
   const [model, setModel] = useState('');
   const [vectorStoreIds, setVectorStoreIds] = useState<string[]>([]);
@@ -70,16 +78,21 @@ export const ChatPage: React.FC = () => {
   const [skills, setSkills] = useState<Skill[]>([]);
   const [teams, setTeams] = useState<ChatTeamInfo[]>([]);
   const [teamsLoading, setTeamsLoading] = useState(true);
-  const [teamsError, setTeamsError] = useState<string | null>(null);
   const [teamId, setTeamId] = useState('');
   const [keyError, setKeyError] = useState<string | null>(null);
   const [input, setInput] = useState('');
-  const [configError, setConfigError] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [traits, setTraits] = useState<ChatTraits>(EMPTY_TRAITS);
   const [traitsLoading, setTraitsLoading] = useState(true);
+  const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false);
+  const [contextTab, setContextTab] = useState<'sources' | 'usage'>('sources');
+  const [compareAnchor, setCompareAnchor] = useState<HTMLElement | null>(null);
+  const [compareModels, setCompareModels] = useState<ModelInfo[]>([]);
+  // Compare mode is a per-conversation setting: with no conversation open,
+  // one is created first and the choice applied once it exists.
+  const pendingCompareRef = useRef<string[] | null>(null);
 
   const rightPanel = useResizablePanel({
     storageKey: 'ai-conversation.rightPanelWidth',
@@ -89,8 +102,12 @@ export const ChatPage: React.FC = () => {
     side: 'left',
   });
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [rootTop, setRootTop] = useState(0);
   const attachInputRef = useRef<HTMLInputElement>(null);
+  const composerInputRef = useRef<HTMLTextAreaElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const pendingSendRef = useRef<{
     text: string;
     attachedUrl?: { url: string; title: string };
@@ -100,36 +117,36 @@ export const ChatPage: React.FC = () => {
   const staged = useStagedFiles();
   const urlContext = useUrlContext(chatApi, input);
 
+  // Load config, traits, skills, teams, models
   useEffect(() => {
     injectDesignSystemAssets();
     chatApi
       .getChatConfig()
       .then(setConfig)
       .catch(err => setConfigError(err.message ?? 'Failed to reach the chat backend'));
+
     chatApi
       .getChatTraits()
       .then(t => {
         setTraits(t);
-        // Pre-select the first option for each trait when empty.
         setToneId(prev => prev || t.tones[0]?.id || '');
         setFocusId(prev => prev || t.focuses[0]?.id || '');
         setVerbosityId(prev => prev || t.verbosities[0]?.id || '');
       })
       .catch(() => {})
       .finally(() => setTraitsLoading(false));
+
     chatApi
       .listSkills()
       .then(setSkills)
       .catch(() => {});
-    // Teams come from govai's /api/litellm/teams, already scoped server-side
-    // to the teams the caller is a member of (via getOrProvisionUser →
-    // team memberships). No chat-backend route needed — same reuse as
-    // liteLlmApi.listModels() in ModelPicker.
+
     liteLlmApi
       .getTeams()
       .then(setTeams)
       .catch(err => setTeamsError(err.message ?? 'Failed to load teams'))
       .finally(() => setTeamsLoading(false));
+
     identityApi
       .getCredentials()
       .then(c => setUserId(c.token ? 'oidc' : 'default'))
@@ -149,9 +166,6 @@ export const ChatPage: React.FC = () => {
     keyToken: keyVal.token,
     keyExpiresAt: keyVal.expiresAt,
     skillId,
-    // The selected team, with a single-team user's only team as the implicit
-    // default — so the common case needs no explicit pick but still gets a
-    // team-bound key. Multi-team users must choose.
     teamId: teamId || (teams.length === 1 ? teams[0].team_id : ''),
     topK: 5,
     webSearch,
@@ -160,17 +174,12 @@ export const ChatPage: React.FC = () => {
     onKeyChange: setKeyVal,
   });
 
-  // The team record the effective key is bound to — drives the model and KB
-  // scoping below.
   const selectedTeam = useMemo(() => {
     const effectiveId = teamId || (teams.length === 1 ? teams[0].team_id : '');
-    return teams.find(t => t.team_id === effectiveId) ?? null;
+    return teams.find(t => t.team_id === effectiveId);
   }, [teams, teamId]);
 
-  // Restore the selected thread's own model/KBs/key into Settings whenever
-  // the active thread changes — otherwise sending a message in an older
-  // thread silently uses whatever is currently picked, not what that
-  // conversation was built with.
+  // Restore thread settings on active thread change
   const activeThreadId = chat.activeThread?.id ?? null;
   useEffect(() => {
     if (!chat.activeThread) return;
@@ -192,29 +201,92 @@ export const ChatPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeThreadId]);
 
-  // Fires a message queued by handleSend() when it had to create a new thread
-  // first — newThread()'s setState is async, so sendMessage (bound to the
-  // pre-creation, still-null activeThread) can't be called in the same tick.
+  // Apply default model on fresh load (when no thread is active and model is unset)
   useEffect(() => {
-    if (!pendingSendRef.current || !activeThreadId) return;
+    if (!config.defaultModel || model || chat.activeThread) return;
+    setModel(config.defaultModel);
+  }, [config.defaultModel, model, chat.activeThread]);
+
+  // Models for the compare picker, loaded the first time it opens.
+  useEffect(() => {
+    if (!compareAnchor || compareModels.length) return;
+    liteLlmApi
+      .listModels()
+      .then(all => setCompareModels(filterModels(all, m => m.model_name, config.excludedModels)))
+      .catch(() => {});
+  }, [compareAnchor, compareModels.length, liteLlmApi, config.excludedModels]);
+
+  useEffect(() => {
+    if (!pendingCompareRef.current || !activeThreadId) return;
+    const models = pendingCompareRef.current;
+    pendingCompareRef.current = null;
+    chat.setCompareMode(true, models);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeThreadId]);
+
+  const handleEnableCompare = (models: string[]) => {
+    setCompareAnchor(null);
+    if (chat.activeThread) {
+      chat.setCompareMode(true, models);
+    } else {
+      pendingCompareRef.current = models;
+      chat.newThread();
+    }
+  };
+
+  // Sends a message queued by handleSend once its conversation exists and
+  // its freshly minted key has reached useThreads (both arrive a render
+  // after handleSend runs).
+  useEffect(() => {
+    if (!pendingSendRef.current || !activeThreadId || !keyVal.token) return;
     const pending = pendingSendRef.current;
     pendingSendRef.current = null;
     chat.sendMessage(pending.text, pending.attachedUrl, undefined, pending.files);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeThreadId]);
+  }, [activeThreadId, keyVal.token]);
 
   const messages = useMemo(
     () => chat.activeThread?.messages ?? [],
     [chat.activeThread],
   );
   const isStreaming = chat.isStreaming;
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isStreaming]);
 
-  // Selecting a skill prefills the model / knowledge bases it declares as
-  // defaults (the user can still override afterwards). Clearing the skill
-  // leaves the current picks untouched.
+  // Setup scroll behavior
+  const { isAtBottom, scrollToBottom } = useStickToBottom(messagesScrollRef, []);
+
+  // Scroll to top for welcome screen (no messages), scroll to bottom for messages
+  useLayoutEffect(() => {
+    if (!messagesScrollRef.current) return;
+    if (messages.length === 0) {
+      messagesScrollRef.current.scrollTop = 0;
+    }
+  }, [messages.length]);
+
+  // Measure the root element's top position to adjust for Backstage header
+  useLayoutEffect(() => {
+    const measureAndAdjust = () => {
+      if (rootRef.current) {
+        const rect = rootRef.current.getBoundingClientRect();
+        setRootTop(rect.top);
+      }
+    };
+    measureAndAdjust();
+    window.addEventListener('resize', measureAndAdjust);
+    return () => window.removeEventListener('resize', measureAndAdjust);
+  }, []);
+
+  useChatShortcuts({
+    onNewChat: () => chat.newThread(),
+    onSearch: () => {
+      setSidebarCollapsed(false);
+      // The search field mounts with the expanded sidebar.
+      setTimeout(() => searchInputRef.current?.focus(), 0);
+    },
+    onToggleSidebar: () => setSidebarCollapsed(v => !v),
+    onStop: isStreaming ? chat.stopGeneration : undefined,
+    onFocusComposer: () => composerInputRef.current?.focus(),
+  });
+
   const handleSkillChange = (id: string) => {
     setSkillId(id);
     const skill = skills.find(s => s.id === id);
@@ -223,13 +295,6 @@ export const ChatPage: React.FC = () => {
     if (skill.defaultVectorStoreIds?.length) setVectorStoreIds(skill.defaultVectorStoreIds);
   };
 
-  // Switching teams re-scopes what the key can actually reach. The ACL and
-  // budget are baked into the key at mint time, so an already-minted key can
-  // never be reused across teams — it's deleted and replaced immediately
-  // (the user's next send then uses the new one; nothing is re-minted here
-  // when no key exists yet, handleSend covers that case). Knowledge bases the
-  // team declares are pre-selected, still fully editable afterwards — the
-  // team's list is a starting point, not a lock.
   const handleTeamChange = async (nextTeamId: string) => {
     setTeamId(nextTeamId);
     setKeyError(null);
@@ -251,31 +316,33 @@ export const ChatPage: React.FC = () => {
       });
       chatApi.deleteChatKey(previousKey).catch(() => {});
     } catch (err: any) {
-      // Leave keyVal untouched on failure: the old (still valid) key keeps
-      // working until it expires, and the error explains why the team change
-      // didn't take effect.
       setKeyError(err.message ?? 'Failed to mint a chat key for this team');
     }
+  };
+
+  const handleResetSettings = () => {
+    setToneId(traits.tones[0]?.id || '');
+    setFocusId(traits.focuses[0]?.id || '');
+    setVerbosityId(traits.verbosities[0]?.id || '');
+    setReasoningEffort('');
+    setWebSearch(false);
+    setCustomSystemPrompt('');
   };
 
   const handleSend = async () => {
     if (!input.trim() || isStreaming) return;
     const effectiveTeamId = teamId || (teams.length === 1 ? teams[0].team_id : '');
-    // The team is required before a key can be minted (litellm.keyGeneration
-    // .teamRequired in govai's config; this plugin's own /config mirrors it).
-    // Without one there is nothing to bill the turn to, so surface it rather
-    // than silently minting a teamless key.
+
     if (config.teamRequired && !effectiveTeamId) {
       setKeyError('Select a team before sending a message.');
       return;
     }
+
     let currentKey = keyVal;
-    // Mint a chat key on the first message, or re-mint an expired one when
-    // starting a fresh thread (no active thread to attach a retry to). A key
-    // that goes stale on an existing thread is instead recovered reactively
-    // in useThreads — mint once, then replay the failed turn.
+    let minted = false;
     const expired =
       !!currentKey.expiresAt && currentKey.expiresAt - Date.now() < KEY_REMINT_SKEW_MS;
+
     if (!currentKey.token || (expired && !chat.activeThread)) {
       try {
         const keyInfo = await chatApi.mintChatKey({
@@ -289,11 +356,13 @@ export const ChatPage: React.FC = () => {
         };
         setKeyVal(currentKey);
         setKeyError(null);
+        minted = true;
       } catch (err: any) {
         setKeyError(err.message ?? 'Failed to mint a chat key');
         return;
       }
     }
+
     const text = input.trim();
     const activeUrlMatch = text.match(URL_TOKEN_RE)?.[1];
     const attachedUrl =
@@ -301,17 +370,19 @@ export const ChatPage: React.FC = () => {
         ? { url: urlContext.preview.url, title: urlContext.preview.title }
         : undefined;
     const files = staged.files.length > 0 ? staged.files : undefined;
+
     if (!chat.activeThread) {
-      // No "New chat" click required — just typing and sending starts one.
-      // newThread()'s setState is async, so the actual send is queued and
-      // fired by the activeThreadId effect once the new thread is live.
-      // currentKey is passed explicitly since it may have just been minted
-      // above — newThread's own key closure predates that mint.
       pendingSendRef.current = { text, attachedUrl, files };
       chat.newThread(currentKey);
+    } else if (minted) {
+      // useThreads still holds the previous (empty) key until the next
+      // render; sending now would drop the message. The pending-send effect
+      // fires once the new key has propagated.
+      pendingSendRef.current = { text, attachedUrl, files };
     } else {
       chat.sendMessage(text, attachedUrl, undefined, files);
     }
+
     setInput('');
     urlContext.reset();
     staged.clear();
@@ -342,69 +413,54 @@ export const ChatPage: React.FC = () => {
     if (fileList) await staged.add(fileList);
   };
 
+  const handleShowSources = () => {
+    setContextTab('sources');
+    setRightPanelCollapsed(false);
+  };
+
   const lastTurnUsage = chat.activeThread?.lastTurnUsage ?? null;
   const totalTokens = chat.activeThread?.totalTokens ?? 0;
-  const statusParts: string[] = [];
-  if (lastTurnUsage) {
-    statusParts.push(`${lastTurnUsage.total_tokens.toLocaleString()} tokens this turn`);
-  }
-  if (chat.keySpend) {
-    statusParts.push(`$${chat.keySpend.spend.toFixed(4)} spent`);
-    if (chat.keySpend.max_budget != null) {
-      statusParts.push(
-        `$${chat.keySpend.spend.toFixed(2)} / $${chat.keySpend.max_budget.toFixed(2)} budget`,
-      );
-    }
-  }
+
+  const selectedSkill = skills.find(s => s.id === skillId);
+
+  // Use live citations if available, otherwise extract from last assistant message
+  const railCitations = useMemo(() => {
+    if (chat.citations.length > 0) return chat.citations;
+    return citationsFromLastAssistant(messages);
+  }, [chat.citations, messages]);
 
   return (
-    <Box sx={{ display: 'flex', height: '100dvh', overflow: 'hidden' }}>
+    <Box
+      ref={rootRef}
+      sx={{
+        display: 'flex',
+        bgcolor: 'background.default',
+        color: 'text.primary',
+        height: rootTop > 0 ? `calc(100dvh - ${rootTop}px)` : '100dvh',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Sidebar */}
       <ThreadSidebar
         collapsed={sidebarCollapsed}
         onToggleCollapsed={() => setSidebarCollapsed(v => !v)}
         config={config}
-        configError={configError}
-        traits={traits}
-        traitsLoading={traitsLoading}
-        skills={skills}
-        skillId={skillId}
-        onSkillChange={handleSkillChange}
-        toneId={toneId}
-        onToneChange={setToneId}
-        focusId={focusId}
-        onFocusChange={setFocusId}
-        verbosityId={verbosityId}
-        onVerbosityChange={setVerbosityId}
-        customSystemPrompt={customSystemPrompt}
-        onCustomSystemPromptChange={setCustomSystemPrompt}
-        teams={teams}
-        teamsLoading={teamsLoading}
-        teamsError={teamsError}
-        teamId={teamId}
-        onTeamChange={handleTeamChange}
-        teamModels={selectedTeam?.models}
-        model={model}
-        onModelChange={setModel}
-        vectorStoreIds={vectorStoreIds}
-        onVectorStoreIdsChange={setVectorStoreIds}
-        teamVectorStores={selectedTeam?.object_permission?.vector_stores}
-        webSearch={webSearch}
-        onWebSearchChange={setWebSearch}
-        reasoningEffort={reasoningEffort}
-        onReasoningEffortChange={setReasoningEffort}
         threads={chat.threads}
         activeThreadId={activeThreadId}
         onNewThread={() => chat.newThread()}
         onSelectThread={chat.selectThread}
         onDeleteThread={chat.deleteThread}
         onTogglePin={chat.togglePin}
+        onRenameThread={chat.renameThread}
         onExportThread={chat.exportThread}
+        onExportMarkdown={chat.exportThreadMarkdown}
         onImportFile={handleImportFile}
         importError={importError}
+        searchInputRef={searchInputRef}
       />
 
-      {/* ─── Center: chat column ─── */}
-      <Box sx={{ flex: 3, display: 'flex', justifyContent: 'center', overflow: 'hidden' }}>
+      {/* Center column */}
+      <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center', overflow: 'hidden' }}>
         <Box
           sx={{
             width: '100%',
@@ -414,44 +470,71 @@ export const ChatPage: React.FC = () => {
             overflow: 'hidden',
           }}
         >
-          <Box
-            sx={{
-              flexShrink: 0,
-              px: 2,
-              py: 1,
-              borderBottom: 1,
-              borderColor: 'divider',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1,
+          {/* Header */}
+          <ChatHeader
+            title={chat.activeThread?.title || 'New conversation'}
+            onRenameThread={
+              chat.activeThread
+                ? (newTitle) => chat.renameThread(chat.activeThread!.id, newTitle)
+                : undefined
+            }
+            skill={selectedSkill}
+            vectorStoreCount={vectorStoreIds.length}
+            webSearch={webSearch}
+            compareMode={chat.activeThread?.mode === 'compare'}
+            compareModelCount={chat.activeThread?.compareModels?.length}
+            onToggleRightPanel={() => setRightPanelCollapsed(v => !v)}
+            onCopyAsMarkdown={() => {
+              if (chat.activeThread) {
+                const md = threadToMarkdown(chat.activeThread);
+                navigator.clipboard.writeText(md).catch(() => {});
+              }
             }}
-          >
-            <ChatIcon fontSize="small" color="action" />
-            <Typography variant="subtitle2" noWrap sx={{ flex: 1 }}>
-              {chat.activeThread?.title ?? 'AI Chat'}
-            </Typography>
-            <Tooltip
-              title={rightPanelCollapsed ? 'Show context panel' : 'Hide context panel'}
-            >
-              <IconButton size="small" onClick={() => setRightPanelCollapsed(v => !v)}>
-                {rightPanelCollapsed ? (
-                  <ChevronLeftIcon fontSize="small" />
-                ) : (
-                  <ChevronRightIcon fontSize="small" />
-                )}
-              </IconButton>
-            </Tooltip>
-          </Box>
+            onExportMarkdown={() => {
+              if (chat.activeThread) chat.exportThreadMarkdown(chat.activeThread.id);
+            }}
+            onExportJSON={() => {
+              // exportThread strips the conversation's key from the file.
+              if (chat.activeThread) chat.exportThread(chat.activeThread.id);
+            }}
+            onCompareClick={el => setCompareAnchor(el)}
+          />
+          <ComparePopover
+            open={!!compareAnchor}
+            anchorEl={compareAnchor}
+            onClose={() => setCompareAnchor(null)}
+            models={compareModels}
+            selectedTeam={selectedTeam}
+            selectedModels={chat.activeThread?.compareModels ?? []}
+            isEnabled={chat.activeThread?.mode === 'compare'}
+            onEnable={handleEnableCompare}
+            onDisable={() => chat.setCompareMode(false)}
+          />
 
+          {/* Error banners */}
           {chat.error && (
             <Box sx={{ px: 2, pt: 1 }}>
               <ErrorBanner error={chat.error} onDismiss={chat.clearError} />
             </Box>
           )}
 
+          {configError && (
+            <Box sx={{ px: 2, pt: 1 }}>
+              <ErrorBanner
+                error={`Couldn't load chat defaults: ${configError}`}
+                onDismiss={() => setConfigError(null)}
+              />
+            </Box>
+          )}
+
           {keyError && (
             <Box sx={{ px: 2, pt: 1 }}>
-              <ErrorBanner error={keyError} onDismiss={() => setKeyError(null)} />
+              <ErrorBanner
+                error={keyError}
+                onDismiss={() => setKeyError(null)}
+                severity={keyError.includes('Select a team') ? 'warning' : undefined}
+                plain={keyError.includes('Select a team')}
+              />
             </Box>
           )}
 
@@ -464,18 +547,23 @@ export const ChatPage: React.FC = () => {
             </Box>
           )}
 
-          <Box sx={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+          {/* Messages or welcome screen */}
+          <Box sx={{ flex: 1, overflowY: 'auto', minHeight: 0 }} ref={messagesScrollRef}>
             {messages.length === 0 ? (
-              <Box
-                sx={{
-                  height: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Typography color="text.secondary">Start a conversation…</Typography>
-              </Box>
+              <WelcomeScreen
+                config={config}
+                selectedSkill={selectedSkill}
+                selectedTeam={selectedTeam}
+                selectedModel={model}
+                teams={teams}
+                teamsLoading={teamsLoading}
+                teamsError={teamsError}
+                skills={skills}
+                teamId={teamId}
+                onTeamChange={handleTeamChange}
+                onSkillSelect={handleSkillChange}
+                onPromptClick={setInput}
+              />
             ) : (
               <MessageList
                 messages={messages}
@@ -483,11 +571,37 @@ export const ChatPage: React.FC = () => {
                 onFeedback={chat.submitFeedback}
                 onRegenerate={chat.regenerateFrom}
                 onEditAndResend={chat.editAndResend}
+                onShowSources={handleShowSources}
+                modelLabel={model}
               />
             )}
-            <div ref={messagesEndRef} />
+            <div style={{ height: 16 }} />
           </Box>
 
+          {/* Scroll to bottom button */}
+          {!isAtBottom && (
+            <Box sx={{ position: 'absolute', bottom: 120, left: '50%', transform: 'translateX(-50%)' }}>
+              <Tooltip title="Scroll to bottom">
+                <IconButton
+                  onClick={() => scrollToBottom('smooth')}
+                  size="small"
+                  sx={{
+                    borderRadius: '50%',
+                    backgroundColor: theme.palette.background.paper,
+                    border: 1,
+                    borderColor: 'divider',
+                    '&:hover': {
+                      backgroundColor: theme.palette.action.hover,
+                    },
+                  }}
+                >
+                  <ChevronLeftIcon sx={{ transform: 'rotate(90deg)' }} fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Box>
+          )}
+
+          {/* Composer */}
           <ChatComposer
             input={input}
             onInputChange={setInput}
@@ -500,24 +614,46 @@ export const ChatPage: React.FC = () => {
             attachError={staged.error}
             onDismissAttachError={staged.dismissError}
             attachInputRef={attachInputRef}
+            composerInputRef={composerInputRef}
             onAttachFiles={handleAttachFiles}
             urlPreview={urlContext.preview}
             urlPreviewLoading={urlContext.loading}
             urlPreviewError={urlContext.error}
             onDismissUrlPreview={urlContext.dismiss}
+            config={config}
+            teams={teams}
+            teamsLoading={teamsLoading}
+            teamsError={teamsError}
+            skills={skills}
+            teamId={teamId}
+            onTeamChange={handleTeamChange}
+            model={model}
+            onModelChange={setModel}
+            vectorStoreIds={vectorStoreIds}
+            onVectorStoreIdsChange={setVectorStoreIds}
+            teamVectorStores={selectedTeam?.object_permission?.vector_stores}
+            skillId={skillId}
+            onSkillChange={handleSkillChange}
+            toneId={toneId}
+            onToneChange={setToneId}
+            focusId={focusId}
+            onFocusChange={setFocusId}
+            verbosityId={verbosityId}
+            onVerbosityChange={setVerbosityId}
+            reasoningEffort={reasoningEffort}
+            onReasoningEffortChange={setReasoningEffort}
+            webSearch={webSearch}
+            onWebSearchChange={setWebSearch}
+            customSystemPrompt={customSystemPrompt}
+            onCustomSystemPromptChange={setCustomSystemPrompt}
+            traits={traits}
+            traitsLoading={traitsLoading}
+            keySpend={chat.keySpend}
           />
-
-          {statusParts.length > 0 && (
-            <Box sx={{ px: 2, pb: 1 }}>
-              <Typography variant="caption" color="text.secondary">
-                {statusParts.join(' · ')}
-              </Typography>
-            </Box>
-          )}
         </Box>
       </Box>
 
-      {/* ─── Right rail: sources + usage ─── */}
+      {/* Right panel */}
       {!rightPanelCollapsed && (
         <>
           <Box
@@ -547,16 +683,40 @@ export const ChatPage: React.FC = () => {
               overflowX: 'hidden',
             }}
           >
-            <SourcesPanel citations={chat.citations} />
-            <Divider />
-            <UsagePanel
+            <ContextPanel
+              citations={railCitations}
               lastTurnUsage={lastTurnUsage}
               totalTokens={totalTokens}
               keySpend={chat.keySpend}
+              keyAlias={keyVal.alias}
+              keyExpiresAt={keyVal.expiresAt}
+              tab={contextTab}
+              onTabChange={setContextTab}
             />
           </Box>
         </>
       )}
+
+      {/* Settings drawer */}
+      <SettingsDrawer
+        open={settingsDrawerOpen}
+        onClose={() => setSettingsDrawerOpen(false)}
+        traits={traits}
+        traitsLoading={traitsLoading}
+        toneId={toneId}
+        onToneChange={setToneId}
+        focusId={focusId}
+        onFocusChange={setFocusId}
+        verbosityId={verbosityId}
+        onVerbosityChange={setVerbosityId}
+        reasoningEffort={reasoningEffort}
+        onReasoningEffortChange={setReasoningEffort}
+        webSearch={webSearch}
+        onWebSearchChange={setWebSearch}
+        customSystemPrompt={customSystemPrompt}
+        onCustomSystemPromptChange={setCustomSystemPrompt}
+        onResetDefaults={handleResetSettings}
+      />
     </Box>
   );
 };

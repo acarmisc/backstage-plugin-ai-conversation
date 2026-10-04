@@ -26,6 +26,8 @@ describe('useChatShortcuts', () => {
       ctrlKey: ctrl,
       metaKey: meta,
       shiftKey: shift,
+      bubbles: true,
+      cancelable: true,
       ...rest,
     });
   };
@@ -137,6 +139,8 @@ describe('useChatShortcuts', () => {
 
     const contenteditable = document.createElement('div');
     contenteditable.contentEditable = 'true';
+    contenteditable.setAttribute('contenteditable', 'true');
+    contenteditable.tabIndex = 0;
     document.body.appendChild(contenteditable);
     contenteditable.focus();
 
@@ -253,5 +257,30 @@ describe('useChatShortcuts', () => {
 
     expect(onSearch).toHaveBeenCalled();
     unmount();
+  });
+
+  it('focuses the composer on / when nothing editable has focus', () => {
+    const onFocusComposer = jest.fn();
+    renderHook(() => useChatShortcuts({ onFocusComposer }));
+    (document.activeElement as HTMLElement | null)?.blur();
+
+    const event = createKeyboardEvent('/');
+    act(() => {
+      document.dispatchEvent(event);
+    });
+
+    expect(onFocusComposer).toHaveBeenCalledTimes(1);
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it('leaves Escape alone when there is nothing to stop', () => {
+    renderHook(() => useChatShortcuts({}));
+
+    const event = createKeyboardEvent('Escape');
+    act(() => {
+      document.dispatchEvent(event);
+    });
+
+    expect(event.defaultPrevented).toBe(false);
   });
 });

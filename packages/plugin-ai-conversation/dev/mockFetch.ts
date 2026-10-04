@@ -120,11 +120,11 @@ async function processData(items: T[]): Promise<Result[]> {
 
 Would you like me to review your specific function?`,
       },
-      { type: 'data-citations' as const, citations: [
+      { type: 'data-citations' as const, data: [
         { filename: 'engineering-handbook/performance.md', score: 0.92, snippet: 'Function signature optimization patterns...', source: 'kb' },
         { filename: 'engineering-handbook/async-patterns.md', score: 0.88, snippet: 'Async function best practices...', source: 'kb' },
       ] },
-      { type: 'data-usage' as const, usage: { prompt_tokens: 145, completion_tokens: 287, total_tokens: 432 } },
+      { type: 'data-usage' as const, data: { prompt_tokens: 145, completion_tokens: 287, total_tokens: 432 } },
     ],
     metadata: { turnId: 'turn-1' },
   },
@@ -152,7 +152,7 @@ For large arrays, consider these approaches:
 
 **Recommendation**: Use generators for arrays >100MB to avoid heap exhaustion.`,
       },
-      { type: 'data-usage' as const, usage: { prompt_tokens: 89, completion_tokens: 156, total_tokens: 245 } },
+      { type: 'data-usage' as const, data: { prompt_tokens: 89, completion_tokens: 156, total_tokens: 245 } },
     ],
     metadata: { turnId: 'turn-2' },
   },
@@ -178,10 +178,10 @@ const sampleThread2Messages = [
 2. **Severity P2**: Manager notification within 5 min
 3. **Severity P3**: Email summary at end of day`,
       },
-      { type: 'data-citations' as const, citations: [
+      { type: 'data-citations' as const, data: [
         { filename: 'platform-runbooks/incident-procedures.md', score: 0.95, snippet: 'Follow this escalation path...', source: 'kb' },
       ] },
-      { type: 'data-usage' as const, usage: { prompt_tokens: 78, completion_tokens: 134, total_tokens: 212 } },
+      { type: 'data-usage' as const, data: { prompt_tokens: 78, completion_tokens: 134, total_tokens: 212 } },
     ],
     metadata: { turnId: 'turn-1' },
   },

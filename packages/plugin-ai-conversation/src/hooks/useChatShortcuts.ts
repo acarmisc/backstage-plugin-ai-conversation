@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 export interface ChatShortcutHandlers {
   onNewChat?: () => void;
@@ -55,8 +55,14 @@ export const SHORTCUTS: ShortcutInfo[] = [
  * @param handlers - Callback functions for each shortcut
  */
 export function useChatShortcuts(handlers: ChatShortcutHandlers): void {
+  // Read the latest handlers from a ref so the listener is attached once,
+  // not on every render.
+  const handlersRef = useRef(handlers);
+  handlersRef.current = handlers;
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      const current = handlersRef.current;
       const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
       const modKey = isMac ? event.metaKey : event.ctrlKey;
 
@@ -65,45 +71,49 @@ export function useChatShortcuts(handlers: ChatShortcutHandlers): void {
       const isInTextInput =
         focusedElement instanceof HTMLInputElement ||
         focusedElement instanceof HTMLTextAreaElement ||
-        (focusedElement instanceof HTMLElement && focusedElement.contentEditable !== 'false');
+        (focusedElement instanceof HTMLElement &&
+          (focusedElement.isContentEditable ||
+            !!focusedElement.closest('[contenteditable=""],[contenteditable="true"]')));
 
       // Ctrl/Cmd+Shift+O: New chat
       if (modKey && event.shiftKey && event.key.toLowerCase() === 'o') {
         event.preventDefault();
-        handlers.onNewChat?.();
+        current.onNewChat?.();
         return;
       }
 
       // Ctrl/Cmd+K: Search threads
       if (modKey && event.key.toLowerCase() === 'k') {
         event.preventDefault();
-        handlers.onSearch?.();
+        current.onSearch?.();
         return;
       }
 
       // Ctrl/Cmd+B: Toggle sidebar
       if (modKey && event.key.toLowerCase() === 'b') {
         event.preventDefault();
-        handlers.onToggleSidebar?.();
+        current.onToggleSidebar?.();
         return;
       }
 
       // Escape: Stop generation
-      if (event.key === 'Escape') {
+      // Only while there is something to stop, so Escape keeps closing
+      // menus and dialogs otherwise.
+      if (event.key === 'Escape' && current.onStop) {
         event.preventDefault();
-        handlers.onStop?.();
+        current.onStop();
         return;
       }
 
       // '/': Focus composer (only when not already in a text input)
       if (event.key === '/' && !isInTextInput) {
         event.preventDefault();
-        handlers.onFocusComposer?.();
+        current.onFocusComposer?.();
         return;
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [handlers]);
+  }, []);
 }

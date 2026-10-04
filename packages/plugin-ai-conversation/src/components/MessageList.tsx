@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Typography } from '@mui/material';
+import { Box } from '@mui/material';
 import { AssistantMessage } from './AssistantMessage';
 import { UserMessage } from './UserMessage';
 import type { AiConversationUIMessage } from '../types';
@@ -8,9 +8,11 @@ export interface MessageListProps {
   messages: AiConversationUIMessage[];
   streamingMessageIds: Set<string>;
   avatarLabel?: string;
+  modelLabel?: string;
   onFeedback?: (messageId: string, vote: 'up' | 'down') => void;
   onRegenerate?: (messageId: string) => void;
   onEditAndResend?: (messageId: string, newContent: string) => void;
+  onShowSources?: () => void;
 }
 
 interface MessageGroup {
@@ -44,9 +46,11 @@ export const MessageList: React.FC<MessageListProps> = ({
   messages,
   streamingMessageIds,
   avatarLabel,
+  modelLabel,
   onFeedback,
   onRegenerate,
   onEditAndResend,
+  onShowSources,
 }) => {
   const groups = groupMessages(messages);
 
@@ -56,10 +60,10 @@ export const MessageList: React.FC<MessageListProps> = ({
         flex: 1,
         overflowY: 'auto',
         px: 2,
-        py: 1,
+        py: 3,
         display: 'flex',
         flexDirection: 'column',
-        gap: 1.5,
+        gap: 3,
       }}
     >
       {groups.map((group, gi) => (
@@ -69,17 +73,14 @@ export const MessageList: React.FC<MessageListProps> = ({
             <Box sx={{ display: 'flex', gap: 1.5, overflowX: 'auto', width: '100%' }}>
               {group.assistants.map(msg => (
                 <Box key={msg.id} sx={{ flex: '1 1 320px', minWidth: 280, maxWidth: 'none' }}>
-                  {msg.metadata?.compareModel && (
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.25 }}>
-                      {msg.metadata.compareModel}
-                    </Typography>
-                  )}
                   <AssistantMessage
                     message={msg}
                     isStreaming={streamingMessageIds.has(msg.id)}
                     avatarLabel={msg.metadata?.compareModel ?? avatarLabel}
+                    modelLabel={msg.metadata?.compareModel ?? modelLabel}
                     onFeedback={onFeedback}
                     onRegenerate={onRegenerate}
+                    onShowSources={onShowSources}
                   />
                 </Box>
               ))}
@@ -91,8 +92,10 @@ export const MessageList: React.FC<MessageListProps> = ({
                 message={msg}
                 isStreaming={streamingMessageIds.has(msg.id)}
                 avatarLabel={avatarLabel}
+                modelLabel={modelLabel}
                 onFeedback={onFeedback}
                 onRegenerate={onRegenerate}
+                onShowSources={onShowSources}
               />
             ))
           )}
