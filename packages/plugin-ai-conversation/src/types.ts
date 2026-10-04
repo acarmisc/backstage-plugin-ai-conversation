@@ -218,6 +218,10 @@ export interface Thread {
   totalTokens: number;
   lastTurnUsage: UsageInfo | null;
   pinned?: boolean;
+  /** Whether the title was explicitly renamed (vs auto-generated from the
+   * first user message). When true, prevents the auto-title-generation logic
+   * from overwriting the manual title. */
+  titleEdited?: boolean;
   /** Catalog entity ref of the selected chat-skill, e.g.
    * "component:default/data-analyst". Sent as `skill_id`; the backend
    * resolves and prepends its system prompt. */
