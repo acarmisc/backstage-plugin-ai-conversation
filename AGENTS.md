@@ -83,7 +83,7 @@ The chat plugin reuses all of this by **importing from the govai package**, not 
 | `/vector_stores` | GET | Lists LiteLLM vector stores for the KB picker. Calls LiteLLM's `/v1/vector_store/list`. |
 | `/skills` | GET | Lists chat skills (metadata only — id/title/description/defaultModel/defaultVectorStoreIds/tags). No system-prompt text. |
 | `/chat/traits` | GET | Static tone/focus/verbosity option lists for the pickers (id/label only — see `traits.ts`). |
-| `/chat/key` | POST/DELETE | Mints / deletes a per-thread `sk-` chat key via the master key. Bound to a `team_id` (required when `teamRequired`; validated against the caller's own LiteLLM teams → 403 otherwise) so budget, rate limits and model ACL are inherited from the team. |
+| `/chat/key` | POST/DELETE | Mints / deletes a per-thread `sk-` chat key via the master key. Bound to a `team_id` (required when `teamRequired`; validated against the caller's own LiteLLM teams → 403 otherwise) so budget, rate limits and model ACL are inherited from the team. `maxRequestBudget` is enforced server-side as a cap. DELETE validates key ownership (resolves caller and lists their keys) and only deletes chat keys (`key_alias` starting with `chat-`); returns 404 otherwise. |
 | `/chat/key/:alias/spend` | GET | Current spend/budget for a chat key, looked up by alias. |
 | `/fetch-context` | POST | SSRF-guarded fetch + extract for the composer's `#url` chip (title/snippet only). |
 | `/feedback` | POST | Upserts a thumbs-up/down vote (with a Q&A snapshot) on an assistant message. |
