@@ -33,6 +33,7 @@
     "dist"
   ],
   "scripts": {
+    "start": "backstage-cli package start --config app-config.yaml",
     "build": "node build.js && tsc -p tsconfig.json",
     "lint": "backstage-cli package lint",
     "test": "backstage-cli package test",
@@ -59,6 +60,7 @@
   },
   "devDependencies": {
     "@backstage/cli": "^0.36.2",
+    "@backstage/frontend-defaults": "^0.5.3",
     "@backstage/test-utils": "^1.7.0",
     "@jest/environment-jsdom-abstract": "^30.0.0",
     "@testing-library/dom": "^10.0.0",

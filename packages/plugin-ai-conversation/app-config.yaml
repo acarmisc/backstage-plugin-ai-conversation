@@ -1,0 +1,10 @@
+app:
+  title: AI Conversation Plugin Dev
+  baseUrl: http://localhost:3000
+  # The dev harness has no backend, so skip the sign-in page and run as the
+  # default guest identity; all plugin data comes from dev/mockFetch.ts and dev/mockApi.ts.
+  extensions:
+    - sign-in-page:app: false
+
+backend:
+  baseUrl: http://localhost:7007
