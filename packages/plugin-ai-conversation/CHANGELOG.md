@@ -1,0 +1,46 @@
+# Changelog
+
+## Unreleased
+
+### Changed
+
+- Redesigned chat page:
+  - sidebar with conversations grouped by date (Pinned, Today, Yesterday,
+    Previous 7 and 30 days, Older), search, inline rename, pin, export and
+    delete with confirmation; import and storage information in its footer;
+  - welcome screen with the active team and model, skill cards and starter
+    prompts, and a team picker when a team is required;
+  - quick Team, Model, Knowledge and Skill pickers in the composer; tone,
+    focus, verbosity, reasoning effort, web search and extra instructions
+    moved to a **Tune** drawer;
+  - answers without bubbles, styled Markdown and code blocks, typing
+    indicator, per-answer token count and sources chip;
+  - Sources and Usage tabs in the right panel, with the key's budget and
+    expiry;
+  - errors explained in plain words; light and dark theme.
+- The page fits under the app header instead of overflowing it.
+
+### Added
+
+- Compare mode can be turned on from the header (it had no entry point) and
+  its models changed while it is on.
+- Rename conversations; export and copy them as Markdown.
+- Paste or drop images into the composer.
+- Keyboard shortcuts: new chat, search, toggle sidebar, stop, focus the
+  message box.
+- Default export for feature discovery in the new frontend system.
+
+### Fixed
+
+- A message sent while the conversation had no key yet could be dropped.
+- The sources chip and token counts never showed for answers from the
+  backend.
+- Stored conversations now show the sources of their last answer.
+- The streaming view no longer jumps to the bottom while you read earlier
+  messages.
+- Failures loading the chat configuration or teams are shown instead of
+  ignored.
+
+## Earlier versions
+
+See the [commit history](https://github.com/acarmisc/backstage-plugin-ai-conversation/commits/main).
