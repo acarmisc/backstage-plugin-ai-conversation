@@ -110,12 +110,13 @@ export const ComposerPill: React.FC<ComposerPillProps> = ({
         open={open}
         anchorEl={anchorEl}
         onClose={handleClose}
+        // The composer sits at the bottom of the page: open upwards.
         anchorOrigin={{
-          vertical: 'bottom',
+          vertical: 'top',
           horizontal: 'left',
         }}
         transformOrigin={{
-          vertical: 'top',
+          vertical: 'bottom',
           horizontal: 'left',
         }}
         slotProps={{

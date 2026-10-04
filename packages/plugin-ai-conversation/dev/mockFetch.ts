@@ -313,7 +313,7 @@ export class MockFetchApi implements FetchApi {
         JSON.stringify({
           key: `sk-mock-${Math.random().toString(36).slice(2, 20)}`,
           key_alias: alias,
-          expires_at: iso(-3), // 3 hours from now-ish
+          expires_at: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(), // like the backend's 3h keys
           max_budget: 5,
         }),
       );
