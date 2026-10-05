@@ -3,16 +3,16 @@ import {
   Box,
   Button,
   Divider,
+  IconButton,
   Drawer,
+  FormControlLabel,
   Stack,
   Switch,
   TextField,
   Typography,
-  useTheme,
 } from '@mui/material';
-import TuneIcon from '@mui/icons-material/Tune';
+import CloseIcon from '@mui/icons-material/Close';
 import { OptionPicker } from './OptionPicker';
-import { RADIUS } from '../theme';
 import type { ChatTraits, ReasoningEffort } from '../types';
 
 export interface SettingsDrawerProps {
@@ -33,6 +33,25 @@ export interface SettingsDrawerProps {
   customSystemPrompt: string;
   onCustomSystemPromptChange: (value: string) => void;
   onResetDefaults?: () => void;
+}
+
+/** True when any conversation setting differs from its default (unset). */
+export function hasCustomSettings(s: {
+  toneId: string;
+  focusId: string;
+  verbosityId: string;
+  reasoningEffort: string;
+  webSearch: boolean;
+  customSystemPrompt: string;
+}): boolean {
+  return (
+    !!s.toneId ||
+    !!s.focusId ||
+    !!s.verbosityId ||
+    !!s.reasoningEffort ||
+    s.webSearch ||
+    s.customSystemPrompt.trim() !== ''
+  );
 }
 
 const REASONING_EFFORTS: { id: ReasoningEffort | ''; label: string }[] = [
@@ -61,15 +80,14 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
   onCustomSystemPromptChange,
   onResetDefaults,
 }) => {
-  const theme = useTheme();
-
-  const hasNonDefaults =
-    toneId !== (traits.tones[0]?.id || '') ||
-    focusId !== (traits.focuses[0]?.id || '') ||
-    verbosityId !== (traits.verbosities[0]?.id || '') ||
-    reasoningEffort !== '' ||
-    webSearch ||
-    customSystemPrompt.trim() !== '';
+  const hasNonDefaults = hasCustomSettings({
+    toneId,
+    focusId,
+    verbosityId,
+    reasoningEffort,
+    webSearch,
+    customSystemPrompt,
+  });
 
   return (
     <Drawer
@@ -81,18 +99,21 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
           width: 360,
           maxWidth: '100vw',
           boxSizing: 'border-box',
-          p: 3,
+          p: 2,
         },
       }}
     >
       <Stack spacing={3} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         {/* Header */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <TuneIcon />
-          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'space-between' }}>
+          <Typography variant="h6">
             Conversation settings
           </Typography>
+          <IconButton size="small" aria-label="Close settings" onClick={onClose}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
         </Box>
+        <Divider />
 
         {/* Scrollable content */}
         <Box sx={{ flex: 1, overflowY: 'auto', pr: 1 }}>
@@ -100,12 +121,9 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
             {/* Style section */}
             <Box>
               <Typography
-                variant="subtitle2"
-                sx={{
-                  fontWeight: 600,
-                  mb: 1.5,
-                  color: theme.palette.text.primary,
-                }}
+                variant="overline"
+                color="text.secondary"
+                sx={{ mb: 1.5, display: 'block' }}
               >
                 Style
               </Typography>
@@ -145,12 +163,9 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
             {/* Reasoning effort section */}
             <Box>
               <Typography
-                variant="subtitle2"
-                sx={{
-                  fontWeight: 600,
-                  mb: 1.5,
-                  color: theme.palette.text.primary,
-                }}
+                variant="overline"
+                color="text.secondary"
+                sx={{ mb: 1.5, display: 'block' }}
               >
                 Reasoning effort
               </Typography>
@@ -167,31 +182,29 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
             {/* Sources section */}
             <Box>
               <Typography
-                variant="subtitle2"
-                sx={{
-                  fontWeight: 600,
-                  mb: 1.5,
-                  color: theme.palette.text.primary,
-                }}
+                variant="overline"
+                color="text.secondary"
+                sx={{ mb: 1.5, display: 'block' }}
               >
                 Sources
               </Typography>
-              <Stack direction="row" spacing={2} alignItems="flex-start">
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="body2" sx={{ fontWeight: 500 }} id="web-search-label">
-                    Web search
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
-                    Let models with a web search tool look things up, alongside the
-                    knowledge bases
-                  </Typography>
-                </Box>
-                <Switch
-                  checked={webSearch}
-                  onChange={e => onWebSearchChange(e.target.checked)}
-                  inputProps={{ 'aria-labelledby': 'web-search-label' }}
-                />
-              </Stack>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={webSearch}
+                    onChange={e => onWebSearchChange(e.target.checked)}
+                  />
+                }
+                label={
+                  <Stack spacing={0}>
+                    <Typography variant="body2">Web search</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Let models with a web search tool look things up, alongside the
+                      knowledge bases
+                    </Typography>
+                  </Stack>
+                }
+              />
             </Box>
 
             <Divider />
@@ -199,12 +212,9 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
             {/* Instructions section */}
             <Box>
               <Typography
-                variant="subtitle2"
-                sx={{
-                  fontWeight: 600,
-                  mb: 1.5,
-                  color: theme.palette.text.primary,
-                }}
+                variant="overline"
+                color="text.secondary"
+                sx={{ mb: 1.5, display: 'block' }}
               >
                 Instructions
               </Typography>
@@ -212,40 +222,32 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                 fullWidth
                 multiline
                 minRows={4}
-                maxRows={10}
                 placeholder="Add custom instructions for this conversation…"
                 value={customSystemPrompt}
                 onChange={e => onCustomSystemPromptChange(e.target.value)}
                 variant="outlined"
                 size="small"
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: RADIUS.md,
-                  },
-                }}
               />
             </Box>
           </Stack>
         </Box>
 
         {/* Footer buttons */}
-        <Stack spacing={1} sx={{ pt: 2, borderTop: 1, borderColor: 'divider' }}>
+        <Divider />
+        <Stack direction="row" spacing={1}>
           <Button
-            fullWidth
-            variant="outlined"
+            variant="text"
             onClick={onResetDefaults}
-            size="small"
             disabled={!hasNonDefaults}
-            sx={{ textTransform: 'none' }}
+            size="small"
           >
             Reset to defaults
           </Button>
+          <Box sx={{ flex: 1 }} />
           <Button
-            fullWidth
             variant="contained"
             onClick={onClose}
             size="small"
-            sx={{ textTransform: 'none' }}
           >
             Done
           </Button>

@@ -7,13 +7,12 @@ import {
   IconButton,
   Tooltip,
   Typography,
-  useTheme,
+  Paper,
 } from '@mui/material';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import PublicIcon from '@mui/icons-material/Public';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { safeHref } from '../safeUrl';
-import { RADIUS, surface, subtleBorder } from '../theme';
 import type { Citation } from '../types';
 
 export interface SourcesPanelProps {
@@ -87,7 +86,6 @@ function groupSources(citations: Citation[]): SourceGroup[] {
 }
 
 const SourceRow: React.FC<{ source: DedupedSource }> = ({ source }) => {
-  const theme = useTheme();
   const [expanded, setExpanded] = useState(false);
   const href = safeHref(source.url);
   const rel = relevanceLabel(source.bestScore);
@@ -96,12 +94,10 @@ const SourceRow: React.FC<{ source: DedupedSource }> = ({ source }) => {
   const isKb = source.source === 'kb';
 
   return (
-    <Box
+    <Paper
+      variant="outlined"
       sx={{
         p: 1.25,
-        bgcolor: surface(theme, 1),
-        borderRadius: RADIUS.sm,
-        border: subtleBorder(theme),
         mb: 1,
       }}
     >
@@ -216,12 +212,11 @@ const SourceRow: React.FC<{ source: DedupedSource }> = ({ source }) => {
           ))}
         </Box>
       </Collapse>
-    </Box>
+    </Paper>
   );
 };
 
 export const SourcesPanel: React.FC<SourcesPanelProps> = ({ citations }) => {
-  const theme = useTheme();
   const groups = groupSources(citations);
   const total = groups.reduce((n, g) => n + g.items.length, 0);
 
@@ -238,21 +233,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({ citations }) => {
           textAlign: 'center',
         }}
       >
-        <Box
-          sx={{
-            width: 48,
-            height: 48,
-            borderRadius: '50%',
-            bgcolor: surface(theme, 2),
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            mb: 1,
-            color: 'text.secondary',
-          }}
-        >
-          <MenuBookIcon />
-        </Box>
+        <MenuBookIcon sx={{ fontSize: 48, mb: 1, color: 'action.disabled' }} />
         <Typography variant="body2" color="text.secondary">
           Sources appear here when a reply uses a knowledge base or web search.
         </Typography>

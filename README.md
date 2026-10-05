@@ -24,8 +24,9 @@ rate limits and model access come from the governance you already have.
   export as JSON or Markdown, import; stored in the browser or, if enabled,
   in your Backstage database.
 - **Quick to use** — welcome screen with skills and starter prompts, quick
-  pickers in the composer, image paste and drag & drop, keyboard shortcuts,
-  light and dark themes.
+  pickers in the composer, image paste and drag & drop, keyboard shortcuts.
+- **Native look** — built from MUI and `@backstage/core-components` on your
+  Backstage theme, light and dark.
 - **Analytics** — usage per skill and model, and feedback totals.
 
 | Start a conversation | Grounded answer with sources |
@@ -114,8 +115,8 @@ and streams the model's answer back. Details in
        maxRequestBudget: 5        # USD per conversation key
    ```
 
-5. If your app sets a Content Security Policy, allow `fonts.googleapis.com`,
-   `fonts.gstatic.com` and `cdn.jsdelivr.net` (code font and KaTeX styles).
+5. If your app sets a Content Security Policy, allow `cdn.jsdelivr.net` (the
+   KaTeX stylesheet for math).
 
 ## Configuration at a glance
 

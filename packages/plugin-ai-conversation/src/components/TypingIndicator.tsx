@@ -1,65 +1,27 @@
 import React from 'react';
-import { Box, useMediaQuery, useTheme } from '@mui/material';
+import { Box, Skeleton } from '@mui/material';
 
 export interface TypingIndicatorProps {
   /**
-   * Size of each dot in pixels. Default 8.
+   * Number of skeleton lines. Default 3.
    */
   size?: number;
 }
 
 /**
- * Three animated dots indicating that the assistant is typing.
- * Respects prefers-reduced-motion.
+ * Loading skeleton indicating that the assistant is typing.
  */
-export const TypingIndicator: React.FC<TypingIndicatorProps> = ({ size = 8 }) => {
-  const theme = useTheme();
-  const prefersReducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
-
-  const dotStyle = {
-    width: size,
-    height: size,
-    borderRadius: '50%',
-    backgroundColor: theme.palette.text.primary,
-    animation: prefersReducedMotion ? 'none' : 'litellm-typing 1.4s infinite',
-  };
+export const TypingIndicator: React.FC<TypingIndicatorProps> = ({ size = 3 }) => {
+  const widths = size === 3 ? ['90%', '75%', '60%'] : Array(size).fill('100%').map((_, i) => {
+    const pct = 100 - (i * 10);
+    return `${Math.max(60, pct)}%`;
+  });
 
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        gap: size * 0.5,
-        alignItems: 'flex-end',
-        '@keyframes litellm-typing': {
-          '0%, 60%, 100%': {
-            opacity: 0.5,
-            transform: 'translateY(0)',
-          },
-          '30%': {
-            opacity: 1,
-            transform: `translateY(-${size}px)`,
-          },
-        },
-      }}
-    >
-      <Box
-        sx={{
-          ...dotStyle,
-          animationDelay: prefersReducedMotion ? '0ms' : '0ms',
-        }}
-      />
-      <Box
-        sx={{
-          ...dotStyle,
-          animationDelay: prefersReducedMotion ? '0ms' : '200ms',
-        }}
-      />
-      <Box
-        sx={{
-          ...dotStyle,
-          animationDelay: prefersReducedMotion ? '0ms' : '400ms',
-        }}
-      />
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+      {widths.map((width, i) => (
+        <Skeleton key={i} variant="text" width={width} height={20} />
+      ))}
     </Box>
   );
 };

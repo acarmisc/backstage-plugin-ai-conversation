@@ -1,6 +1,5 @@
 import React from 'react';
-import { Box, LinearProgress, Typography, useTheme } from '@mui/material';
-import { MONO_FONT_STACK, RADIUS, surface, subtleBorder } from '../theme';
+import { Box, LinearProgress, Table, TableBody, TableCell, TableContainer, TableRow, Typography, Paper } from '@mui/material';
 import type { KeySpend, UsageInfo } from '../types';
 
 export interface UsagePanelProps {
@@ -38,27 +37,6 @@ function getBudgetColor(budgetPct: number | null) {
   return 'primary';
 }
 
-const StatTile: React.FC<{ label: string; value: string }> = ({ label, value }) => {
-  const theme = useTheme();
-  return (
-    <Box
-      sx={{
-        p: 1.25,
-        bgcolor: surface(theme, 1),
-        borderRadius: RADIUS.sm,
-        border: subtleBorder(theme),
-      }}
-    >
-      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-        {label}
-      </Typography>
-      <Typography variant="body2" fontWeight={600}>
-        {value}
-      </Typography>
-    </Box>
-  );
-};
-
 export const UsagePanel: React.FC<UsagePanelProps> = ({
   lastTurnUsage,
   totalTokens,
@@ -66,7 +44,6 @@ export const UsagePanel: React.FC<UsagePanelProps> = ({
   keyAlias,
   keyExpiresAt,
 }) => {
-  const theme = useTheme();
   const budgetPct =
     keySpend?.max_budget && keySpend.max_budget > 0
       ? Math.min(100, (keySpend.spend / keySpend.max_budget) * 100)
@@ -85,45 +62,35 @@ export const UsagePanel: React.FC<UsagePanelProps> = ({
 
   return (
     <Box sx={{ p: 2 }}>
-      {/* 2x2 stat tiles grid */}
+      {/* Usage stats table */}
       {lastTurnUsage && (
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: 1,
-            mb: 2,
-          }}
-        >
-          <StatTile
-            label="This turn"
-            value={`${lastTurnUsage.total_tokens.toLocaleString()} tokens`}
-          />
-          <StatTile
-            label="Session total"
-            value={`${totalTokens.toLocaleString()} tokens`}
-          />
-          <StatTile
-            label="Prompt"
-            value={`${lastTurnUsage.prompt_tokens.toLocaleString()}`}
-          />
-          <StatTile
-            label="Completion"
-            value={`${lastTurnUsage.completion_tokens.toLocaleString()}`}
-          />
-        </Box>
+        <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
+          <Table size="small">
+            <TableBody>
+              <TableRow>
+                <TableCell>This turn</TableCell>
+                <TableCell align="right">{lastTurnUsage.total_tokens.toLocaleString()} tokens</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>Session total</TableCell>
+                <TableCell align="right">{totalTokens.toLocaleString()} tokens</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>Prompt</TableCell>
+                <TableCell align="right">{lastTurnUsage.prompt_tokens.toLocaleString()}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>Completion</TableCell>
+                <TableCell align="right">{lastTurnUsage.completion_tokens.toLocaleString()}</TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </TableContainer>
       )}
 
-      {/* Budget card */}
+      {/* Budget section */}
       {keySpend && (
-        <Box
-          sx={{
-            p: 1.5,
-            bgcolor: surface(theme, 1),
-            borderRadius: RADIUS.md,
-            border: subtleBorder(theme),
-          }}
-        >
+        <Paper variant="outlined" sx={{ p: 1.5 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', mb: 1 }}>
             <Typography variant="subtitle2" fontWeight={600}>
               Budget
@@ -138,13 +105,6 @@ export const UsagePanel: React.FC<UsagePanelProps> = ({
               <LinearProgress
                 variant="determinate"
                 value={budgetPct ?? 0}
-                sx={{
-                  borderRadius: '4px',
-                  height: 6,
-                  backgroundColor: theme.palette.mode === 'light'
-                    ? 'rgba(0, 0, 0, 0.08)'
-                    : 'rgba(255, 255, 255, 0.12)',
-                }}
                 color={getBudgetColor(budgetPct)}
               />
             </Box>
@@ -155,8 +115,7 @@ export const UsagePanel: React.FC<UsagePanelProps> = ({
               variant="caption"
               sx={{
                 display: 'block',
-                fontFamily: MONO_FONT_STACK,
-                fontSize: '0.75rem',
+                fontFamily: 'monospace',
                 color: 'text.secondary',
                 mb: 0.5,
                 wordBreak: 'break-all',
@@ -171,7 +130,7 @@ export const UsagePanel: React.FC<UsagePanelProps> = ({
               expires in {timeRemaining}
             </Typography>
           )}
-        </Box>
+        </Paper>
       )}
     </Box>
   );

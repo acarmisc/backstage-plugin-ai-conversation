@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Box, IconButton, Tooltip, useTheme } from '@mui/material';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import { Box, Fab, Tooltip } from '@mui/material';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import { useApi, identityApiRef } from '@backstage/core-plugin-api';
 import { liteLlmApiRef } from '@acarmisc/backstage-plugin-litellm';
 
@@ -51,7 +51,6 @@ const EMPTY_CONFIG: ChatConfig = {
 const EMPTY_TRAITS: ChatTraits = { tones: [], focuses: [], verbosities: [] };
 
 export const ChatPage: React.FC = () => {
-  const theme = useTheme();
   const chatApi = useApi(aiConversationApiRef);
   const liteLlmApi = useApi(liteLlmApiRef);
   const identityApi = useApi(identityApiRef);
@@ -125,12 +124,9 @@ export const ChatPage: React.FC = () => {
 
     chatApi
       .getChatTraits()
-      .then(t => {
-        setTraits(t);
-        setToneId(prev => prev || t.tones[0]?.id || '');
-        setFocusId(prev => prev || t.focuses[0]?.id || '');
-        setVerbosityId(prev => prev || t.verbosities[0]?.id || '');
-      })
+      // No trait is preselected: "Default" (none) is what every conversation
+      // starts with, and what Reset to defaults goes back to.
+      .then(setTraits)
       .catch(() => {})
       .finally(() => setTraitsLoading(false));
 
@@ -573,21 +569,9 @@ export const ChatPage: React.FC = () => {
           {!isAtBottom && (
             <Box sx={{ position: 'absolute', bottom: 120, left: '50%', transform: 'translateX(-50%)' }}>
               <Tooltip title="Scroll to bottom">
-                <IconButton
-                  onClick={() => scrollToBottom('smooth')}
-                  size="small"
-                  sx={{
-                    borderRadius: '50%',
-                    backgroundColor: theme.palette.background.paper,
-                    border: 1,
-                    borderColor: 'divider',
-                    '&:hover': {
-                      backgroundColor: theme.palette.action.hover,
-                    },
-                  }}
-                >
-                  <ChevronLeftIcon sx={{ transform: 'rotate(90deg)' }} fontSize="small" />
-                </IconButton>
+<Fab size="small" aria-label="Scroll to bottom" onClick={() => scrollToBottom('smooth')}>
+                  <KeyboardArrowDownIcon />
+                </Fab>
               </Tooltip>
             </Box>
           )}

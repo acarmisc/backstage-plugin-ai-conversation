@@ -96,7 +96,7 @@ export const ComparePopover: React.FC<ComparePopoverProps> = ({
     >
       <Box sx={{ p: 2, minWidth: 320 }}>
         <Stack spacing={2}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+          <Typography variant="subtitle2">
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
               <CompareArrowsIcon fontSize="small" />
               <span>Compare models</span>
@@ -116,7 +116,6 @@ export const ComparePopover: React.FC<ComparePopoverProps> = ({
                   alignItems: 'center',
                   gap: 1,
                   p: 1,
-                  borderRadius: '4px',
                   '&:hover': {
                     backgroundColor: theme.palette.action.hover,
                   },
@@ -134,9 +133,6 @@ export const ComparePopover: React.FC<ComparePopoverProps> = ({
                   <Typography
                     variant="body2"
                     noWrap
-                    sx={{
-                      fontWeight: 500,
-                    }}
                   >
                     {model.model_name}
                   </Typography>

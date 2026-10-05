@@ -90,11 +90,9 @@ proxy to LiteLLM. Reports in these areas are most useful:
   `chat_message_feedback` as snapshotted events (thread_id/message_id/rating/snapshot),
   not full thread history.
 
-- **CDN dependencies.** KaTeX CSS and JetBrains Mono webfont load from public CDNs
-  (`cdn.jsdelivr.net`, `fonts.googleapis.com`) at runtime. Content-Security-Policy
-  headers must allow these origins. If the deployment is locked down offline,
-  bundling the KaTeX CSS (via esbuild text loader) and self-hosting the font are
-  necessary.
+- **CDN dependency.** The KaTeX stylesheet loads from `cdn.jsdelivr.net` at
+  runtime, so the Content-Security-Policy must allow that origin. For an
+  offline deployment the KaTeX CSS would need bundling (esbuild text loader).
 
 - **Credentials in error responses.** Error messages sent to the browser have
   bearer tokens and `sk-` keys redacted and are truncated (same pattern as the
