@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Chip, IconButton, Tooltip, Typography, useTheme } from '@mui/material';
+import { Box, Chip, IconButton, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tooltip, Typography, Paper } from '@mui/material';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ThumbUpOutlinedIcon from '@mui/icons-material/ThumbUpOutlined';
 import ThumbDownIcon from '@mui/icons-material/ThumbDown';
@@ -9,6 +9,7 @@ import CheckIcon from '@mui/icons-material/Check';
 import ReplayIcon from '@mui/icons-material/Replay';
 import BuildIcon from '@mui/icons-material/Build';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -17,7 +18,6 @@ import { StreamingAvatar } from './StreamingAvatar';
 import { CodeBlock } from './CodeBlock';
 import { TypingIndicator } from './TypingIndicator';
 import { extractText } from '../hooks/messageShape';
-import { surface } from '../theme';
 import type { AiConversationUIMessage } from '../types';
 
 export interface AssistantMessageProps {
@@ -82,7 +82,7 @@ const FilePart: React.FC<{ url: string; mediaType: string; filename?: string }> 
         component="img"
         src={url}
         alt={filename ?? 'attachment'}
-        sx={{ maxWidth: 240, maxHeight: 240, borderRadius: '4px', display: 'block', mb: 0.5 }}
+        sx={{ maxWidth: 240, maxHeight: 240, borderRadius: 1, display: 'block', mb: 0.5 }}
       />
     );
   }
@@ -100,7 +100,6 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
   onRegenerate,
   onShowSources,
 }) => {
-  const theme = useTheme();
   const [copied, setCopied] = useState(false);
   const text = extractText(message);
 
@@ -133,30 +132,10 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
             sx={{
               '& p': { m: 0, mb: '0.5em' },
               '& p:last-child': { mb: 0 },
-              '& h1': { fontSize: '1.25rem', fontWeight: 600, mt: '1em', mb: '0.5em' },
-              '& h2': { fontSize: '1.125rem', fontWeight: 600, mt: '0.875em', mb: '0.5em' },
-              '& h3': { fontSize: '1rem', fontWeight: 600, mt: '0.75em', mb: '0.5em' },
               '& ul, & ol': { pl: 2, mb: '0.5em' },
               '& li': { mb: '0.25em' },
-              '& table': {
-                borderCollapse: 'collapse',
-                width: '100%',
-                border: `1px solid ${theme.palette.divider}`,
-                mb: '0.5em',
-              },
-              '& th': {
-                backgroundColor: surface(theme, 2),
-                borderBottom: `1px solid ${theme.palette.divider}`,
-                padding: '0.5rem',
-                textAlign: 'left',
-                fontWeight: 600,
-              },
-              '& td': {
-                borderBottom: `1px solid ${theme.palette.divider}`,
-                padding: '0.5rem',
-              },
               '& blockquote': {
-                borderLeftColor: 'primary.main',
+                borderLeftColor: 'divider',
                 borderLeftWidth: '4px',
                 borderLeftStyle: 'solid',
                 paddingLeft: '1em',
@@ -173,7 +152,26 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
             <ReactMarkdown
               remarkPlugins={[remarkGfm, remarkMath]}
               rehypePlugins={[rehypeKatex]}
-              components={{ code: CodeBlock }}
+              components={{
+                code: CodeBlock,
+                // Headings stay below the page and header titles.
+                h1: ({ children }) => <Typography variant="h6" component="h3" sx={{ mt: 2, mb: 1 }}>{children}</Typography>,
+                h2: ({ children }) => <Typography variant="subtitle1" component="h4" sx={{ mt: 2, mb: 0.5 }}>{children}</Typography>,
+                h3: ({ children }) => <Typography variant="subtitle2" component="h5" sx={{ mt: 1.5, mb: 0.5 }}>{children}</Typography>,
+                h4: ({ children }) => <Typography variant="subtitle2" component="h6" sx={{ mt: 1.5, mb: 0.5 }}>{children}</Typography>,
+                table: ({ children }) => (
+                  <TableContainer component={Paper} variant="outlined" sx={{ my: 1, overflowWrap: 'normal' }}>
+                    <Table size="small">{children}</Table>
+                  </TableContainer>
+                ),
+                thead: ({ children }) => <TableHead>{children}</TableHead>,
+                tbody: ({ children }) => <TableBody>{children}</TableBody>,
+                tr: ({ children }) => <TableRow>{children}</TableRow>,
+                // The Backstage theme breaks words in table cells; in narrow
+                // compare columns that splits short words mid-way.
+                th: ({ children }) => <TableCell sx={{ wordBreak: 'normal' }}>{children}</TableCell>,
+                td: ({ children }) => <TableCell sx={{ wordBreak: 'normal' }}>{children}</TableCell>,
+              }}
             >
               {part.text}
             </ReactMarkdown>
@@ -190,7 +188,7 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
       return null;
     });
   } else if (isStreaming) {
-    body = <TypingIndicator size={6} />;
+    body = <TypingIndicator size={3} />;
   } else {
     body = null;
   }
@@ -212,7 +210,7 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
           <Typography
             variant="caption"
             color="text.secondary"
-            sx={{ display: 'block', mb: 0.5, fontWeight: 500 }}
+            sx={{ display: 'block', mb: 0.5 }}
           >
             {modelLabel}
           </Typography>
@@ -221,9 +219,8 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
         {/* Message content */}
         <Box
           sx={{
-            wordBreak: 'break-word',
-            fontSize: '0.95rem',
-            lineHeight: 1.7,
+            overflowWrap: 'anywhere',
+            typography: 'body1',
             '& p': { m: 0, mb: '0.5em' },
             '& p:last-child': { mb: 0 },
             '& ul, & ol': { pl: 2, mb: '0.5em' },
@@ -237,12 +234,13 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
         {citationCount > 0 && (
           <Box sx={{ mt: 1 }}>
             <Chip
+              icon={<MenuBookIcon />}
               label={`${citationCount} source${citationCount !== 1 ? 's' : ''}`}
               size="small"
+              variant="outlined"
               onClick={onShowSources}
               sx={{
                 cursor: onShowSources ? 'pointer' : 'default',
-                fontWeight: 500,
               }}
             />
           </Box>

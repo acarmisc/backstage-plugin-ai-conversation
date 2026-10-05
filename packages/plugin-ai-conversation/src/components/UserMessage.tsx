@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
-import { Box, Button, Chip, IconButton, TextField, Tooltip, useTheme, alpha } from '@mui/material';
+import { Box, Button, Chip, IconButton, TextField, Tooltip } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import CheckIcon from '@mui/icons-material/Check';
 import EditIcon from '@mui/icons-material/Edit';
 import LinkIcon from '@mui/icons-material/Link';
 import { safeHref } from '../safeUrl';
 import { extractText } from '../hooks/messageShape';
-import { RADIUS } from '../theme';
 import type { AiConversationUIMessage } from '../types';
 
 export interface UserMessageProps {
@@ -15,7 +14,6 @@ export interface UserMessageProps {
 }
 
 export const UserMessage: React.FC<UserMessageProps> = ({ message, onEditAndResend }) => {
-  const theme = useTheme();
   const text = extractText(message);
   const fileParts = message.parts.filter(
     (p): p is { type: 'file'; url: string; mediaType: string; filename?: string } => p.type === 'file',
@@ -110,7 +108,7 @@ export const UserMessage: React.FC<UserMessageProps> = ({ message, onEditAndRese
                 component="img"
                 src={p.url}
                 alt={p.filename ?? 'attachment'}
-                sx={{ maxWidth: 160, maxHeight: 160, borderRadius: RADIUS.sm }}
+                sx={{ maxWidth: 160, maxHeight: 160, borderRadius: 1 }}
               />
             ) : (
               <Chip key={i} size="small" label={p.filename ?? p.mediaType} variant="outlined" />
@@ -122,9 +120,9 @@ export const UserMessage: React.FC<UserMessageProps> = ({ message, onEditAndRese
         <Box
           sx={{
             maxWidth: '80%',
-            bgcolor: alpha(theme.palette.primary.main, 0.08),
-            borderRadius: `${RADIUS.lg} ${RADIUS.lg} ${RADIUS.sm} ${RADIUS.lg}`,
-            px: 1.5,
+            bgcolor: 'action.selected',
+            borderRadius: 1,
+            px: 2,
             py: 1,
             whiteSpace: 'pre-wrap',
             wordBreak: 'break-word',

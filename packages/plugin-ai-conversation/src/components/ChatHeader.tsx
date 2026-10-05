@@ -16,7 +16,6 @@ import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
-import { RADIUS, ACCENT_GRADIENT } from '../theme';
 import type { Skill } from '../types';
 
 export interface ChatHeaderProps {
@@ -139,11 +138,6 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
               size="small"
               label={skill.title}
               variant="outlined"
-              sx={{
-                height: 24,
-                fontSize: '0.75rem',
-                borderRadius: RADIUS.pill,
-              }}
             />
           )}
           {vectorStoreCount !== undefined && vectorStoreCount > 0 && (
@@ -151,11 +145,6 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
               size="small"
               label={`${vectorStoreCount} knowledge base${vectorStoreCount !== 1 ? 's' : ''}`}
               variant="outlined"
-              sx={{
-                height: 24,
-                fontSize: '0.75rem',
-                borderRadius: RADIUS.pill,
-              }}
             />
           )}
           {webSearch && (
@@ -163,11 +152,6 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
               size="small"
               label="Web"
               variant="outlined"
-              sx={{
-                height: 24,
-                fontSize: '0.75rem',
-                borderRadius: RADIUS.pill,
-              }}
             />
           )}
           {compareMode && compareModelCount !== undefined && compareModelCount > 0 && (
@@ -175,14 +159,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
               size="small"
               label={`Compare ×${compareModelCount}`}
               variant="outlined"
-              sx={{
-                height: 24,
-                fontSize: '0.75rem',
-                borderRadius: RADIUS.pill,
-                background: ACCENT_GRADIENT,
-                color: 'white',
-                border: 'none',
-              }}
+              color="primary"
             />
           )}
         </Stack>

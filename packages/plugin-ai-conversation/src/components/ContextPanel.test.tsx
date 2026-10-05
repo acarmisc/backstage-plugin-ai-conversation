@@ -65,7 +65,7 @@ describe('ContextPanel', () => {
     renderContextPanel(citations);
 
     // The badge should show the number of citations
-    expect(screen.getByText('2')).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Sources (2)' })).toBeTruthy();
   });
 
   it('should dedupe citations with same filename in badge count', () => {
@@ -77,7 +77,7 @@ describe('ContextPanel', () => {
 
     // Should show 1 (deduped) not 2
     // Note: SourcesPanel handles deduping internally
-    expect(screen.getByText('2')).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Sources (2)' })).toBeTruthy();
   });
 
   it('should call onTabChange when clicking Usage tab', () => {

@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- The chat page now looks like the rest of Backstage: it is built from
+  standard MUI components and `@backstage/core-components` on your Backstage
+  theme, without custom gradients, pill buttons, rounded cards or shadows.
+  Code blocks use Backstage's `CodeSnippet`, Markdown tables and usage figures
+  use standard tables, and loading answers show skeleton lines.
+- The page no longer loads the JetBrains Mono webfont from Google Fonts; only
+  the KaTeX stylesheet (`cdn.jsdelivr.net`) is still needed in your Content
+  Security Policy.
+- New dependency: `@backstage/core-components`.
+
 ## 0.19.0 — 2026-10-05
 
 ### Changed

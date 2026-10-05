@@ -62,10 +62,10 @@ a web search tool ignore it.
 The page must be public `https`. Private and internal addresses, oversized
 responses and slow sites are refused; the chip shows the reason.
 
-## Code font or math look wrong
+## Math looks wrong
 
-Your Content Security Policy blocks `fonts.googleapis.com`,
-`fonts.gstatic.com` or `cdn.jsdelivr.net`. Allow them in `backend.csp`.
+Your Content Security Policy blocks `cdn.jsdelivr.net`, where the KaTeX
+stylesheet comes from. Allow it in `backend.csp`.
 
 ## Conversations don't follow me to another browser
 

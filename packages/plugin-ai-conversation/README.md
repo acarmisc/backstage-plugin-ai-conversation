@@ -37,9 +37,8 @@ const app = createApp({ features: [aiConversationPlugin] });
 `ChatPage`, `AnalyticsPage` and `AiConversationApi` are also exported for
 apps that wire pages themselves.
 
-The page loads the JetBrains Mono font and the KaTeX stylesheet from
-`fonts.googleapis.com` and `cdn.jsdelivr.net`; allow them in your Content
-Security Policy.
+The page loads the KaTeX stylesheet from `cdn.jsdelivr.net`; allow it in
+your Content Security Policy.
 
 ## Documentation
 

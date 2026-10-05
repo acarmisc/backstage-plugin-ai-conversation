@@ -9,11 +9,10 @@ import {
   DialogTitle,
   Divider,
   IconButton,
-  InputBase,
-  Link,
   List,
   ListItem,
   ListItemButton,
+  ListItemIcon,
   ListItemText,
   Menu,
   MenuItem,
@@ -33,10 +32,8 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import PushPinIcon from '@mui/icons-material/PushPin';
 import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
 import SearchIcon from '@mui/icons-material/Search';
-import AssignmentIcon from '@mui/icons-material/Assignment';
-import ChatIcon from '@mui/icons-material/Chat';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import { RADIUS, ACCENT_GRADIENT, surface } from '../theme';
+import StorageIcon from '@mui/icons-material/Storage';
+import BarChartIcon from '@mui/icons-material/BarChart';
 
 import { groupThreadsByDate, threadMatchesQuery } from '../utils/threadGroups';
 import type { ChatConfig, Thread } from '../types';
@@ -45,14 +42,24 @@ export const SIDEBAR_WIDTH = 272;
 export const SIDEBAR_RAIL_WIDTH = 56;
 
 
-export function getPersistenceTooltip(config: ChatConfig): string {
-  if (!config.persistence.enabled) {
-    return 'Stored in this browser';
-  }
+/** Short label for where conversations are kept. */
+export function getPersistenceLabel(config: ChatConfig): string {
+  if (!config.persistence.enabled) return 'Stored in this browser';
   if (config.persistence.ttlDays > 0) {
     return `Saved to your account · ${config.persistence.ttlDays} days`;
   }
   return 'Saved to your account';
+}
+
+/** Explains where conversations live, given the active persistence mode. */
+export function getPersistenceTooltip(config: ChatConfig): string {
+  if (!config.persistence.enabled) {
+    return 'Conversations are stored only in this browser and are lost if browser data is cleared.';
+  }
+  if (config.persistence.ttlDays > 0) {
+    return `Conversations are saved to your account and deleted after ${config.persistence.ttlDays} days of inactivity.`;
+  }
+  return 'Conversations are saved to your account and kept indefinitely.';
 }
 
 export interface ThreadSidebarProps {
@@ -171,23 +178,11 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
         }}
       >
         {/* Brand icon */}
-        <Box
-          sx={{
-            width: 28,
-            height: 28,
-            borderRadius: RADIUS.sm,
-            background: ACCENT_GRADIENT,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'white',
-            fontSize: 16,
-            cursor: 'pointer',
-          }}
-          onClick={onToggleCollapsed}
-        >
-          <ChatIcon sx={{ fontSize: 16 }} />
-        </Box>
+        <Tooltip title="Expand sidebar" placement="right">
+          <IconButton size="small" aria-label="Expand sidebar" onClick={onToggleCollapsed}>
+            <ChevronRightIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
 
         {/* New chat */}
         <Tooltip title="New chat (⌘⇧O)" placement="right">
@@ -237,23 +232,8 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
           flexShrink: 0,
         }}
       >
-        <Box
-          sx={{
-            width: 28,
-            height: 28,
-            borderRadius: RADIUS.sm,
-            background: ACCENT_GRADIENT,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'white',
-            flexShrink: 0,
-          }}
-        >
-          <ChatIcon sx={{ fontSize: 16 }} />
-        </Box>
-        <Typography variant="subtitle1" sx={{ fontWeight: 600, flex: 1 }}>
-          AI Chat
+        <Typography variant="h6" sx={{ flex: 1 }}>
+          Conversations
         </Typography>
         <Tooltip title="Collapse sidebar">
           <IconButton size="small" onClick={onToggleCollapsed}>
@@ -270,38 +250,29 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
           startIcon={<AddIcon />}
           onClick={onNewThread}
           size="small"
+          title="New chat (⌘⇧O)"
           sx={{
             textTransform: 'none',
-            fontWeight: 600,
-            borderRadius: RADIUS.md,
           }}
         >
           New chat
-          <Typography variant="caption" sx={{ ml: 'auto', opacity: 0.6, fontSize: '0.7rem' }}>
-            ⌘⇧O
-          </Typography>
         </Button>
       </Box>
 
       {/* Search */}
       <Box sx={{ px: 1.5, pb: 1, flexShrink: 0 }}>
-        <InputBase
+        <TextField
           inputRef={searchInputRef}
           fullWidth
-          placeholder="Search…"
+          size="small"
+          placeholder="Search conversations"
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
-          startAdornment={
-            <SearchIcon fontSize="small" sx={{ mr: 0.75, color: 'text.secondary' }} />
-          }
-          sx={{
-            border: 1,
-            borderColor: 'divider',
-            borderRadius: RADIUS.md,
-            px: 1,
-            py: 0.75,
-            fontSize: '0.85rem',
-            backgroundColor: surface(theme, 0),
+          variant="outlined"
+          InputProps={{
+            startAdornment: (
+              <SearchIcon fontSize="small" sx={{ mr: 0.75, color: 'text.secondary' }} />
+            ),
           }}
         />
       </Box>
@@ -364,7 +335,6 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                         selected={activeThreadId === thread.id}
                         onClick={() => onSelectThread(thread.id)}
                         sx={{
-                          borderRadius: RADIUS.sm,
                           py: 0.75,
                           px: 1,
                           width: '100%',
@@ -432,74 +402,43 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
       <Divider />
 
       {/* Footer */}
-      <Box sx={{ px: 1.5, py: 1.5, flexShrink: 0 }}>
-        {/* Import button */}
-        <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
-          <Tooltip title="Import thread">
-            <IconButton
-              size="small"
-              onClick={() => importInputRef.current?.click()}
-              sx={{ flex: 1 }}
-            >
-              <FileUploadIcon fontSize="small" sx={{ mr: 0.5 }} />
-              <Typography variant="caption">Import</Typography>
-            </IconButton>
-          </Tooltip>
-          <input
-            ref={importInputRef}
-            type="file"
-            accept="application/json"
-            hidden
-            onChange={onImportFile}
-          />
-        </Box>
-
+      <List dense disablePadding sx={{ flexShrink: 0, py: 0.5 }}>
+        <ListItemButton onClick={() => importInputRef.current?.click()}>
+          <ListItemIcon sx={{ minWidth: 36 }}>
+            <FileUploadIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText primary="Import conversation" />
+        </ListItemButton>
+        <input
+          ref={importInputRef}
+          type="file"
+          accept="application/json"
+          hidden
+          onChange={onImportFile}
+        />
         {importError && (
-          <Typography variant="caption" color="error" sx={{ display: 'block', mb: 1 }}>
-            {importError}
-          </Typography>
+          <ListItem>
+            <ListItemText primary={importError} primaryTypographyProps={{ color: 'error', variant: 'caption' }} />
+          </ListItem>
         )}
-
-        {/* Storage info */}
-        <Tooltip title={persistenceTooltip}>
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 0.75,
-              px: 1,
-              py: 0.75,
-              fontSize: '0.75rem',
-              color: theme.palette.text.secondary,
-              mb: 1,
-            }}
-          >
-            <AssignmentIcon fontSize="small" />
-            <Typography variant="caption">{persistenceTooltip}</Typography>
-          </Box>
+        <ListItemButton component="a" href="/ai-conversation/analytics">
+          <ListItemIcon sx={{ minWidth: 36 }}>
+            <BarChartIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText primary="Analytics" />
+        </ListItemButton>
+        <Tooltip title={persistenceTooltip} placement="right">
+          <ListItem>
+            <ListItemIcon sx={{ minWidth: 36 }}>
+              <StorageIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText
+              primary={getPersistenceLabel(config)}
+              primaryTypographyProps={{ variant: 'caption', color: 'text.secondary' }}
+            />
+          </ListItem>
         </Tooltip>
-
-        {/* Analytics link */}
-        <Link
-          href="/ai-conversation/analytics"
-          underline="none"
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 0.75,
-            px: 1,
-            py: 0.75,
-            fontSize: '0.75rem',
-            color: theme.palette.primary.main,
-            '&:hover': {
-              opacity: 0.8,
-            },
-          }}
-        >
-          <TrendingUpIcon fontSize="small" />
-          <Typography variant="caption">Analytics</Typography>
-        </Link>
-      </Box>
+      </List>
 
       {/* Thread menu */}
       <Menu anchorEl={menuAnchor} open={!!menuAnchor} onClose={handleCloseMenu}>

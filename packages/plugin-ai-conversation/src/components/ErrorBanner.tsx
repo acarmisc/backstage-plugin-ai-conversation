@@ -1,6 +1,5 @@
 import React from 'react';
 import { Alert, AlertTitle } from '@mui/material';
-import { RADIUS } from '../theme';
 
 export interface ErrorBannerProps {
   error?: string;
@@ -100,7 +99,6 @@ export const ErrorBanner: React.FC<ErrorBannerProps> = ({ error, onDismiss, seve
         onClose={onDismiss}
         sx={{
           mb: 2,
-          borderRadius: RADIUS.md,
           '& .MuiAlert-message': {
             width: '100%',
           },
@@ -120,7 +118,6 @@ export const ErrorBanner: React.FC<ErrorBannerProps> = ({ error, onDismiss, seve
       onClose={onDismiss}
       sx={{
         mb: 2,
-        borderRadius: RADIUS.md,
         '& .MuiAlert-message': {
           width: '100%',
         },

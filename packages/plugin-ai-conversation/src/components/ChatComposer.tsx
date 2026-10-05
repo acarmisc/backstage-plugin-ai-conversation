@@ -6,10 +6,10 @@ import {
   IconButton,
   InputBase,
   LinearProgress,
+  Paper,
   Stack,
   Tooltip,
   Typography,
-  useMediaQuery,
   useTheme,
 } from '@mui/material';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
@@ -21,7 +21,7 @@ import PsychologyIcon from '@mui/icons-material/Psychology';
 import StopIcon from '@mui/icons-material/Stop';
 import TuneIcon from '@mui/icons-material/Tune';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import SendIcon from '@mui/icons-material/Send';
 import type { FileUIPart } from 'ai';
 
 import { ComposerPill } from './ComposerPill';
@@ -30,7 +30,6 @@ import { ModelPicker } from './ModelPicker';
 import { VectorStorePicker } from './VectorStorePicker';
 import { SkillPicker } from './SkillPicker';
 import { SettingsDrawer } from './SettingsDrawer';
-import { RADIUS, ACCENT_GRADIENT, surface } from '../theme';
 import type { ChatConfig, ChatTeamInfo, ChatTraits, ReasoningEffort, Skill, UrlContextPreview } from '../types';
 
 export const ALLOWED_ATTACHMENT_MEDIA_TYPES = 'image/png,image/jpeg,image/webp,image/gif';
@@ -190,7 +189,6 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
   keySpend,
 }) => {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false);
 
   const showUrlChip = urlPreviewLoading || !!urlPreview || !!urlPreviewError;
@@ -259,21 +257,13 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
           py: 1.5,
         }}
       >
-        <Box
+        <Paper
+          variant="outlined"
           sx={{
-            borderRadius: RADIUS.lg,
-            border: 1,
-            borderColor: 'divider',
-            backgroundColor: surface(theme, 1),
-            boxShadow: '0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.06)',
             display: 'flex',
             flexDirection: 'column',
             gap: 1.5,
             p: 2,
-            transition: 'border-color 0.15s',
-            '&:focus-within': {
-              borderColor: theme.palette.primary.main,
-            },
           }}
         >
           {/* Textarea */}
@@ -285,15 +275,12 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
             fullWidth
             placeholder="Ask anything… (type #https://… to add a page)"
             value={input}
-            onChange={e => onInputChange(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => onInputChange(e.target.value)}
             onKeyDown={onKeyDown}
             inputProps={{
               'aria-label': 'Message',
             }}
-            sx={{
-              fontSize: '0.95rem',
-              lineHeight: 1.6,
-            }}
+            sx={{ typography: 'body1' }}
           />
 
           {/* Toolbar row: pills + attach + send */}
@@ -315,7 +302,6 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                     label="Team"
                     value={selectedTeam?.team_alias || 'No team'}
                     isError={isTeamMissing}
-                    size="small"
                   >
                     <TeamPicker
                       value={teamId}
@@ -334,7 +320,6 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                 icon={<AutoAwesomeIcon />}
                 label="Model"
                 value={model || 'Select'}
-                size="small"
               >
                 <ModelPicker
                   value={model}
@@ -350,7 +335,6 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                 icon={<MenuBookIcon />}
                 label="Knowledge"
                 value={kbCount > 0 ? `${kbCount}` : 'None'}
-                size="small"
               >
                 <VectorStorePicker
                   value={vectorStoreIds}
@@ -365,7 +349,6 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                 icon={<PsychologyIcon />}
                 label="Skill"
                 value={selectedSkill?.title || 'None'}
-                size="small"
               >
                 <SkillPicker
                   value={skillId}
@@ -377,22 +360,13 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
               {/* Tune button - opens settings drawer */}
               <Tooltip title="Conversation settings">
                 <Box sx={{ display: 'flex' }}>
-                  <Button
+                  <IconButton
                     aria-label="Conversation settings"
                     onClick={() => setSettingsDrawerOpen(true)}
                     size="small"
-                    variant="outlined"
-                    sx={{
-                      borderRadius: RADIUS.pill,
-                      minWidth: 32,
-                      width: isMobile ? 32 : 'auto',
-                      px: isMobile ? 0 : 1,
-                      textTransform: 'none',
-                      fontWeight: 500,
-                    }}
                   >
                     <TuneIcon fontSize="small" />
-                  </Button>
+                  </IconButton>
                 </Box>
               </Tooltip>
             </Stack>
@@ -420,22 +394,16 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
               {/* Send/Stop button */}
               {isStreaming ? (
                 <Tooltip title="Stop generation (Esc)">
-                  <IconButton
+                  <Button
                     aria-label="Stop generation"
                     onClick={onStop}
-                    sx={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: '50%',
-                      backgroundColor: theme.palette.error.main,
-                      color: 'white',
-                      '&:hover': {
-                        backgroundColor: theme.palette.error.dark,
-                      },
-                    }}
+                    size="small"
+                    variant="outlined"
+                    color="error"
+                    startIcon={<StopIcon />}
                   >
-                    <StopIcon fontSize="small" />
-                  </IconButton>
+                    Stop
+                  </Button>
                 </Tooltip>
               ) : (
                 <Tooltip title={input.trim() ? 'Send (Enter)' : 'Type a message first'}>
@@ -444,29 +412,16 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                       aria-label="Send message"
                       onClick={onSend}
                       disabled={!input.trim()}
-                      sx={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: '50%',
-                        background: input.trim() ? ACCENT_GRADIENT : undefined,
-                        color: 'white',
-                        '&:disabled': {
-                          backgroundColor: theme.palette.action.disabledBackground,
-                          color: theme.palette.action.disabled,
-                        },
-                        '&:hover:not(:disabled)': {
-                          opacity: 0.9,
-                        },
-                      }}
+                      color="primary"
                     >
-                      <ArrowUpwardIcon fontSize="small" />
+                      <SendIcon fontSize="small" />
                     </IconButton>
                   </span>
                 </Tooltip>
               )}
             </Stack>
           </Stack>
-        </Box>
+        </Paper>
 
         {/* Budget line + hints */}
         <Box
@@ -490,11 +445,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                 variant="determinate"
                 value={budgetPercent}
                 sx={{
-                  height: 4,
-                  borderRadius: '8px',
-                  backgroundColor: theme.palette.action.disabledBackground,
                   '& .MuiLinearProgress-bar': {
-                    borderRadius: '8px',
                     backgroundColor: budgetBarColor,
                   },
                 }}

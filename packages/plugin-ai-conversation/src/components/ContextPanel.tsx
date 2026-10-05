@@ -1,8 +1,7 @@
 import React from 'react';
-import { Box, Tab, Tabs, useTheme } from '@mui/material';
+import { Box, Tab, Tabs } from '@mui/material';
 import { SourcesPanel } from './SourcesPanel';
 import { UsagePanel } from './UsagePanel';
-import { RADIUS, surface, subtleBorder } from '../theme';
 import type { Citation, KeySpend, UsageInfo } from '../types';
 
 export interface ContextPanelProps {
@@ -26,7 +25,6 @@ export const ContextPanel: React.FC<ContextPanelProps> = ({
   tab,
   onTabChange,
 }) => {
-  const theme = useTheme();
   const citationCount = citations.length;
 
   return (
@@ -35,8 +33,8 @@ export const ContextPanel: React.FC<ContextPanelProps> = ({
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
-        bgcolor: surface(theme, 0),
-        borderLeft: subtleBorder(theme),
+        borderLeft: 1,
+        borderColor: 'divider',
       }}
     >
       {/* Tabs header */}
@@ -45,37 +43,16 @@ export const ContextPanel: React.FC<ContextPanelProps> = ({
         onChange={(_e, value) => onTabChange(value)}
         variant="fullWidth"
         sx={{
-          borderBottom: subtleBorder(theme),
+          borderBottom: 1,
+          borderColor: 'divider',
           '& .MuiTab-root': {
             textTransform: 'none',
-            fontSize: '0.875rem',
-            fontWeight: 500,
           },
         }}
       >
         <Tab
           label={
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              Sources
-              {citationCount > 0 && (
-                <Box
-                  sx={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    minWidth: 20,
-                    height: 20,
-                    bgcolor: 'primary.main',
-                    color: 'primary.contrastText',
-                    borderRadius: RADIUS.pill,
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                  }}
-                >
-                  {citationCount}
-                </Box>
-              )}
-            </Box>
+citationCount > 0 ? `Sources (${citationCount})` : 'Sources'
           }
           value="sources"
         />

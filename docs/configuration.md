@@ -60,10 +60,8 @@ litellm:
   it as a data-governance decision.
 - **Web search** is passed to LiteLLM as `web_search_options`. If no model
   in your proxy supports it, it does nothing.
-- **Content Security Policy**: the page loads the JetBrains Mono font from
-  `fonts.googleapis.com` / `fonts.gstatic.com` and the KaTeX stylesheet from
-  `cdn.jsdelivr.net`. Allow them, or math and code fall back to default
-  fonts.
+- **Content Security Policy**: the page loads the KaTeX stylesheet from
+  `cdn.jsdelivr.net`. Allow it, or LaTeX math renders unstyled.
 
 ## Database
 

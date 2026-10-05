@@ -25,13 +25,13 @@ export const BarList: React.FC<BarListProps> = ({ rows, emptyLabel = 'No data ye
           <Typography variant="body2" sx={{ width: 180, flexShrink: 0 }} noWrap title={row.key}>
             {row.key}
           </Typography>
-          <Box sx={{ flex: 1, bgcolor: 'action.hover', borderRadius: '4px', overflow: 'hidden', height: 18 }}>
+          <Box sx={{ flex: 1, bgcolor: 'action.hover', borderRadius: 1, overflow: 'hidden', height: 18 }}>
             <Box
               sx={{
                 width: `${(row.count / max) * 100}%`,
                 height: '100%',
                 bgcolor: 'primary.main',
-                borderRadius: '4px',
+                borderRadius: 1,
               }}
             />
           </Box>
