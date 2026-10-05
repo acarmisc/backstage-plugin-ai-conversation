@@ -54,6 +54,13 @@ import type {
 
 const THREAD_EXPORT_VERSION = 2 as const;
 
+/** Title for a new conversation: its first message, or the first
+ * attachment's name when the message is only images. */
+function threadTitleFor(text: string, files?: FileUIPart[]): string {
+  if (text.trim()) return text.slice(0, 40);
+  return (files?.[0]?.filename ?? 'Image').slice(0, 40);
+}
+
 function genId(): string {
   return `t_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -517,7 +524,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
       attachedUrl?: { url: string; title: string },
       files?: FileUIPart[],
     ) => {
-      if (!text.trim() || !activeThread || !keyToken) return;
+      if ((!text.trim() && !files?.length) || !activeThread || !keyToken) return;
 
       lastSendRef.current = {
         threadId: activeThread.id,
@@ -539,7 +546,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
           t.id === threadId
             ? {
                 ...t,
-                title: t.messages.length === 0 && !t.titleEdited ? text.slice(0, 40) : t.title,
+                title: t.messages.length === 0 && !t.titleEdited ? threadTitleFor(text, files) : t.title,
                 model,
                 vectorStoreIds,
                 customSystemPrompt,
@@ -563,7 +570,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
       chat.setMessages(baseMessages);
       chat
         .sendMessage(
-          { text, files, metadata: { attachedUrl } },
+          text ? { text, files, metadata: { attachedUrl } } : { files: files ?? [], metadata: { attachedUrl } },
           { body: attachedUrl ? { context_url: attachedUrl.url } : undefined },
         )
         .catch(() => {});
@@ -610,7 +617,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
       attachedUrl?: { url: string; title: string },
       files?: FileUIPart[],
     ) => {
-      if (!text.trim() || !activeThread || !keyToken || models.length === 0) return;
+      if ((!text.trim() && !files?.length) || !activeThread || !keyToken || models.length === 0) return;
 
       setError(null);
       setCitations([]);
@@ -620,7 +627,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
         id: genId(),
         role: 'user',
         metadata: { attachedUrl, turnId },
-        parts: [{ type: 'text', text }, ...(files ?? [])],
+        parts: [...(text ? [{ type: 'text' as const, text }] : []), ...(files ?? [])],
       };
       const threadId = activeThread.id;
 
@@ -632,7 +639,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
             ? {
                 ...t,
                 messages: [...baseMessages, userMsg],
-                title: t.messages.length === 0 ? text.slice(0, 40) : t.title,
+                title: t.messages.length === 0 ? threadTitleFor(text, files) : t.title,
                 vectorStoreIds,
                 customSystemPrompt,
                 toneId,
@@ -701,9 +708,9 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
         activeThread.mode === 'compare' && !!compareModels?.length && target.isCompareEligible;
 
       if (isCompare) {
-        runCompareSend(target.text, target.baseMessages, compareModels!);
+        runCompareSend(target.text, target.baseMessages, compareModels!, undefined, target.files);
       } else {
-        runSend(target.text, target.baseMessages);
+        runSend(target.text, target.baseMessages, undefined, target.files);
       }
     },
     [activeThread, runSend, runCompareSend],
@@ -716,9 +723,9 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
       const target = computeEditTarget(activeThread.messages, messageId);
       if (!target) return;
       if (activeThread.mode === 'compare' && activeThread.compareModels?.length) {
-        runCompareSend(newContent, target.baseMessages, activeThread.compareModels);
+        runCompareSend(newContent, target.baseMessages, activeThread.compareModels, undefined, target.files);
       } else {
-        runSend(newContent, target.baseMessages);
+        runSend(newContent, target.baseMessages, undefined, target.files);
       }
     },
     [activeThread, runSend, runCompareSend],

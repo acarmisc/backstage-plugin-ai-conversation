@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.20.1 — 2026-10-05
+
+### Fixed
+
+- Images were refused for models whose LiteLLM name has a provider or region
+  prefix (`openai/gpt-4o`, `bedrock/eu.anthropic.claude-…`,
+  `vertex_ai/gemini-…`) with "model … is not known to accept image
+  attachments". The name check now matches anywhere in the name and also
+  recognises Llama 3.2 Vision / Llama 4, Gemma 3, LLaVA, Pixtral, Qwen-VL and
+  Amazon Nova Lite/Pro/Premier. `multimodalModels` still overrides it.
+
 ## 0.20.0 — 2026-10-05
 
 No functional changes. Released to keep the version aligned with

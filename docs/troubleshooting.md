@@ -49,8 +49,17 @@ The picker shows the models the selected team can call, minus
 
 ## "model … is not known to accept image attachments"
 
-The model isn't in `multimodalModels` (or, without it, doesn't match the
-name heuristic). Add it to `litellm.aiConversation.multimodalModels`.
+The model isn't in `multimodalModels` (or, without it, its name doesn't
+contain a known vision model family such as `claude`, `gpt-4`, `gpt-5`,
+`gemini`, `-vl`, `vision`, `llava`, `pixtral` or `nova-pro`). Add it to
+`litellm.aiConversation.multimodalModels`; once that list is set, only the
+models in it accept images.
+
+## Images disappear after a reload
+
+By design: images are kept only while the page is open, so they don't fill
+the browser's storage or the server-side thread. Attach them again to ask
+about them in a later session.
 
 ## Web search does nothing
 

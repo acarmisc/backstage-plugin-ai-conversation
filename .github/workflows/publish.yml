@@ -180,15 +180,15 @@ jobs:
           URL: ${{ needs.resolve.outputs.url }}
           SPEC: ${{ needs.resolve.outputs.name }}@${{ needs.resolve.outputs.version }}
         run: |
-          # The registry can take a few minutes to serve a new version.
-          for i in $(seq 1 30); do
+          # The registry can take several minutes to serve a new version.
+          for i in $(seq 1 90); do
             if [ "$(curl -s -o /dev/null -w '%{http_code}' "$URL")" = 200 ]; then
               echo "$SPEC is live on npm"
               exit 0
             fi
             sleep 10
           done
-          echo "::error::$SPEC is not visible on npm after 5 minutes"
+          echo "::error::$SPEC is not visible on npm after 15 minutes"
           exit 1
 
       - name: Create GitHub Release

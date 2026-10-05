@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.20.1 — 2026-10-05
+
+### Fixed
+
+- Attaching images with the paperclip did nothing: the picked files were
+  discarded before they were read.
+- Pasting and dropping images on the composer now attach them, as the user
+  guide already described.
+- A message can be only images: Send is enabled once an image is staged, and
+  the conversation is titled after the first image.
+- Regenerate and edit-and-resend keep the message's images.
+- Images are no longer written to browser storage or to the server-side
+  thread. A few images exceeded the browser's storage quota, which silently
+  stopped every conversation from being saved, and the server's 1MB
+  per-thread cap. After a reload, earlier images show as file names and are
+  not sent again.
+
+### Changed
+
+- Staged images show a thumbnail inside the composer. Files that aren't PNG,
+  JPEG, WebP or GIF, or are larger than 4 MB, are refused with a message
+  instead of failing when sent.
+
 ## 0.20.0 — 2026-10-05
 
 ### Changed

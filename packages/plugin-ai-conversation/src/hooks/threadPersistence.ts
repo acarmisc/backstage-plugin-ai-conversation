@@ -46,8 +46,32 @@ export function migrateThreadMessages(messages: unknown): AiConversationUIMessag
  * sessions.
  */
 export function toSaveThreadBody(thread: Thread): SaveThreadBody {
-  const { keyToken: _keyToken, keyAlias: _keyAlias, ...data } = thread;
+  const { keyToken: _keyToken, keyAlias: _keyAlias, ...data } = stripAttachmentData(thread);
   return { title: thread.title, pinned: !!thread.pinned, data };
+}
+
+/**
+ * Drops the data of inline (data URL) attachments before a thread is
+ * stored. A few images exceed both the browser's localStorage quota (where
+ * a failed write would stop every conversation from being saved) and the
+ * server's 1MB per-thread cap. The part stays, with an empty url, so the
+ * conversation still shows that an image was sent; the transport leaves
+ * such parts out of later requests.
+ */
+export function stripAttachmentData(thread: Thread): Thread {
+  const hasInline = thread.messages.some(m =>
+    m.parts.some(p => p.type === 'file' && p.url.startsWith('data:')),
+  );
+  if (!hasInline) return thread;
+  return {
+    ...thread,
+    messages: thread.messages.map(m => ({
+      ...m,
+      parts: m.parts.map(p =>
+        p.type === 'file' && p.url.startsWith('data:') ? { ...p, url: '' } : p,
+      ),
+    })),
+  };
 }
 
 /**

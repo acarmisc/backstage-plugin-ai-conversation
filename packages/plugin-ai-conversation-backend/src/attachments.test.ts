@@ -45,8 +45,8 @@ describe('isLikelyMultimodal', () => {
       expect(isLikelyMultimodal('claude-3-5-sonnet', undefined)).toBe(true);
       expect(isLikelyMultimodal('Claude-2', undefined)).toBe(true);
       expect(isLikelyMultimodal('CLAUDE-100', undefined)).toBe(true);
-      // Note: 'claude' without a dash does not match /^claude-/i pattern
-      expect(isLikelyMultimodal('claude', undefined)).toBe(false);
+      // Note: with unanchored pattern, 'claude' (without dash) also matches
+      expect(isLikelyMultimodal('claude', undefined)).toBe(true);
     });
 
     it('matches gpt-4* case-insensitively', () => {
@@ -85,6 +85,43 @@ describe('isLikelyMultimodal', () => {
       expect(isLikelyMultimodal('gpt-3.5-turbo', undefined)).toBe(false);
       expect(isLikelyMultimodal('text-davinci-003', undefined)).toBe(false);
       expect(isLikelyMultimodal('llama-2', undefined)).toBe(false);
+    });
+
+    it('matches models with provider/region prefixes', () => {
+      // Claude models
+      expect(isLikelyMultimodal('anthropic/claude-sonnet-4', undefined)).toBe(true);
+      expect(isLikelyMultimodal('bedrock/eu.anthropic.claude-3-7-sonnet-20250219-v1:0', undefined)).toBe(true);
+
+      // GPT models
+      expect(isLikelyMultimodal('openai/gpt-4o', undefined)).toBe(true);
+      expect(isLikelyMultimodal('azure/gpt-4o-mini', undefined)).toBe(true);
+
+      // Gemini models
+      expect(isLikelyMultimodal('vertex_ai/gemini-2.5-pro', undefined)).toBe(true);
+
+      // Vision models
+      expect(isLikelyMultimodal('qwen2.5-vl-72b', undefined)).toBe(true);
+      expect(isLikelyMultimodal('llama-3.2-90b-vision', undefined)).toBe(true);
+    });
+
+    it('rejects non-multimodal models even with provider prefixes', () => {
+      expect(isLikelyMultimodal('gpt-3.5-turbo', undefined)).toBe(false);
+      expect(isLikelyMultimodal('text-embedding-3-large', undefined)).toBe(false);
+      expect(isLikelyMultimodal('mistral-large', undefined)).toBe(false);
+    });
+  });
+
+  describe('configured models override default patterns', () => {
+    it('uses exact case-insensitive match when configured list is provided', () => {
+      const configured = ['my-vision'];
+      expect(isLikelyMultimodal('MY-VISION', configured)).toBe(true);
+      expect(isLikelyMultimodal('openai/gpt-4o', configured)).toBe(false);
+    });
+
+    it('rejects provider-prefixed models when not in configured list', () => {
+      const configured = ['my-vision'];
+      expect(isLikelyMultimodal('openai/gpt-4o', configured)).toBe(false);
+      expect(isLikelyMultimodal('anthropic/claude-sonnet-4', configured)).toBe(false);
     });
   });
 });

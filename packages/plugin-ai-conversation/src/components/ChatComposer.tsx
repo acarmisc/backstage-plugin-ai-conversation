@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Avatar,
   Badge,
   Box,
   Button,
@@ -33,7 +34,7 @@ import { SkillPicker } from './SkillPicker';
 import { SettingsDrawer, hasCustomSettings } from './SettingsDrawer';
 import type { ChatConfig, ChatTeamInfo, ChatTraits, ReasoningEffort, Skill, UrlContextPreview } from '../types';
 
-export const ALLOWED_ATTACHMENT_MEDIA_TYPES = 'image/png,image/jpeg,image/webp,image/gif';
+import { ALLOWED_ATTACHMENT_MEDIA_TYPES } from '../hooks/useStagedFiles';
 
 export interface ChatComposerProps {
   input: string;
@@ -50,6 +51,8 @@ export interface ChatComposerProps {
   attachInputRef: React.RefObject<HTMLInputElement>;
   composerInputRef?: React.RefObject<HTMLTextAreaElement>;
   onAttachFiles: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  /** Pasted or dropped files. */
+  onAddFiles: (files: File[]) => void;
 
   urlPreview: UrlContextPreview | null;
   urlPreviewLoading: boolean;
@@ -155,6 +158,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
   attachInputRef,
   composerInputRef,
   onAttachFiles,
+  onAddFiles,
   urlPreview,
   urlPreviewLoading,
   urlPreviewError,
@@ -191,6 +195,38 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
 }) => {
   const theme = useTheme();
   const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const canSend = !!input.trim() || stagedFiles.length > 0;
+
+  const hasFiles = (dt: DataTransfer | null) => !!dt && Array.from(dt.types).includes('Files');
+
+  // Pasted images become attachments; pasted text keeps its default
+  // behaviour.
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const files = Array.from(e.clipboardData?.files ?? []);
+    if (!files.length) return;
+    e.preventDefault();
+    onAddFiles(files);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    if (!hasFiles(e.dataTransfer)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    setDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+    setDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    if (!hasFiles(e.dataTransfer)) return;
+    e.preventDefault();
+    setDragOver(false);
+    onAddFiles(Array.from(e.dataTransfer.files));
+  };
 
   const showUrlChip = urlPreviewLoading || !!urlPreview || !!urlPreviewError;
   const showAttachments = stagedFiles.length > 0 || !!attachError;
@@ -215,41 +251,6 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
 
   return (
     <>
-      {/* Staged files and URL preview chips */}
-      {(showUrlChip || showAttachments) && (
-        <Box sx={{ px: 2, pt: 1, display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-          {showUrlChip && (
-            <UrlPreviewChip
-              loading={urlPreviewLoading}
-              error={urlPreviewError}
-              preview={urlPreview}
-              onDismiss={onDismissUrlPreview}
-            />
-          )}
-          {stagedFiles.map((f, i) => (
-            <Chip
-              key={i}
-              size="small"
-              icon={<AttachFileIcon fontSize="small" />}
-              label={f.filename ?? f.mediaType}
-              variant="outlined"
-              onDelete={() => onRemoveStagedFile(i)}
-              deleteIcon={<CloseIcon fontSize="small" />}
-            />
-          ))}
-          {attachError && (
-            <Chip
-              size="small"
-              color="error"
-              label={attachError}
-              variant="outlined"
-              onDelete={onDismissAttachError}
-              deleteIcon={<CloseIcon fontSize="small" />}
-            />
-          )}
-        </Box>
-      )}
-
       {/* Main composer card */}
       <Box
         sx={{
@@ -260,13 +261,51 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
       >
         <Paper
           variant="outlined"
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
           sx={{
+            ...(dragOver ? { borderColor: 'primary.main' } : {}),
             display: 'flex',
             flexDirection: 'column',
             gap: 1.5,
             p: 2,
           }}
         >
+          {/* Staged images and URL preview chips */}
+          {(showUrlChip || showAttachments) && (
+            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+              {showUrlChip && (
+                <UrlPreviewChip
+                  loading={urlPreviewLoading}
+                  error={urlPreviewError}
+                  preview={urlPreview}
+                  onDismiss={onDismissUrlPreview}
+                />
+              )}
+              {stagedFiles.map((f, i) => (
+                <Chip
+                  key={i}
+                  size="small"
+                  avatar={<Avatar variant="rounded" src={f.url} alt="" />}
+                  label={f.filename ?? f.mediaType}
+                  variant="outlined"
+                  onDelete={() => onRemoveStagedFile(i)}
+                  deleteIcon={<CloseIcon fontSize="small" />}
+                />
+              ))}
+              {attachError && (
+                <Chip
+                  size="small"
+                  color="error"
+                  label={attachError}
+                  variant="outlined"
+                  onDelete={onDismissAttachError}
+                  deleteIcon={<CloseIcon fontSize="small" />}
+                />
+              )}
+            </Box>
+          )}
           {/* Textarea */}
           <InputBase
             inputRef={composerInputRef}
@@ -278,6 +317,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
             value={input}
             onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => onInputChange(e.target.value)}
             onKeyDown={onKeyDown}
+            onPaste={handlePaste}
             inputProps={{
               'aria-label': 'Message',
             }}
@@ -390,8 +430,9 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
             {/* Right: attach + send/stop */}
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
               {/* Attach button */}
-              <Tooltip title="Attach image">
+              <Tooltip title="Attach images (or paste / drop them)">
                 <IconButton
+                  aria-label="Attach images"
                   size="small"
                   onClick={() => attachInputRef.current?.click()}
                 >
@@ -401,7 +442,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
               <input
                 ref={attachInputRef}
                 type="file"
-                accept={ALLOWED_ATTACHMENT_MEDIA_TYPES}
+                accept={ALLOWED_ATTACHMENT_MEDIA_TYPES.join(',')}
                 multiple
                 hidden
                 onChange={onAttachFiles}
@@ -422,12 +463,12 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                   </Button>
                 </Tooltip>
               ) : (
-                <Tooltip title={input.trim() ? 'Send (Enter)' : 'Type a message first'}>
+                <Tooltip title={canSend ? 'Send (Enter)' : 'Type a message first'}>
                   <span>
                     <IconButton
                       aria-label="Send message"
                       onClick={onSend}
-                      disabled={!input.trim()}
+                      disabled={!canSend}
                       color="primary"
                     >
                       <SendIcon fontSize="small" />

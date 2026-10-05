@@ -43,8 +43,10 @@ The buttons under the message box change the next turn of this conversation:
 Other inputs:
 
 - **Images** — attach with the paperclip, paste from the clipboard or drop
-  them on the composer (PNG, JPEG, WebP or GIF, up to 4 per message), for
-  models that accept images.
+  them on the composer (PNG, JPEG, WebP or GIF, up to 4 MB each and 4 per
+  message), for models that accept images. A message can be only images.
+  Images are not stored with the conversation: after a reload they show as
+  file names and the model no longer sees them.
 - **Web pages** — type `#https://example.com/page` in your message: the page
   is fetched by the server and added as context for that message.
 - **Budget** — the line under the composer shows what the conversation's key
