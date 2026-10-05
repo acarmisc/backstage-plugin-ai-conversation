@@ -1,4 +1,4 @@
-import { fromPersisted, toSaveThreadBody, migrateThreadMessages } from './threadPersistence';
+import { fromPersisted, toSaveThreadBody, migrateThreadMessages, stripAttachmentData } from './threadPersistence';
 import type { PersistedThread, Thread, AiConversationUIMessage } from '../types';
 
 const newShapeMessages: AiConversationUIMessage[] = [
@@ -101,6 +101,117 @@ describe('migrateThreadMessages', () => {
   });
 });
 
+describe('stripAttachmentData', () => {
+  it('converts data: URL file parts to empty url', () => {
+    const thread = makeThread({
+      messages: [
+        {
+          id: 'm1',
+          role: 'user',
+          parts: [
+            { type: 'text', text: 'Check this image' },
+            { type: 'file', mediaType: 'image/png', filename: 'screenshot.png', url: 'data:image/png;base64,ABC123' },
+          ],
+        },
+      ],
+    });
+    const stripped = stripAttachmentData(thread);
+    const filePart = stripped.messages[0].parts.find(p => p.type === 'file');
+    expect(filePart).toBeDefined();
+    expect((filePart as any).url).toBe('');
+    expect((filePart as any).filename).toBe('screenshot.png');
+    expect((filePart as any).mediaType).toBe('image/png');
+  });
+
+  it('leaves https URL file parts untouched', () => {
+    const thread = makeThread({
+      messages: [
+        {
+          id: 'm1',
+          role: 'user',
+          parts: [
+            { type: 'file', mediaType: 'image/png', filename: 'remote.png', url: 'https://example.com/img.png' },
+          ],
+        },
+      ],
+    });
+    const stripped = stripAttachmentData(thread);
+    const filePart = stripped.messages[0].parts.find(p => p.type === 'file');
+    expect((filePart as any).url).toBe('https://example.com/img.png');
+  });
+
+  it('leaves text parts untouched', () => {
+    const thread = makeThread({
+      messages: [
+        {
+          id: 'm1',
+          role: 'user',
+          parts: [{ type: 'text', text: 'Hello world' }],
+        },
+      ],
+    });
+    const stripped = stripAttachmentData(thread);
+    expect(stripped).toBe(thread);
+  });
+
+  it('returns the same object when there are no inline files', () => {
+    const thread = makeThread({
+      messages: [
+        {
+          id: 'm1',
+          role: 'user',
+          parts: [
+            { type: 'text', text: 'Message' },
+            { type: 'file', mediaType: 'image/png', filename: 'remote.png', url: 'https://example.com/img.png' },
+          ],
+        },
+      ],
+    });
+    const stripped = stripAttachmentData(thread);
+    expect(stripped).toBe(thread);
+  });
+
+  it('handles multiple data: URL files in one message', () => {
+    const thread = makeThread({
+      messages: [
+        {
+          id: 'm1',
+          role: 'user',
+          parts: [
+            { type: 'file', mediaType: 'image/png', filename: 'a.png', url: 'data:image/png;base64,AAA' },
+            { type: 'file', mediaType: 'image/jpeg', filename: 'b.jpg', url: 'data:image/jpeg;base64,BBB' },
+          ],
+        },
+      ],
+    });
+    const stripped = stripAttachmentData(thread);
+    const fileParts = stripped.messages[0].parts.filter(p => p.type === 'file');
+    expect(fileParts).toHaveLength(2);
+    fileParts.forEach(fp => {
+      expect((fp as any).url).toBe('');
+    });
+  });
+
+  it('handles mixed inline and remote files', () => {
+    const thread = makeThread({
+      messages: [
+        {
+          id: 'm1',
+          role: 'user',
+          parts: [
+            { type: 'file', mediaType: 'image/png', filename: 'local.png', url: 'data:image/png;base64,LOCAL' },
+            { type: 'file', mediaType: 'image/png', filename: 'remote.png', url: 'https://example.com/remote.png' },
+          ],
+        },
+      ],
+    });
+    const stripped = stripAttachmentData(thread);
+    const fileParts = stripped.messages[0].parts.filter(p => p.type === 'file');
+    expect((fileParts[0] as any).url).toBe('');
+    expect((fileParts[1] as any).url).toBe('https://example.com/remote.png');
+  });
+});
+
 describe('toSaveThreadBody', () => {
   it('strips the live keyToken/keyAlias credential', () => {
     const body = toSaveThreadBody(makeThread());
@@ -131,6 +242,25 @@ describe('toSaveThreadBody', () => {
       vectorStoreIds: thread.vectorStoreIds,
       totalTokens: thread.totalTokens,
     });
+  });
+
+  it('strips inline attachment data before saving to storage', () => {
+    const thread = makeThread({
+      messages: [
+        {
+          id: 'm1',
+          role: 'user',
+          parts: [
+            { type: 'text', text: 'Look' },
+            { type: 'file', mediaType: 'image/png', filename: 'pic.png', url: 'data:image/png;base64,BIG' },
+          ],
+        },
+      ],
+    });
+    const body = toSaveThreadBody(thread);
+    const filePart = body.data.messages[0].parts.find(p => p.type === 'file');
+    expect((filePart as any).url).toBe('');
+    expect((filePart as any).filename).toBe('pic.png');
   });
 });
 
