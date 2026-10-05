@@ -6,52 +6,91 @@ name: Publish to npm
 #
 # The tag prefix selects which workspace package gets published, and its
 # version must match the version already committed in that package's
-# package.json.
+# package.json. The full CI (quality, cleanliness, security) runs first;
+# publishing only starts when every check passes.
+#
+# Requires the NPM_TOKEN repository secret (an npm granular access token
+# with read/write on the @acarmisc packages).
 
 on:
   push:
     tags:
-      - "ai-conversation@*"
-      - "ai-conversation-backend@*"
+      - 'ai-conversation@*'
+      - 'ai-conversation-backend@*'
+  # Manual fallback when a tag can't be pushed: run the workflow on the commit
+  # to release, passing the tag name (e.g. ai-conversation@0.1.0). The GitHub
+  # Release step then creates that tag on this commit.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to publish, e.g. ai-conversation@0.1.0'
+        required: true
+        type: string
+      release_only:
+        description: >-
+          Only create the tag and GitHub Release for a version that is
+          already on npm (recovery when publishing succeeded but the
+          release step did not).
+        required: false
+        default: false
+        type: boolean
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: publish-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
-  publish:
+  resolve:
+    name: Resolve release
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.pkg.outputs.tag }}
+      dir: ${{ steps.pkg.outputs.dir }}
+      workspace: ${{ steps.pkg.outputs.workspace }}
+      name: ${{ steps.pkg.outputs.name }}
+      version: ${{ steps.pkg.outputs.version }}
+      url: ${{ steps.pkg.outputs.url }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
         with:
-          node-version: "22"
+          fetch-depth: 0 # to check the commit is on main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
 
       - name: Enable Corepack
         run: corepack enable
 
       - name: Resolve package from tag
         id: pkg
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
-          TAG="${GITHUB_REF_NAME}"
+          TAG="${INPUT_TAG:-$GITHUB_REF_NAME}"
           case "$TAG" in
-            ai-conversation-backend@*)
-              echo "workspace=@acarmisc/backstage-plugin-ai-conversation-backend" >> "$GITHUB_OUTPUT"
-              echo "dir=packages/plugin-ai-conversation-backend" >> "$GITHUB_OUTPUT"
-              echo "version=${TAG#ai-conversation-backend@}" >> "$GITHUB_OUTPUT"
-              ;;
-            ai-conversation@*)
-              echo "workspace=@acarmisc/backstage-plugin-ai-conversation" >> "$GITHUB_OUTPUT"
-              echo "dir=packages/plugin-ai-conversation" >> "$GITHUB_OUTPUT"
-              echo "version=${TAG#ai-conversation@}" >> "$GITHUB_OUTPUT"
-              ;;
+            ai-conversation-backend@*) DIR=packages/plugin-ai-conversation-backend ;;
+            ai-conversation@*) DIR=packages/plugin-ai-conversation ;;
             *)
               echo "::error::Unrecognized tag pattern: $TAG"
               exit 1
               ;;
           esac
+          NAME=$(node -p "require('./$DIR/package.json').name")
+          {
+            echo "tag=$TAG"
+            echo "dir=$DIR"
+            echo "workspace=$NAME"
+            echo "version=${TAG#*@}"
+            echo "name=$NAME"
+            # Registry URL of this exact version: 200 when published, 404
+            # when not. Queried with curl, not `yarn npm view`: no need to configure
+            # registry auth.
+            echo "url=https://registry.npmjs.org/${NAME/\//%2F}/${TAG#*@}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Verify tag version matches package.json
         run: |
@@ -62,21 +101,100 @@ jobs:
             exit 1
           fi
 
+      - name: Verify the commit is on main
+        # Releases come from reviewed code only, never from a side branch.
+        run: |
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$GITHUB_SHA is not on main; merge the release first."
+            exit 1
+          fi
+
+      - name: Verify the version is not published yet (or is, for release_only)
+        env:
+          URL: ${{ steps.pkg.outputs.url }}
+          SPEC: ${{ steps.pkg.outputs.name }}@${{ steps.pkg.outputs.version }}
+          RELEASE_ONLY: ${{ inputs.release_only || false }}
+        run: |
+          status=$(curl -s -o /dev/null -w '%{http_code}' "$URL")
+          case "$RELEASE_ONLY:$status" in
+            false:404|true:200) echo "$SPEC: registry answered $status" ;;
+            false:200) echo "::error::$SPEC is already on npm; bump the version."; exit 1 ;;
+            true:404) echo "::error::$SPEC is not on npm; release_only needs a published version."; exit 1 ;;
+            *) echo "::error::Unexpected registry answer $status for $SPEC"; exit 1 ;;
+          esac
+
+  checks:
+    name: CI
+    needs: resolve
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+      pull-requests: write
+
+  publish:
+    name: Publish ${{ needs.resolve.outputs.tag }}
+    needs: [resolve, checks]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # GitHub Release + tag
+      id-token: write # npm provenance
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Enable Corepack
+        run: corepack enable
+
       - name: Install dependencies
+        if: ${{ !inputs.release_only }}
         run: yarn install --immutable
 
       - name: Build
-        run: yarn workspace "${{ steps.pkg.outputs.workspace }}" build
+        if: ${{ !inputs.release_only }}
+        run: yarn workspace "${{ needs.resolve.outputs.workspace }}" build
+
+      - name: Check package contents
+        if: ${{ !inputs.release_only }}
+        run: node scripts/check-packages.mjs "${{ needs.resolve.outputs.dir }}"
 
       - name: Publish to npm
-        working-directory: ${{ steps.pkg.outputs.dir }}
-        run: yarn npm publish --access public
+        if: ${{ !inputs.release_only }}
+        working-directory: ${{ needs.resolve.outputs.dir }}
+        # npm (not yarn) for --provenance, like the sibling plugins. The
+        # packages have no workspace: dependencies, so npm can publish them
+        # as they are. --ignore-scripts: dist/ was built above, and the
+        # tarball checked in the previous step is exactly what is published.
+        run: npm publish --access public --provenance --ignore-scripts
         env:
-          YARN_NPM_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Verify the release on npm
+        env:
+          URL: ${{ needs.resolve.outputs.url }}
+          SPEC: ${{ needs.resolve.outputs.name }}@${{ needs.resolve.outputs.version }}
+        run: |
+          # The registry can take a few minutes to serve a new version.
+          for i in $(seq 1 30); do
+            if [ "$(curl -s -o /dev/null -w '%{http_code}' "$URL")" = 200 ]; then
+              echo "$SPEC is live on npm"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::$SPEC is not visible on npm after 5 minutes"
+          exit 1
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
+          tag_name: ${{ needs.resolve.outputs.tag }}
+          name: ${{ needs.resolve.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           generate_release_notes: true

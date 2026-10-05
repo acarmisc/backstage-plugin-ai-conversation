@@ -1,0 +1,61 @@
+name: Snyk
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  snyk:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      # Fork PRs and repos without the secret don't get a token: skip, don't fail.
+      - name: Warn if SNYK_TOKEN is missing
+        if: ${{ env.SNYK_TOKEN == '' }}
+        run: echo "::warning::SNYK_TOKEN is not set; skipping the Snyk scan."
+
+      - name: Install Snyk CLI
+        if: ${{ env.SNYK_TOKEN != '' }}
+        run: npm install -g snyk@1
+
+      # Findings go to the Security tab instead of failing the build: several
+      # are transitive inside @backstage/* with no upstream fix (the blocking
+      # gate on critical advisories is the audit step in ci.yml).
+      - name: Snyk open source scan
+        if: ${{ env.SNYK_TOKEN != '' }}
+        run: snyk test --all-projects --severity-threshold=high --sarif-file-output=snyk-oss.sarif
+        continue-on-error: true
+
+      - name: Snyk code scan
+        if: ${{ env.SNYK_TOKEN != '' }}
+        run: snyk code test --sarif-file-output=snyk-code.sarif
+        continue-on-error: true
+
+      - name: Upload Snyk results to code scanning
+        if: ${{ env.SNYK_TOKEN != '' && hashFiles('snyk-*.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: .

@@ -1,0 +1,20 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: backstage-plugin-ai-conversation-backend
+  title: AI Conversation backend
+  description: Backend of the AI Conversation plugin: chat keys, streaming proxy, retrieval and threads.
+  annotations:
+    github.com/project-slug: acarmisc/backstage-plugin-ai-conversation
+  tags:
+    - backstage-plugin
+    - ai
+    - litellm
+  links:
+    - url: https://www.npmjs.com/package/@acarmisc/backstage-plugin-ai-conversation-backend
+      title: npm
+spec:
+  type: backstage-backend-plugin
+  lifecycle: experimental
+  owner: user:acarmisc
+  system: backstage-plugin-ai-conversation

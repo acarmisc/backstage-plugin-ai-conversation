@@ -10,6 +10,7 @@ import { migrateThreadMessages } from './threadPersistence';
 import { useThreadPersistence, loadThreads } from './useThreadPersistence';
 import { createAiConversationTransport, type ChatRequestSettings } from './aiSdkTransport';
 import { extractText } from './messageShape';
+import { threadToMarkdown, downloadFile } from '../utils/threadMarkdown';
 import { useCompareChat } from './useCompareChat';
 import type {
   Thread,
@@ -135,7 +136,9 @@ export interface UseChatResult {
   clearError: () => void;
   submitFeedback: (messageId: string, vote: 'up' | 'down') => void;
   togglePin: (id: string) => void;
+  renameThread: (id: string, title: string) => void;
   exportThread: (id: string) => void;
+  exportThreadMarkdown: (id: string) => void;
   importThread: (file: File) => Promise<void>;
   setCompareMode: (enabled: boolean, models?: string[]) => void;
   isStreaming: boolean;
@@ -536,7 +539,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
           t.id === threadId
             ? {
                 ...t,
-                title: t.messages.length === 0 ? text.slice(0, 40) : t.title,
+                title: t.messages.length === 0 && !t.titleEdited ? text.slice(0, 40) : t.title,
                 model,
                 vectorStoreIds,
                 customSystemPrompt,
@@ -754,21 +757,43 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
     [threads, persistenceEnabled, api],
   );
 
+  const renameThread = useCallback(
+    (id: string, title: string) => {
+      const current = threads.find(t => t.id === id);
+      if (!current) return;
+      // Trim whitespace, ignore empty titles, cap at 120 characters
+      const trimmed = title.trim().slice(0, 120);
+      if (!trimmed) return;
+      const next = { ...current, title: trimmed, titleEdited: true, updatedAt: Date.now() };
+      setThreads(prev => prev.map(t => (t.id === id ? next : t)));
+      // Save immediately to server when persistence is enabled, same pattern as togglePin
+      if (persistenceEnabled) api.saveThread(next).catch(() => {});
+    },
+    [threads, persistenceEnabled, api],
+  );
+
   const exportThread = useCallback(
     (id: string) => {
       const thread = threads.find(t => t.id === id);
       if (!thread) return;
       const { keyToken: _keyToken, keyAlias: _keyAlias, ...portable } = thread;
       const payload: ThreadExport = { version: THREAD_EXPORT_VERSION, thread: portable };
-      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${thread.title.replace(/[^\w-]+/g, '_').slice(0, 60) || 'thread'}.json`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      downloadFile(
+        `${thread.title.replace(/[^\w-]+/g, '_').slice(0, 60) || 'thread'}.json`,
+        'application/json',
+        JSON.stringify(payload, null, 2),
+      );
+    },
+    [threads],
+  );
+
+  const exportThreadMarkdown = useCallback(
+    (id: string) => {
+      const thread = threads.find(t => t.id === id);
+      if (!thread) return;
+      const content = threadToMarkdown(thread);
+      const filename = `${thread.title.replace(/[^\w-]+/g, '_').slice(0, 60) || 'thread'}.md`;
+      downloadFile(filename, 'text/markdown', content);
     },
     [threads],
   );
@@ -871,7 +896,9 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
     clearError,
     submitFeedback,
     togglePin,
+    renameThread,
     exportThread,
+    exportThreadMarkdown,
     importThread,
     setCompareMode,
     isStreaming,

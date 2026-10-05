@@ -196,7 +196,7 @@ describe('fromPersisted', () => {
       data: body.data,
     };
     const restored = fromPersisted(persisted);
-    expect(restored).toEqual({ ...original, keyToken: '', keyAlias: '' });
+    expect(restored).toEqual({ ...original, keyToken: '', keyAlias: '', titleEdited: false });
   });
 
   it('survives a null data payload (corrupt DB row) instead of crashing', () => {

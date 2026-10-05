@@ -76,6 +76,7 @@ export function fromPersisted(persisted: PersistedThread): Thread {
     id: typeof raw.id === 'string' ? raw.id : persisted.id,
     title: typeof raw.title === 'string' && raw.title ? raw.title : persisted.title,
     pinned: typeof raw.pinned === 'boolean' ? raw.pinned : persisted.pinned,
+    titleEdited: typeof raw.titleEdited === 'boolean' ? raw.titleEdited : false,
     messages: migrateThreadMessages(raw.messages),
     model: typeof raw.model === 'string' ? raw.model : '',
     vectorStoreIds: Array.isArray(raw.vectorStoreIds) ? raw.vectorStoreIds : [],

@@ -1,0 +1,20 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: backstage-plugin-ai-conversation
+  title: AI Conversation
+  description: Frontend of the AI Conversation plugin: the /ai-conversation chat page.
+  annotations:
+    github.com/project-slug: acarmisc/backstage-plugin-ai-conversation
+  tags:
+    - backstage-plugin
+    - ai
+    - litellm
+  links:
+    - url: https://www.npmjs.com/package/@acarmisc/backstage-plugin-ai-conversation
+      title: npm
+spec:
+  type: backstage-frontend-plugin
+  lifecycle: experimental
+  owner: user:acarmisc
+  system: backstage-plugin-ai-conversation

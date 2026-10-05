@@ -2,66 +2,57 @@ import React, { useMemo, useState } from 'react';
 import {
   Box,
   Button,
-  Collapse,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   Divider,
   IconButton,
   InputBase,
+  Link,
   List,
   ListItem,
   ListItemButton,
-  ListItemIcon,
   ListItemText,
   Menu,
   MenuItem,
+  TextField,
   Tooltip,
   Typography,
+  useTheme,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import DeleteIcon from '@mui/icons-material/Delete';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import EditIcon from '@mui/icons-material/Edit';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
-import HistoryIcon from '@mui/icons-material/History';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import PushPinIcon from '@mui/icons-material/PushPin';
 import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
 import SearchIcon from '@mui/icons-material/Search';
-import SettingsIcon from '@mui/icons-material/Settings';
-import { extractText } from '../hooks/messageShape';
-import { ChatSettingsPanel } from './ChatSettingsPanel';
+import AssignmentIcon from '@mui/icons-material/Assignment';
+import ChatIcon from '@mui/icons-material/Chat';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import { RADIUS, ACCENT_GRADIENT, surface } from '../theme';
 
-import type { ChatConfig, ChatTeamInfo, ChatTraits, ReasoningEffort, Skill, Thread } from '../types';
+import { groupThreadsByDate, threadMatchesQuery } from '../utils/threadGroups';
+import type { ChatConfig, Thread } from '../types';
 
-export const SIDEBAR_WIDTH = 280;
-export const SIDEBAR_RAIL_WIDTH = 48;
+export const SIDEBAR_WIDTH = 272;
+export const SIDEBAR_RAIL_WIDTH = 56;
 
-/** Pinned first, then most-recently-updated. Shared with nothing else —
- * kept here since the sidebar is its only consumer. */
-export function sortThreads(threads: Thread[]): Thread[] {
-  return [...threads].sort((a, b) => {
-    if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
-    return b.updatedAt - a.updatedAt;
-  });
-}
 
-function threadMatchesQuery(thread: Thread, query: string): boolean {
-  const q = query.trim().toLowerCase();
-  if (!q) return true;
-  if (thread.title.toLowerCase().includes(q)) return true;
-  return thread.messages.some(m => extractText(m).toLowerCase().includes(q));
-}
-
-/** Explains where threads actually live, given the active persistence mode. */
 export function getPersistenceTooltip(config: ChatConfig): string {
   if (!config.persistence.enabled) {
-    return 'Threads are stored only in this browser (localStorage) and are lost if browser data is cleared.';
+    return 'Stored in this browser';
   }
   if (config.persistence.ttlDays > 0) {
-    return `Threads are saved to your account and auto-deleted after ${config.persistence.ttlDays} days of inactivity.`;
+    return `Saved to your account · ${config.persistence.ttlDays} days`;
   }
-  return 'Threads are saved to your account and kept indefinitely.';
+  return 'Saved to your account';
 }
 
 export interface ThreadSidebarProps {
@@ -69,383 +60,512 @@ export interface ThreadSidebarProps {
   onToggleCollapsed: () => void;
 
   config: ChatConfig;
-  configError: string | null;
-  traits: ChatTraits;
-  traitsLoading: boolean;
-  skills: Skill[];
-  skillId: string;
-  onSkillChange: (id: string) => void;
-  toneId: string;
-  onToneChange: (id: string) => void;
-  focusId: string;
-  onFocusChange: (id: string) => void;
-  verbosityId: string;
-  onVerbosityChange: (id: string) => void;
-  customSystemPrompt: string;
-  onCustomSystemPromptChange: (value: string) => void;
-  teams: ChatTeamInfo[];
-  teamsLoading: boolean;
-  teamsError: string | null;
-  teamId: string;
-  onTeamChange: (teamId: string) => void;
-  teamModels?: string[] | null;
-  model: string;
-  onModelChange: (model: string) => void;
-  vectorStoreIds: string[];
-  onVectorStoreIdsChange: (ids: string[]) => void;
-  teamVectorStores?: string[] | null;
-  webSearch: boolean;
-  onWebSearchChange: (enabled: boolean) => void;
-  reasoningEffort: ReasoningEffort | '';
-  onReasoningEffortChange: (value: ReasoningEffort | '') => void;
-
   threads: Thread[];
   activeThreadId: string | null;
   onNewThread: () => void;
   onSelectThread: (id: string) => void;
   onDeleteThread: (id: string) => void;
   onTogglePin: (id: string) => void;
+  onRenameThread?: (id: string, title: string) => void;
   onExportThread: (id: string) => void;
+  onExportMarkdown?: (id: string) => void;
   onImportFile: (e: React.ChangeEvent<HTMLInputElement>) => void;
   importError: string | null;
+  searchInputRef?: React.RefObject<HTMLInputElement>;
 }
 
 /**
- * Left rail: collapsible settings panel, the new/import actions, and the
- * searchable thread history. Purely presentational — all thread and settings
- * state is owned by ChatPage.
+ * Left sidebar: brand, new chat, search, thread history (grouped by date),
+ * and footer (import, storage info, analytics).
  */
 export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   collapsed,
   onToggleCollapsed,
   config,
-  configError,
-  traits,
-  traitsLoading,
-  skills,
-  skillId,
-  onSkillChange,
-  toneId,
-  onToneChange,
-  focusId,
-  onFocusChange,
-  verbosityId,
-  onVerbosityChange,
-  customSystemPrompt,
-  onCustomSystemPromptChange,
-  teams,
-  teamsLoading,
-  teamsError,
-  teamId,
-  onTeamChange,
-  teamModels,
-  model,
-  onModelChange,
-  vectorStoreIds,
-  onVectorStoreIdsChange,
-  teamVectorStores,
-  webSearch,
-  onWebSearchChange,
-  reasoningEffort,
-  onReasoningEffortChange,
   threads,
   activeThreadId,
   onNewThread,
   onSelectThread,
   onDeleteThread,
   onTogglePin,
+  onRenameThread,
   onExportThread,
+  onExportMarkdown,
   onImportFile,
   importError,
+  searchInputRef,
 }) => {
-  const [showSettings, setShowSettings] = useState(true);
-  const [historyOpen, setHistoryOpen] = useState(false);
+  const theme = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [menuTarget, setMenuTarget] = useState<string | null>(null);
+  const [renamingThreadId, setRenamingThreadId] = useState<string | null>(null);
+  const [renamingValue, setRenamingValue] = useState('');
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const importInputRef = React.useRef<HTMLInputElement>(null);
 
   const visibleThreads = useMemo(
-    () => sortThreads(threads.filter(t => threadMatchesQuery(t, searchQuery))),
+    () => threads.filter(t => threadMatchesQuery(t, searchQuery)),
     [threads, searchQuery],
   );
 
-  const openMenu = (e: React.MouseEvent<HTMLElement>, threadId: string) => {
+  const groupedThreads = useMemo(() => groupThreadsByDate(visibleThreads), [visibleThreads]);
+
+  const menuThread = threads.find(t => t.id === menuTarget) ?? null;
+  const persistenceTooltip = getPersistenceTooltip(config);
+
+  const handleOpenMenu = (e: React.MouseEvent<HTMLElement>, threadId: string) => {
     e.stopPropagation();
     setMenuAnchor(e.currentTarget);
     setMenuTarget(threadId);
   };
-  const closeMenu = () => {
+
+  const handleCloseMenu = () => {
     setMenuAnchor(null);
     setMenuTarget(null);
   };
 
-  const menuThread = threads.find(t => t.id === menuTarget) ?? null;
+  const handleStartRename = (threadId: string, currentTitle: string) => {
+    setRenamingThreadId(threadId);
+    setRenamingValue(currentTitle);
+    handleCloseMenu();
+  };
 
-  const persistenceTooltip = getPersistenceTooltip(config);
+  const handleSaveRename = () => {
+    if (renamingValue.trim() && onRenameThread) {
+      onRenameThread(renamingThreadId!, renamingValue.trim());
+    }
+    setRenamingThreadId(null);
+  };
 
+  const handleCancelRename = () => {
+    setRenamingThreadId(null);
+  };
+
+  const handleDeleteClick = (threadId: string) => {
+    setDeleteConfirmId(threadId);
+    handleCloseMenu();
+  };
+
+  const handleConfirmDelete = () => {
+    if (deleteConfirmId) {
+      onDeleteThread(deleteConfirmId);
+    }
+    setDeleteConfirmId(null);
+  };
+
+  if (collapsed) {
+    // Icon rail
+    return (
+      <Box
+        sx={{
+          width: SIDEBAR_RAIL_WIDTH,
+          flexShrink: 0,
+          borderRight: 1,
+          borderColor: 'divider',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          py: 1,
+          gap: 1,
+        }}
+      >
+        {/* Brand icon */}
+        <Box
+          sx={{
+            width: 28,
+            height: 28,
+            borderRadius: RADIUS.sm,
+            background: ACCENT_GRADIENT,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'white',
+            fontSize: 16,
+            cursor: 'pointer',
+          }}
+          onClick={onToggleCollapsed}
+        >
+          <ChatIcon sx={{ fontSize: 16 }} />
+        </Box>
+
+        {/* New chat */}
+        <Tooltip title="New chat (⌘⇧O)" placement="right">
+          <IconButton onClick={onNewThread} size="small">
+            <AddIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+
+        {/* Search (expands) */}
+        <Tooltip title="Search (⌘K)" placement="right">
+          <IconButton onClick={onToggleCollapsed} size="small">
+            <SearchIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+
+        {/* Expand button */}
+        <Tooltip title="Expand" placement="right">
+          <IconButton onClick={onToggleCollapsed} size="small">
+            <ChevronRightIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      </Box>
+    );
+  }
+
+  // Full sidebar
   return (
     <Box
       sx={{
-        width: collapsed ? SIDEBAR_RAIL_WIDTH : SIDEBAR_WIDTH,
+        width: SIDEBAR_WIDTH,
         flexShrink: 0,
         borderRight: 1,
         borderColor: 'divider',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        transition: 'width 0.15s',
       }}
     >
+      {/* Brand row */}
       <Box
         sx={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: collapsed ? 'center' : 'flex-end',
-          px: 0.5,
-          py: 0.5,
+          px: 1.5,
+          py: 1,
+          gap: 1,
+          flexShrink: 0,
         }}
       >
-        <Tooltip title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+        <Box
+          sx={{
+            width: 28,
+            height: 28,
+            borderRadius: RADIUS.sm,
+            background: ACCENT_GRADIENT,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'white',
+            flexShrink: 0,
+          }}
+        >
+          <ChatIcon sx={{ fontSize: 16 }} />
+        </Box>
+        <Typography variant="subtitle1" sx={{ fontWeight: 600, flex: 1 }}>
+          AI Chat
+        </Typography>
+        <Tooltip title="Collapse sidebar">
           <IconButton size="small" onClick={onToggleCollapsed}>
-            {collapsed ? (
-              <ChevronRightIcon fontSize="small" />
-            ) : (
-              <ChevronLeftIcon fontSize="small" />
-            )}
+            <ChevronLeftIcon fontSize="small" />
           </IconButton>
         </Tooltip>
       </Box>
 
-      {collapsed ? (
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, pt: 1 }}>
-          <Tooltip title="New chat" placement="right">
-            <IconButton onClick={onNewThread}>
-              <AddIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Settings" placement="right">
-            <IconButton onClick={onToggleCollapsed}>
-              <SettingsIcon />
-            </IconButton>
-          </Tooltip>
-        </Box>
-      ) : (
-        <>
-          <ChatSettingsPanel
-            showSettings={showSettings}
-            onToggleShowSettings={() => setShowSettings(v => !v)}
-            configError={configError}
-            config={config}
-            traits={traits}
-            traitsLoading={traitsLoading}
-            skills={skills}
-            skillId={skillId}
-            onSkillChange={onSkillChange}
-            toneId={toneId}
-            onToneChange={onToneChange}
-            focusId={focusId}
-            onFocusChange={onFocusChange}
-            customSystemPrompt={customSystemPrompt}
-            onCustomSystemPromptChange={onCustomSystemPromptChange}
-            teams={teams}
-            teamsLoading={teamsLoading}
-            teamsError={teamsError}
-            teamId={teamId}
-            onTeamChange={onTeamChange}
-            teamModels={teamModels}
-            model={model}
-            onModelChange={onModelChange}
-            vectorStoreIds={vectorStoreIds}
-            onVectorStoreIdsChange={onVectorStoreIdsChange}
-            teamVectorStores={teamVectorStores}
-            webSearch={webSearch}
-            onWebSearchChange={onWebSearchChange}
-            verbosityId={verbosityId}
-            onVerbosityChange={onVerbosityChange}
-            reasoningEffort={reasoningEffort}
-            onReasoningEffortChange={onReasoningEffortChange}
-          />
+      {/* New chat button */}
+      <Box sx={{ px: 1.5, py: 1, flexShrink: 0 }}>
+        <Button
+          fullWidth
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={onNewThread}
+          size="small"
+          sx={{
+            textTransform: 'none',
+            fontWeight: 600,
+            borderRadius: RADIUS.md,
+          }}
+        >
+          New chat
+          <Typography variant="caption" sx={{ ml: 'auto', opacity: 0.6, fontSize: '0.7rem' }}>
+            ⌘⇧O
+          </Typography>
+        </Button>
+      </Box>
 
-          <Divider />
+      {/* Search */}
+      <Box sx={{ px: 1.5, pb: 1, flexShrink: 0 }}>
+        <InputBase
+          inputRef={searchInputRef}
+          fullWidth
+          placeholder="Search…"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          startAdornment={
+            <SearchIcon fontSize="small" sx={{ mr: 0.75, color: 'text.secondary' }} />
+          }
+          sx={{
+            border: 1,
+            borderColor: 'divider',
+            borderRadius: RADIUS.md,
+            px: 1,
+            py: 0.75,
+            fontSize: '0.85rem',
+            backgroundColor: surface(theme, 0),
+          }}
+        />
+      </Box>
 
-          <Box sx={{ p: 1.5, display: 'flex', gap: 1 }}>
-            <Button
-              fullWidth
-              variant="outlined"
-              startIcon={<AddIcon />}
-              onClick={onNewThread}
-              size="small"
-            >
-              New chat
-            </Button>
-            <Tooltip title="Import thread">
-              <IconButton size="small" onClick={() => importInputRef.current?.click()}>
-                <FileUploadIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-            <input
-              ref={importInputRef}
-              type="file"
-              accept="application/json"
-              hidden
-              onChange={onImportFile}
-            />
-          </Box>
-          {importError && (
-            <Box sx={{ px: 1.5, pb: 1 }}>
-              <Typography variant="caption" color="error">
-                {importError}
+      {/* Thread history - always visible, scrollable */}
+      <Box sx={{ flex: 1, overflowY: 'auto', minHeight: 0, px: 1 }}>
+        {groupedThreads.length > 0 ? (
+          groupedThreads.map(group => (
+            <Box key={group.label} sx={{ mb: 2 }}>
+              {/* Group label */}
+              <Typography
+                variant="caption"
+                sx={{
+                  display: 'block',
+                  px: 1,
+                  py: 1,
+                  color: theme.palette.text.secondary,
+                  fontWeight: 500,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.06,
+                  fontSize: '0.65rem',
+                }}
+              >
+                {group.label}
               </Typography>
-            </Box>
-          )}
 
+              {/* Threads in group */}
+              <List dense sx={{ p: 0 }}>
+                {group.threads.map(thread => (
+                  <ListItem
+                    key={thread.id}
+                    disablePadding
+                    sx={{
+                      mb: 0.5,
+                      '&:hover .thread-menu-button': {
+                        opacity: 1,
+                      },
+                    }}
+                  >
+                    {renamingThreadId === thread.id ? (
+                      // Inline rename input
+                      <Box sx={{ width: '100%', px: 1, py: 0.5 }}>
+                        <TextField
+                          // Shown only after an explicit rename action, so focus belongs here.
+                          // eslint-disable-next-line jsx-a11y/no-autofocus
+                          autoFocus
+                          fullWidth
+                          size="small"
+                          value={renamingValue}
+                          onChange={e => setRenamingValue(e.target.value)}
+                          onBlur={handleSaveRename}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') handleSaveRename();
+                            if (e.key === 'Escape') handleCancelRename();
+                          }}
+                        />
+                      </Box>
+                    ) : (
+                      <ListItemButton
+                        selected={activeThreadId === thread.id}
+                        onClick={() => onSelectThread(thread.id)}
+                        sx={{
+                          borderRadius: RADIUS.sm,
+                          py: 0.75,
+                          px: 1,
+                          width: '100%',
+                          position: 'relative',
+                        }}
+                      >
+                        <ListItemText
+                          primary={
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                              {thread.pinned && (
+                                <PushPinIcon
+                                  fontSize="small"
+                                  sx={{ color: 'text.secondary', flexShrink: 0 }}
+                                />
+                              )}
+                              <Typography
+                                variant="body2"
+                                noWrap
+                                sx={{
+                                  flex: 1,
+                                }}
+                              >
+                                {thread.title}
+                              </Typography>
+                            </Box>
+                          }
+                          primaryTypographyProps={{ noWrap: true }}
+                        />
+                        <Tooltip title="Options">
+                          <IconButton
+                            className="thread-menu-button"
+                            edge="end"
+                            size="small"
+                            onClick={e => handleOpenMenu(e, thread.id)}
+                            sx={{
+                              ml: 1,
+                              opacity: 0,
+                              transition: 'opacity 0.2s',
+                            }}
+                          >
+                            <MoreVertIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </ListItemButton>
+                    )}
+                  </ListItem>
+                ))}
+              </List>
+            </Box>
+          ))
+        ) : (
+          <Typography
+            variant="body2"
+            sx={{
+              color: theme.palette.text.secondary,
+              textAlign: 'center',
+              py: 3,
+          }}
+          >
+            {searchQuery ? 'No threads match your search.' : 'No conversations yet.'}
+          </Typography>
+        )}
+      </Box>
+
+      <Divider />
+
+      {/* Footer */}
+      <Box sx={{ px: 1.5, py: 1.5, flexShrink: 0 }}>
+        {/* Import button */}
+        <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+          <Tooltip title="Import thread">
+            <IconButton
+              size="small"
+              onClick={() => importInputRef.current?.click()}
+              sx={{ flex: 1 }}
+            >
+              <FileUploadIcon fontSize="small" sx={{ mr: 0.5 }} />
+              <Typography variant="caption">Import</Typography>
+            </IconButton>
+          </Tooltip>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept="application/json"
+            hidden
+            onChange={onImportFile}
+          />
+        </Box>
+
+        {importError && (
+          <Typography variant="caption" color="error" sx={{ display: 'block', mb: 1 }}>
+            {importError}
+          </Typography>
+        )}
+
+        {/* Storage info */}
+        <Tooltip title={persistenceTooltip}>
           <Box
             sx={{
               display: 'flex',
               alignItems: 'center',
-              cursor: 'pointer',
-              px: 1.5,
-              py: 1,
-              bgcolor: 'action.hover',
+              gap: 0.75,
+              px: 1,
+              py: 0.75,
+              fontSize: '0.75rem',
+              color: theme.palette.text.secondary,
+              mb: 1,
             }}
-            onClick={() => setHistoryOpen(v => !v)}
           >
-            <HistoryIcon fontSize="small" sx={{ mr: 1 }} />
-            <Typography variant="overline" sx={{ flex: 1 }}>
-              History
-            </Typography>
-            {config.persistence.enabled && (
-              <Tooltip title={persistenceTooltip}>
-                <Typography variant="caption" color="text.secondary" sx={{ mr: 0.5 }}>
-                  {config.persistence.ttlDays > 0 ? `${config.persistence.ttlDays}d` : 'saved'}
-                </Typography>
-              </Tooltip>
-            )}
-            <ExpandMoreIcon
-              fontSize="small"
-              sx={{
-                transform: historyOpen ? 'rotate(180deg)' : 'none',
-                transition: 'transform 0.2s',
-              }}
-            />
+            <AssignmentIcon fontSize="small" />
+            <Typography variant="caption">{persistenceTooltip}</Typography>
           </Box>
-          <Collapse in={historyOpen}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-              <Box sx={{ px: 1.5, pb: 1 }}>
-                <InputBase
-                  fullWidth
-                  placeholder="Search threads…"
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  startAdornment={
-                    <SearchIcon
-                      fontSize="small"
-                      sx={{ mr: 0.75, color: 'text.secondary' }}
-                    />
-                  }
-                  sx={{
-                    border: 1,
-                    borderColor: 'divider',
-                    borderRadius: 2,
-                    px: 1,
-                    py: 0.5,
-                    fontSize: '0.85rem',
-                  }}
-                />
-              </Box>
+        </Tooltip>
 
-              <Box sx={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-                <List dense>
-                  {visibleThreads.map(t => (
-                    <ListItem
-                      key={t.id}
-                      disablePadding
-                      secondaryAction={
-                        <IconButton
-                          edge="end"
-                          size="small"
-                          aria-label={`Thread actions for ${t.title}`}
-                          onClick={e => openMenu(e, t.id)}
-                        >
-                          <MoreVertIcon fontSize="small" />
-                        </IconButton>
-                      }
-                    >
-                      <ListItemButton
-                        selected={activeThreadId === t.id}
-                        onClick={() => onSelectThread(t.id)}
-                        sx={{ pr: 6 }}
-                      >
-                        {t.pinned && (
-                          <PushPinIcon
-                            fontSize="small"
-                            sx={{ mr: 0.75, color: 'text.secondary' }}
-                          />
-                        )}
-                        <ListItemText
-                          primary={t.title}
-                          primaryTypographyProps={{ noWrap: true, variant: 'body2' }}
-                          secondaryTypographyProps={{ noWrap: true, variant: 'caption' }}
-                        />
-                      </ListItemButton>
-                    </ListItem>
-                  ))}
-                  {visibleThreads.length === 0 && (
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ px: 2, py: 1, display: 'block' }}
-                    >
-                      {searchQuery ? 'No threads match your search.' : 'No threads yet.'}
-                    </Typography>
-                  )}
-                </List>
-              </Box>
-            </Box>
-          </Collapse>
+        {/* Analytics link */}
+        <Link
+          href="/ai-conversation/analytics"
+          underline="none"
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 0.75,
+            px: 1,
+            py: 0.75,
+            fontSize: '0.75rem',
+            color: theme.palette.primary.main,
+            '&:hover': {
+              opacity: 0.8,
+            },
+          }}
+        >
+          <TrendingUpIcon fontSize="small" />
+          <Typography variant="caption">Analytics</Typography>
+        </Link>
+      </Box>
 
-          <Menu anchorEl={menuAnchor} open={!!menuAnchor} onClose={closeMenu}>
-            <MenuItem
-              onClick={() => {
-                if (menuTarget) onTogglePin(menuTarget);
-                closeMenu();
-              }}
-            >
-              <ListItemIcon>
-                {menuThread?.pinned ? (
-                  <PushPinIcon fontSize="small" />
-                ) : (
-                  <PushPinOutlinedIcon fontSize="small" />
-                )}
-              </ListItemIcon>
-              {menuThread?.pinned ? 'Unpin' : 'Pin'}
-            </MenuItem>
-            <MenuItem
-              onClick={() => {
-                if (menuTarget) onExportThread(menuTarget);
-                closeMenu();
-              }}
-            >
-              <ListItemIcon>
-                <FileDownloadIcon fontSize="small" />
-              </ListItemIcon>
-              Export
-            </MenuItem>
-            <MenuItem
-              onClick={() => {
-                if (menuTarget) onDeleteThread(menuTarget);
-                closeMenu();
-              }}
-            >
-              <ListItemIcon>
-                <DeleteIcon fontSize="small" />
-              </ListItemIcon>
-              Delete
-            </MenuItem>
-          </Menu>
-        </>
-      )}
+      {/* Thread menu */}
+      <Menu anchorEl={menuAnchor} open={!!menuAnchor} onClose={handleCloseMenu}>
+        {onRenameThread && (
+          <MenuItem onClick={() => handleStartRename(menuTarget!, menuThread?.title || '')}>
+            <EditIcon fontSize="small" sx={{ mr: 1 }} />
+            Rename
+          </MenuItem>
+        )}
+        <MenuItem
+          onClick={() => {
+            if (menuTarget) onTogglePin(menuTarget);
+            handleCloseMenu();
+          }}
+        >
+          {menuThread?.pinned ? (
+            <PushPinIcon fontSize="small" sx={{ mr: 1 }} />
+          ) : (
+            <PushPinOutlinedIcon fontSize="small" sx={{ mr: 1 }} />
+          )}
+          {menuThread?.pinned ? 'Unpin' : 'Pin'}
+        </MenuItem>
+        {onExportMarkdown && (
+          <MenuItem
+            onClick={() => {
+              if (menuTarget) onExportMarkdown(menuTarget);
+              handleCloseMenu();
+            }}
+          >
+            <FileDownloadIcon fontSize="small" sx={{ mr: 1 }} />
+            Export Markdown
+          </MenuItem>
+        )}
+        <MenuItem
+          onClick={() => {
+            if (menuTarget) onExportThread(menuTarget);
+            handleCloseMenu();
+          }}
+        >
+          <FileDownloadIcon fontSize="small" sx={{ mr: 1 }} />
+          Export JSON
+        </MenuItem>
+        <MenuItem onClick={() => handleDeleteClick(menuTarget!)}>
+          <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
+          Delete
+        </MenuItem>
+      </Menu>
+
+      {/* Delete confirmation dialog */}
+      <Dialog
+        open={!!deleteConfirmId}
+        onClose={() => setDeleteConfirmId(null)}
+      >
+        <DialogTitle>Delete this conversation?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteConfirmId(null)}>Cancel</Button>
+          <Button onClick={handleConfirmDelete} variant="contained" color="error">
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

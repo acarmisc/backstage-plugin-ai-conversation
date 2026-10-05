@@ -1,17 +1,38 @@
-import React from 'react';
-import { Box, Chip, IconButton, InputBase, Tooltip } from '@mui/material';
+import React, { useState } from 'react';
+import {
+  Box,
+  Button,
+  Chip,
+  IconButton,
+  InputBase,
+  LinearProgress,
+  Stack,
+  Tooltip,
+  Typography,
+  useMediaQuery,
+  useTheme,
+} from '@mui/material';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import CloseIcon from '@mui/icons-material/Close';
+import GroupsIcon from '@mui/icons-material/Groups';
 import LinkIcon from '@mui/icons-material/Link';
-import SendIcon from '@mui/icons-material/Send';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
+import PsychologyIcon from '@mui/icons-material/Psychology';
 import StopIcon from '@mui/icons-material/Stop';
+import TuneIcon from '@mui/icons-material/Tune';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import type { FileUIPart } from 'ai';
-import type { UrlContextPreview } from '../types';
 
-/** Mirrors the backend's attachments.ts allow-list. The two packages don't
- * share a types module, so it's kept in sync by hand — a mismatch only means
- * the user sees a later 400 instead of an earlier client-side warning. The
- * per-message *count* limit lives in useStagedFiles, next to the check. */
+import { ComposerPill } from './ComposerPill';
+import { TeamPicker } from './TeamPicker';
+import { ModelPicker } from './ModelPicker';
+import { VectorStorePicker } from './VectorStorePicker';
+import { SkillPicker } from './SkillPicker';
+import { SettingsDrawer } from './SettingsDrawer';
+import { RADIUS, ACCENT_GRADIENT, surface } from '../theme';
+import type { ChatConfig, ChatTeamInfo, ChatTraits, ReasoningEffort, Skill, UrlContextPreview } from '../types';
+
 export const ALLOWED_ATTACHMENT_MEDIA_TYPES = 'image/png,image/jpeg,image/webp,image/gif';
 
 export interface ChatComposerProps {
@@ -27,17 +48,49 @@ export interface ChatComposerProps {
   attachError: string | null;
   onDismissAttachError: () => void;
   attachInputRef: React.RefObject<HTMLInputElement>;
+  composerInputRef?: React.RefObject<HTMLTextAreaElement>;
   onAttachFiles: (e: React.ChangeEvent<HTMLInputElement>) => void;
 
   urlPreview: UrlContextPreview | null;
   urlPreviewLoading: boolean;
   urlPreviewError: string | null;
   onDismissUrlPreview: () => void;
+
+  // New props for settings + pickers
+  config: ChatConfig;
+  teams: ChatTeamInfo[];
+  teamsLoading: boolean;
+  teamsError?: string | null;
+  skills: Skill[];
+
+  teamId: string;
+  onTeamChange: (teamId: string) => void;
+  model: string;
+  onModelChange: (modelId: string) => void;
+  vectorStoreIds: string[];
+  onVectorStoreIdsChange: (ids: string[]) => void;
+  teamVectorStores?: string[] | null;
+  skillId: string;
+  onSkillChange: (skillId: string) => void;
+
+  toneId: string;
+  onToneChange: (id: string) => void;
+  focusId: string;
+  onFocusChange: (id: string) => void;
+  verbosityId: string;
+  onVerbosityChange: (id: string) => void;
+  reasoningEffort: ReasoningEffort | '';
+  onReasoningEffortChange: (value: ReasoningEffort | '') => void;
+  webSearch: boolean;
+  onWebSearchChange: (enabled: boolean) => void;
+  customSystemPrompt: string;
+  onCustomSystemPromptChange: (value: string) => void;
+  traits: ChatTraits;
+  traitsLoading: boolean;
+
+  keySpend?: { spend: number; max_budget: number | null } | null;
 }
 
-/** One preview chip for the composer's `#url` affordance — loading, error,
- * or the resolved page title. Only ever shows title/snippet; the full page
- * text is fetched server-side at send time. */
 const UrlPreviewChip: React.FC<{
   loading: boolean;
   error: string | null;
@@ -85,9 +138,8 @@ const UrlPreviewChip: React.FC<{
 };
 
 /**
- * The composer strip: attachment button, staged-file and `#url` chips, the
- * textarea, and the send/stop button. Presentational — all state lives in
- * ChatPage.
+ * Composer with new design: card-based layout, pill-based toolbar (Team/Model/KB/Skill),
+ * Tune drawer button, attach/send buttons, and budget status.
  */
 export const ChatComposer: React.FC<ChatComposerProps> = ({
   input,
@@ -101,30 +153,80 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
   attachError,
   onDismissAttachError,
   attachInputRef,
+  composerInputRef,
   onAttachFiles,
   urlPreview,
   urlPreviewLoading,
   urlPreviewError,
   onDismissUrlPreview,
+  config,
+  teams,
+  teamsLoading,
+  teamsError,
+  skills,
+  teamId,
+  onTeamChange,
+  model,
+  onModelChange,
+  vectorStoreIds,
+  onVectorStoreIdsChange,
+  teamVectorStores,
+  skillId,
+  onSkillChange,
+  toneId,
+  onToneChange,
+  focusId,
+  onFocusChange,
+  verbosityId,
+  onVerbosityChange,
+  reasoningEffort,
+  onReasoningEffortChange,
+  webSearch,
+  onWebSearchChange,
+  customSystemPrompt,
+  onCustomSystemPromptChange,
+  traits,
+  traitsLoading,
+  keySpend,
 }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false);
+
   const showUrlChip = urlPreviewLoading || !!urlPreview || !!urlPreviewError;
   const showAttachments = stagedFiles.length > 0 || !!attachError;
 
+  const selectedTeam = teams.find(t => t.team_id === teamId);
+  const selectedSkill = skills.find(s => s.id === skillId);
+  const kbCount = vectorStoreIds.length;
+
+  const isTeamMissing = config.teamRequired && !teamId;
+
+  // Budget status
+  const budgetPercent = keySpend && keySpend.max_budget
+    ? Math.min((keySpend.spend / keySpend.max_budget) * 100, 100)
+    : 0;
+  let budgetBarColor = theme.palette.primary.main;
+  if (budgetPercent >= 95) budgetBarColor = theme.palette.error.main;
+  else if (budgetPercent >= 80) budgetBarColor = theme.palette.warning.main;
+  const budgetStatus =
+    keySpend && keySpend.max_budget
+      ? `$${keySpend.spend.toFixed(4)} of $${keySpend.max_budget.toFixed(2)} used`
+      : '';
+
   return (
     <>
-      {showUrlChip && (
-        <Box sx={{ px: 2, pt: 1 }}>
-          <UrlPreviewChip
-            loading={urlPreviewLoading}
-            error={urlPreviewError}
-            preview={urlPreview}
-            onDismiss={onDismissUrlPreview}
-          />
-        </Box>
-      )}
-
-      {showAttachments && (
+      {/* Staged files and URL preview chips */}
+      {(showUrlChip || showAttachments) && (
         <Box sx={{ px: 2, pt: 1, display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+          {showUrlChip && (
+            <UrlPreviewChip
+              loading={urlPreviewLoading}
+              error={urlPreviewError}
+              preview={urlPreview}
+              onDismiss={onDismissUrlPreview}
+            />
+          )}
           {stagedFiles.map((f, i) => (
             <Chip
               key={i}
@@ -149,63 +251,290 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
         </Box>
       )}
 
+      {/* Main composer card */}
       <Box
         sx={{
           flexShrink: 0,
-          borderTop: 1,
-          borderColor: 'divider',
           px: 2,
           py: 1.5,
-          display: 'flex',
-          gap: 1,
-          alignItems: 'flex-end',
         }}
       >
-        <Tooltip title="Attach image">
-          <IconButton size="small" onClick={() => attachInputRef.current?.click()}>
-            <AttachFileIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-        <input
-          ref={attachInputRef}
-          type="file"
-          accept={ALLOWED_ATTACHMENT_MEDIA_TYPES}
-          multiple
-          hidden
-          onChange={onAttachFiles}
-        />
-        <InputBase
-          multiline
-          minRows={1}
-          maxRows={5}
-          fullWidth
-          placeholder="Send a message…  (Enter to send, Shift+Enter for newline)"
-          value={input}
-          onChange={e => onInputChange(e.target.value)}
-          onKeyDown={onKeyDown}
+        <Box
           sx={{
+            borderRadius: RADIUS.lg,
             border: 1,
             borderColor: 'divider',
-            borderRadius: 2,
-            px: 1.5,
-            py: 0.75,
-            fontSize: '0.9rem',
+            backgroundColor: surface(theme, 1),
+            boxShadow: '0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.06)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 1.5,
+            p: 2,
+            transition: 'border-color 0.15s',
+            '&:focus-within': {
+              borderColor: theme.palette.primary.main,
+            },
           }}
-        />
-        {isStreaming ? (
-          <Tooltip title="Stop">
-            <IconButton color="error" onClick={onStop}>
-              <StopIcon />
-            </IconButton>
-          </Tooltip>
-        ) : (
-          <Tooltip title="Send">
-            <IconButton color="primary" onClick={onSend} disabled={!input.trim()}>
-              <SendIcon />
-            </IconButton>
-          </Tooltip>
-        )}
+        >
+          {/* Textarea */}
+          <InputBase
+            inputRef={composerInputRef}
+            multiline
+            minRows={1}
+            maxRows={10}
+            fullWidth
+            placeholder="Ask anything… (type #https://… to add a page)"
+            value={input}
+            onChange={e => onInputChange(e.target.value)}
+            onKeyDown={onKeyDown}
+            inputProps={{
+              'aria-label': 'Message',
+            }}
+            sx={{
+              fontSize: '0.95rem',
+              lineHeight: 1.6,
+            }}
+          />
+
+          {/* Toolbar row: pills + attach + send */}
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{
+              alignItems: 'flex-end',
+              justifyContent: 'space-between',
+            }}
+          >
+            {/* Left: pill selectors */}
+            <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+              {/* Team pill */}
+              <Tooltip title={isTeamMissing ? 'Select a team' : ''}>
+                <Box sx={{ display: 'flex' }}>
+                  <ComposerPill
+                    icon={<GroupsIcon />}
+                    label="Team"
+                    value={selectedTeam?.team_alias || 'No team'}
+                    isError={isTeamMissing}
+                    size="small"
+                  >
+                    <TeamPicker
+                      value={teamId}
+                      onChange={onTeamChange}
+                      teams={teams}
+                      loading={teamsLoading}
+                      error={teamsError}
+                      required={config.teamRequired}
+                    />
+                  </ComposerPill>
+                </Box>
+              </Tooltip>
+
+              {/* Model pill - always mounted for default selection */}
+              <ComposerPill
+                icon={<AutoAwesomeIcon />}
+                label="Model"
+                value={model || 'Select'}
+                size="small"
+              >
+                <ModelPicker
+                  value={model}
+                  onChange={onModelChange}
+                  defaultModel={config.defaultModel}
+                  excludedModels={config.excludedModels}
+                  teamModels={selectedTeam?.models}
+                />
+              </ComposerPill>
+
+              {/* Knowledge bases pill */}
+              <ComposerPill
+                icon={<MenuBookIcon />}
+                label="Knowledge"
+                value={kbCount > 0 ? `${kbCount}` : 'None'}
+                size="small"
+              >
+                <VectorStorePicker
+                  value={vectorStoreIds}
+                  onChange={onVectorStoreIdsChange}
+                  defaultVectorStoreIds={config.defaultVectorStoreIds}
+                  extraStores={teamVectorStores}
+                />
+              </ComposerPill>
+
+              {/* Skill pill */}
+              <ComposerPill
+                icon={<PsychologyIcon />}
+                label="Skill"
+                value={selectedSkill?.title || 'None'}
+                size="small"
+              >
+                <SkillPicker
+                  value={skillId}
+                  skills={skills}
+                  onChange={onSkillChange}
+                />
+              </ComposerPill>
+
+              {/* Tune button - opens settings drawer */}
+              <Tooltip title="Conversation settings">
+                <Box sx={{ display: 'flex' }}>
+                  <Button
+                    aria-label="Conversation settings"
+                    onClick={() => setSettingsDrawerOpen(true)}
+                    size="small"
+                    variant="outlined"
+                    sx={{
+                      borderRadius: RADIUS.pill,
+                      minWidth: 32,
+                      width: isMobile ? 32 : 'auto',
+                      px: isMobile ? 0 : 1,
+                      textTransform: 'none',
+                      fontWeight: 500,
+                    }}
+                  >
+                    <TuneIcon fontSize="small" />
+                  </Button>
+                </Box>
+              </Tooltip>
+            </Stack>
+
+            {/* Right: attach + send/stop */}
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+              {/* Attach button */}
+              <Tooltip title="Attach image">
+                <IconButton
+                  size="small"
+                  onClick={() => attachInputRef.current?.click()}
+                >
+                  <AttachFileIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              <input
+                ref={attachInputRef}
+                type="file"
+                accept={ALLOWED_ATTACHMENT_MEDIA_TYPES}
+                multiple
+                hidden
+                onChange={onAttachFiles}
+              />
+
+              {/* Send/Stop button */}
+              {isStreaming ? (
+                <Tooltip title="Stop generation (Esc)">
+                  <IconButton
+                    aria-label="Stop generation"
+                    onClick={onStop}
+                    sx={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: '50%',
+                      backgroundColor: theme.palette.error.main,
+                      color: 'white',
+                      '&:hover': {
+                        backgroundColor: theme.palette.error.dark,
+                      },
+                    }}
+                  >
+                    <StopIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              ) : (
+                <Tooltip title={input.trim() ? 'Send (Enter)' : 'Type a message first'}>
+                  <span>
+                    <IconButton
+                      aria-label="Send message"
+                      onClick={onSend}
+                      disabled={!input.trim()}
+                      sx={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: '50%',
+                        background: input.trim() ? ACCENT_GRADIENT : undefined,
+                        color: 'white',
+                        '&:disabled': {
+                          backgroundColor: theme.palette.action.disabledBackground,
+                          color: theme.palette.action.disabled,
+                        },
+                        '&:hover:not(:disabled)': {
+                          opacity: 0.9,
+                        },
+                      }}
+                    >
+                      <ArrowUpwardIcon fontSize="small" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              )}
+            </Stack>
+          </Stack>
+        </Box>
+
+        {/* Budget line + hints */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 2,
+            mt: 1.5,
+            px: 1,
+          }}
+        >
+          {keySpend && keySpend.max_budget ? (
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
+                  {budgetStatus}
+                </Typography>
+              </Box>
+              <LinearProgress
+                variant="determinate"
+                value={budgetPercent}
+                sx={{
+                  height: 4,
+                  borderRadius: '8px',
+                  backgroundColor: theme.palette.action.disabledBackground,
+                  '& .MuiLinearProgress-bar': {
+                    borderRadius: '8px',
+                    backgroundColor: budgetBarColor,
+                  },
+                }}
+              />
+            </Box>
+          ) : null}
+          <Typography variant="caption" sx={{ color: theme.palette.text.secondary, whiteSpace: 'nowrap' }}>
+            Enter to send · Shift+Enter for newline
+          </Typography>
+        </Box>
       </Box>
+
+      {/* Settings drawer */}
+      <SettingsDrawer
+        open={settingsDrawerOpen}
+        onClose={() => setSettingsDrawerOpen(false)}
+        traits={traits}
+        traitsLoading={traitsLoading}
+        toneId={toneId}
+        onToneChange={onToneChange}
+        focusId={focusId}
+        onFocusChange={onFocusChange}
+        verbosityId={verbosityId}
+        onVerbosityChange={onVerbosityChange}
+        reasoningEffort={reasoningEffort}
+        onReasoningEffortChange={onReasoningEffortChange}
+        webSearch={webSearch}
+        onWebSearchChange={onWebSearchChange}
+        customSystemPrompt={customSystemPrompt}
+        onCustomSystemPromptChange={onCustomSystemPromptChange}
+        onResetDefaults={() => {
+          // Reset to defaults handled by caller (ChatPage)
+          onToneChange(traits.tones[0]?.id || '');
+          onFocusChange(traits.focuses[0]?.id || '');
+          onVerbosityChange(traits.verbosities[0]?.id || '');
+          onReasoningEffortChange('');
+          onWebSearchChange(false);
+          onCustomSystemPromptChange('');
+        }}
+      />
     </>
   );
 };

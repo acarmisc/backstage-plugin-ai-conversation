@@ -37,6 +37,15 @@ import {
   purgeExpiredThreads,
   saveThread as savePersistedThread,
 } from './persistence';
+import {
+  sanitizeUpstreamMessage,
+  validateStreamRequest,
+  validateSpendAlias,
+  computeEffectiveBudget,
+  validateModelsField,
+  keyMatches,
+  isChatKeyAlias,
+} from './guards';
 import type {
   VectorStore,
   ChatStreamRequestV2,
@@ -409,7 +418,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       res.json(skills);
     } catch (err: any) {
       logger.error('Failed to list skills', err);
-      res.status(502).json({ error: err.message });
+      res.status(502).json({ error: sanitizeUpstreamMessage(err.message) });
     }
   });
 
@@ -430,7 +439,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       res.json(await fetchVectorStores());
     } catch (err: any) {
       logger.error('Failed to list vector stores', err);
-      res.status(502).json({ error: err.message });
+      res.status(502).json({ error: sanitizeUpstreamMessage(err.message) });
     }
   });
 
@@ -460,7 +469,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       });
     } catch (err: any) {
       logger.warn('fetch-context failed', err);
-      res.status(err.status ?? 502).json({ error: err.message });
+      res.status(err.status ?? 502).json({ error: sanitizeUpstreamMessage(err.message) });
     }
   });
 
@@ -474,6 +483,10 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
   // there): the requested team must be one the caller is actually a member
   // of, so the endpoint can never be used to mint a key billed to someone
   // else's team.
+  //
+  // Budget cap: if `litellm.aiConversation.maxRequestBudget` is configured,
+  // it's enforced server-side to prevent client-side override — the actual
+  // key budget is min(requested, configured).
   router.post('/chat/key', async (req: Request, res: Response) => {
     try {
       const tokenEntityRef = await resolveUserId(req, auth);
@@ -485,10 +498,20 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       const client = new LiteLLMClient({ baseUrl: chatConfig.baseUrl, masterKey });
 
       const body = (req.body ?? {}) as {
-        models?: string[];
-        max_budget?: number;
+        models?: unknown;
+        max_budget?: unknown;
         team_id?: string;
       };
+
+      // Validate models field
+      const models = validateModelsField(body.models);
+      if (body.models !== undefined && body.models !== null && models === undefined) {
+        res.status(400).json({ error: 'models must be an array of strings (max 50 entries)' });
+        return;
+      }
+
+      // Server-side budget cap: enforce configured maximum
+      const effectiveBudget = computeEffectiveBudget(body.max_budget, chatConfig.maxRequestBudget);
 
       const teamId = body.team_id?.trim() || undefined;
       if (teamRequired && !teamId) {
@@ -528,8 +551,8 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       const alias = `chat-${entityName}-${Date.now()}`;
       const result = await client.generateKey({
         alias,
-        models: body.models ?? [],
-        max_budget: body.max_budget,
+        models: models ?? [],
+        max_budget: effectiveBudget,
         user_id: userId,
         // Team binding is what carries the governance: budget, tpm/rpm and
         // the model allowlist all resolve through it in LiteLLM.
@@ -549,11 +572,14 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       });
     } catch (err: any) {
       logger.error('Failed to mint chat key', err);
-      res.status(502).json({ error: err.message });
+      res.status(502).json({ error: sanitizeUpstreamMessage(err.message) });
     }
   });
 
   // Delete a chat key by its real sk- value (client sends what it stored).
+  // Security: only delete keys that the caller owns and that were minted by
+  // this chat plugin (key_alias starts with 'chat-'). Resolves the caller's
+  // user and lists their keys via LiteLLM to confirm ownership.
   router.delete('/chat/key', async (req: Request, res: Response) => {
     try {
       const tokenEntityRef = await resolveUserId(req, auth);
@@ -561,17 +587,36 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
         res.status(401).json({ error: 'unauthenticated' });
         return;
       }
-      const { key } = req.body as { key: string };
-      if (!key) {
+      const { key } = req.body as { key?: string };
+      if (!key || typeof key !== 'string') {
         res.status(400).json({ error: 'key required' });
         return;
       }
+
+      const userId = toLiteLLMUserId(tokenEntityRef, userIdDomain);
       const client = new LiteLLMClient({ baseUrl: chatConfig.baseUrl, masterKey });
+
+      // LiteLLM stores keys as sha256(raw key), so the caller's own key list
+      // is enough to prove ownership. A listing failure propagates as a 502
+      // rather than masquerading as "not found".
+      const userKeys = await client.listKeys(userId);
+      const matchedKey = userKeys.find(
+        k =>
+          keyMatches(key, k.token ?? '') &&
+          isChatKeyAlias(k.key_alias),
+      );
+
+      if (!matchedKey) {
+        // 404 for not found (either doesn't exist or not owned by caller)
+        res.status(404).json({ error: 'key not found' });
+        return;
+      }
+
       await client.deleteKeys({ keys: [key] });
       res.json({ success: true });
     } catch (err: any) {
       logger.error('Failed to delete chat key', err);
-      res.status(502).json({ error: err.message });
+      res.status(502).json({ error: sanitizeUpstreamMessage(err.message) });
     }
   });
 
@@ -580,6 +625,12 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
   // which the client already has from the mint response).
   router.get('/chat/key/:alias/spend', async (req: Request, res: Response) => {
     try {
+      // Validate alias format early to prevent injection/bypass
+      if (!validateSpendAlias(req.params.alias)) {
+        res.status(400).json({ error: 'invalid key alias format' });
+        return;
+      }
+
       const tokenEntityRef = await resolveUserId(req, auth);
       if (!tokenEntityRef) {
         res.status(401).json({ error: 'unauthenticated' });
@@ -596,7 +647,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       res.json({ spend: match.spend, max_budget: match.max_budget ?? null });
     } catch (err: any) {
       logger.error('Failed to fetch chat key spend', err);
-      res.status(502).json({ error: err.message });
+      res.status(502).json({ error: sanitizeUpstreamMessage(err.message) });
     }
   });
 
@@ -646,7 +697,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       res.json({ success: true });
     } catch (err: any) {
       logger.error('Failed to record chat feedback', err);
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: sanitizeUpstreamMessage(err.message) });
     }
   });
 
@@ -678,7 +729,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       res.json(summary);
     } catch (err: any) {
       logger.error('Failed to summarize feedback', err);
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: sanitizeUpstreamMessage(err.message) });
     }
   });
 
@@ -707,7 +758,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       res.json(summary);
     } catch (err: any) {
       logger.error('Failed to summarize usage', err);
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: sanitizeUpstreamMessage(err.message) });
     }
   });
 
@@ -751,7 +802,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       res.json(threads);
     } catch (err: any) {
       logger.error('Failed to list persisted threads', err);
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: sanitizeUpstreamMessage(err.message) });
     }
   });
 
@@ -766,7 +817,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       res.json({ success: true });
     } catch (err: any) {
       logger.warn(`Failed to save thread ${req.params.id}: ${err.message}`);
-      res.status(err.status ?? 500).json({ error: err.message });
+      res.status(err.status ?? 500).json({ error: sanitizeUpstreamMessage(err.message) });
     }
   });
 
@@ -776,7 +827,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       res.json({ success: true });
     } catch (err: any) {
       logger.error(`Failed to delete thread ${req.params.id}`, err);
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: sanitizeUpstreamMessage(err.message) });
     }
   });
 
@@ -785,13 +836,14 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
   // `/chat/completions` routes were removed once nothing called them.
   router.post('/chat/stream/v2', async (req: Request, res: Response) => {
     try {
-      const body = req.body as ChatStreamRequestV2;
-      if (!body?.model || !body?.messages || !body?.user_key) {
-        res.status(400).json({
-          error: 'model, messages, user_key required',
-        });
+      // Validate request body comprehensively
+      const bodyValidation = validateStreamRequest(req.body);
+      if (!bodyValidation.ok) {
+        res.status(400).json({ error: bodyValidation.error });
         return;
       }
+
+      const body = req.body as ChatStreamRequestV2;
 
       const tokenEntityRef = await resolveUserId(req, auth);
       if (!tokenEntityRef) {
@@ -863,7 +915,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
             userKey: body.user_key,
             vectorStoreIds: body.vector_store_ids,
             query: lastUserText(withSystemPrompt),
-            topK: body.top_k ?? 5,
+            topK: body.top_k === undefined || body.top_k === null ? 5 : Number(body.top_k),
           });
         } catch (err: any) {
           // A KB outage must not take down plain chat. The turn remains
@@ -899,7 +951,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
     } catch (err: any) {
       logger.error('chat/stream/v2 failed', err);
       if (!res.headersSent) {
-        res.status(err.status ?? 500).json({ error: err.message });
+        res.status(err.status ?? 500).json({ error: sanitizeUpstreamMessage(err.message) });
       }
     }
   });

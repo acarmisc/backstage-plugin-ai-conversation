@@ -83,7 +83,7 @@ The chat plugin reuses all of this by **importing from the govai package**, not 
 | `/vector_stores` | GET | Lists LiteLLM vector stores for the KB picker. Calls LiteLLM's `/v1/vector_store/list`. |
 | `/skills` | GET | Lists chat skills (metadata only — id/title/description/defaultModel/defaultVectorStoreIds/tags). No system-prompt text. |
 | `/chat/traits` | GET | Static tone/focus/verbosity option lists for the pickers (id/label only — see `traits.ts`). |
-| `/chat/key` | POST/DELETE | Mints / deletes a per-thread `sk-` chat key via the master key. Bound to a `team_id` (required when `teamRequired`; validated against the caller's own LiteLLM teams → 403 otherwise) so budget, rate limits and model ACL are inherited from the team. |
+| `/chat/key` | POST/DELETE | Mints / deletes a per-thread `sk-` chat key via the master key. Bound to a `team_id` (required when `teamRequired`; validated against the caller's own LiteLLM teams → 403 otherwise) so budget, rate limits and model ACL are inherited from the team. `maxRequestBudget` is enforced server-side as a cap. DELETE validates key ownership (resolves caller and lists their keys) and only deletes chat keys (`key_alias` starting with `chat-`); returns 404 otherwise. |
 | `/chat/key/:alias/spend` | GET | Current spend/budget for a chat key, looked up by alias. |
 | `/fetch-context` | POST | SSRF-guarded fetch + extract for the composer's `#url` chip (title/snippet only). |
 | `/feedback` | POST | Upserts a thumbs-up/down vote (with a Q&A snapshot) on an assistant message. |
@@ -213,10 +213,14 @@ Replaced the original hand-rolled `useChat.ts` (manual SSE reader, abort-per-mes
 
 | Component | Responsibility |
 |---|---|
-| `ChatPage` | Page shell at `/ai-conversation`. Owns settings/thread/key state; composes the sidebar, message area and right rail. |
-| `ThreadSidebar` | Left rail: collapsible settings panel (via `ChatSettingsPanel`), new/import actions, searchable thread history with per-thread menu (pin/export/delete). |
-| `ChatComposer` | Attachment button, staged-file / `#url` chips, textarea, send/stop button. |
-| `ChatSettingsPanel` | Skill/Team/Model/KB pickers, extra prompt, and the Advanced accordion (Tone/Focus/Verbosity/Reasoning effort/Web search). |
+| `ChatPage` | Page shell at `/ai-conversation`. Owns settings/thread/key state (key minting, team switch re-mint, pending sends that wait for a new thread or a freshly minted key), keyboard shortcuts (`useChatShortcuts`), compare popover, and fits its height under the app header. |
+| `ThreadSidebar` | Left rail: brand, New chat, search, date-grouped history (`utils/threadGroups.ts`) with inline rename and a per-thread menu (rename/pin/export JSON or Markdown/delete with confirm); footer with import, storage indicator and Analytics link. Collapses to an icon rail. |
+| `ChatHeader` | Renamable title, context chips (skill, KBs, web, compare), Compare button, More menu (copy/export Markdown, export JSON, shortcuts), right-rail toggle. |
+| `WelcomeScreen` | Empty state: active team/model, team picker when required, skill cards, starter prompts (`utils/suggestions.ts`). |
+| `ChatComposer` | Composer card: chips for staged files and `#url`, textarea, `ComposerPill` pickers (Team/Model/Knowledge/Skill, popovers opening upwards), Tune button, attach + paste + drag & drop, send/stop, budget line. |
+| `SettingsDrawer` | The Tune drawer: Tone/Focus/Verbosity, Reasoning effort, Web search, extra instructions, reset. |
+| `ComparePopover` | Picks 2–3 team-scoped models for compare mode; turns it on, updates it or turns it off. |
+| `ContextPanel` | Right rail: Sources/Usage tabs. Falls back to the last answer's `data-citations` (`utils/citations.ts`) when no live stream reported any. |
 | `SkillPicker` | Dropdown of `chat-skill` catalog entities (or bundled skills) from `listSkills()`. Selecting one prefills `ModelPicker`/`VectorStorePicker` from its defaults and sends `skill_id` with the request. |
 | `OptionPicker` | Generic small Select (label + options + onChange), shared by Tone/Focus/Verbosity (options from `getChatTraits()`) and Reasoning effort (fixed `low`/`medium`/`high`, no backend call). |
 | `TeamPicker` | Dropdown from `liteLlmApiRef.getTeams()` (govai's route, already scoped to the caller's teams). Required when `config.teamRequired`. Selecting a team re-mints the chat key bound to it, prefills the team's KBs, and re-scopes `ModelPicker` to the team's model allowlist. |
@@ -226,7 +230,10 @@ Replaced the original hand-rolled `useChat.ts` (manual SSE reader, abort-per-mes
 | `AssistantMessage` / `UserMessage` | Per-role rendering, markdown, message actions (feedback/regenerate/copy, edit-and-resend). |
 | `SourcesPanel` | Right-rail. Latest turn's citations, deduped and grouped KB vs Web. |
 | `UsagePanel` | Right-rail. Per-turn and session token counts, plus the thread's chat key spend/budget. |
-| `ErrorBanner` | Stream error or fetch failure (e.g. 401 from LiteLLM — key out of budget). |
+| `ErrorBanner` | MUI Alert; `classifyError` turns key/budget/rate-limit/network failures into a title and hint; `plain` shows a validation message as is. |
+| `TypingIndicator` | Dots shown before the first token (reduced-motion aware). |
+
+Styling tokens live in `theme.ts` (`RADIUS` as px strings — a numeric `borderRadius` in `sx` is multiplied by the theme's shape radius —, `surface`, `subtleBorder`, the accent gradient). Data parts (`data-citations`, `data-usage`) carry their payload in `part.data`.
 
 ### Plugin registration
 
@@ -281,15 +288,24 @@ backstage-plugin-ai-conversation/
     │       │   ├── useUrlContext.ts           # `#url` preview resolution
     │       │   ├── useStagedFiles.ts          # attachment staging
     │       │   ├── useResizablePanel.ts
+    │       │   ├── useStickToBottom.ts        # follow streaming only at the bottom
+    │       │   ├── useChatShortcuts.ts
     │       │   ├── threadPersistence.ts       # shape mapping + migration
     │       │   ├── aiSdkTransport.ts
     │       │   ├── chatTruncation.ts
     │       │   └── messageShape.ts
+    │       ├── utils/                     # threadGroups, threadMarkdown, citations, suggestions
     │       └── components/
     │           ├── ChatPage.tsx
     │           ├── ThreadSidebar.tsx
+    │           ├── ChatHeader.tsx
+    │           ├── WelcomeScreen.tsx
     │           ├── ChatComposer.tsx
-    │           ├── ChatSettingsPanel.tsx
+    │           ├── ComposerPill.tsx
+    │           ├── SettingsDrawer.tsx
+    │           ├── ComparePopover.tsx
+    │           ├── ContextPanel.tsx
+    │           ├── TypingIndicator.tsx
     │           ├── MessageList.tsx
     │           ├── AssistantMessage.tsx
     │           ├── UserMessage.tsx
@@ -317,6 +333,7 @@ backstage-plugin-ai-conversation/
             ├── index.ts
             ├── plugin.ts
             ├── router.ts                  # all HTTP routes
+            ├── guards.ts                  # request validation, budget cap, key ownership, error redaction
             ├── uiMessageStream.ts         # SSE proxy + AI SDK UI Message Stream adapter
             ├── rag.ts                     # two-step retrieval + context injection
             ├── attachments.ts             # image validation + OpenAI content mapping
@@ -345,6 +362,8 @@ backstage-plugin-ai-conversation/
 14. **Web search toggle** — passes `web_search` through as LiteLLM's `web_search_options` alongside (not instead of) any selected knowledge bases; sources panel labels results Web vs Knowledge base by a `url`-field heuristic (LiteLLM doesn't tag result origin explicitly). Assumes the target LiteLLM deployment has a native web-search-capable model — **unverified against the live proxy**, see the "Known gaps" note below.
 15. **Analytics dashboard** — `chat_events` migration + best-effort per-turn logging (thread_id/user_ref/model/persona_id/grounded, not message content), `GET /feedback/summary` + `GET /usage/summary?groupBy=skill|model&range=`, `/ai-conversation/analytics` page with hand-rolled bar charts (no new charting dependency). The summary endpoints return aggregate counts only, so they're reachable by any authenticated user — genuine admin-only *page* access requires a permission-policy in the target Backstage app, which this repo doesn't own (see "Known gaps"). Note the `persona_id` column name is legacy: the API field is `skillId` on both sides (the frontend previously sent `personaId`, which silently nulled every row — fixed).
 16. **Opt-in server-side thread persistence** — `chat_threads` migration (`id`+`user_ref` composite PK, opaque JSON `data` column) behind `litellm.aiConversation.persistence.enabled` (default `false`). `GET/PUT/DELETE /api/ai-conversation/threads[/:id]`, each 404ing when persistence is off. `data` is never interpreted server-side — it's the frontend's `Thread` shape minus the live `keyToken`/`keyAlias` credential (same exclusion `exportThread()` already applied — see `hooks/threadPersistence.ts`'s `toSaveThreadBody`/`fromPersisted`), size-capped at 1MB per thread (`persistence.ts`). `useThreads` treats the backend as authoritative once enabled: loads the server's list on mount and syncs the active thread on the same 400ms debounce that already drives the localStorage write; localStorage keeps writing regardless, as an offline cache/fallback. `GET /threads` is paginated (`?limit=&offset=`, default 200 / max 500). All the sync plumbing lives in `hooks/useThreadPersistence.ts`. Auto-deletion after `ttlDays` (default 30, `0` = unlimited) runs via `coreServices.scheduler`, not a plain `setInterval` — the target deployment runs 2 Backstage replicas (see "Target environment"), and the scheduler service's DB-backed task locking is what keeps the sweep from running twice per tick.
+
+17. **Redesign and hardening** — chat page redesign (see Components), compare mode reachable again, thread rename and Markdown export, keyboard shortcuts, image paste/drop; backend `guards.ts` (DELETE `/chat/key` ownership via sha256 match against the caller's `/user/info` keys, server-side `maxRequestBudget` cap, `/chat/stream/v2` body validation, upstream error redaction); dev harness, screenshot script, CI/publish pipeline, public docs in `docs/`.
 
 ## Things NOT in v1
 
@@ -381,8 +400,17 @@ yarn workspace @acarmisc/backstage-plugin-ai-conversation test
 yarn workspace @acarmisc/backstage-plugin-ai-conversation-backend test
 ```
 
-CI runs `yarn lint`, `yarn test` and `yarn build` on every push/PR
-(`.github/workflows/ci.yml`). `dist/` is build output and is not committed.
+CI (`.github/workflows/ci.yml`, Node 22 and 24) runs `yarn lint`, `yarn test`,
+`yarn build`, `node scripts/check-packages.mjs` (tarball contents) and checks
+the tree is clean, plus a security job (yarn npm audit, gitleaks, dependency
+review). `dist/` is build output and is not committed.
+
+Dev harness: `cd packages/plugin-ai-conversation && yarn start` serves the
+chat page on mock data (`dev/mockFetch.ts` replaces the app's `fetchApi`, so
+the real API client and the AI SDK transport run against it). With it
+running, `node scripts/capture-screenshots.mjs` regenerates `docs/images`.
+User-facing docs live in `README.md` and `docs/`; keep them in sync with
+behaviour changes.
 
 ## Release
 

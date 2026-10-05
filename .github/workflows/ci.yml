@@ -1,29 +1,126 @@
 name: CI
 
+# Quality, cleanliness and security gates. Runs on every PR and push to
+# main, and is called by publish.yml so nothing reaches npm without
+# passing the same checks.
+
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_call:
 
 permissions:
   contents: read
 
+concurrency:
+  # A new push to a PR supersedes its running checks. Everything else
+  # (main, release calls from publish.yml) gets its own group and always
+  # runs to completion: parallel releases dispatched from main share
+  # github.ref and must not cancel each other.
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  check:
+  verify:
+    name: verify (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22', '24']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Lint
+        run: yarn lint
+
+      - name: Build
+        run: yarn build
+
+      - name: Test
+        run: yarn test
+
+      - name: Package contents
+        # What `yarn npm publish` would ship: entry points present, no sources,
+        # tests, fixtures, env files or npm credentials.
+        run: node scripts/check-packages.mjs
+
+      - name: Clean working tree
+        # Build and test output must be gitignored, and nothing may rewrite
+        # tracked files (lockfile, generated code) during the run.
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::error::The build left the working tree dirty:"
+            git status --porcelain
+            git diff
+            exit 1
+          fi
+
+  security:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history for the secret scan
+
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: '22'
+
       - name: Enable Corepack
         run: corepack enable
+
       - name: Install dependencies
-        run: yarn install
-      - name: Lint
-        run: yarn lint
-      - name: Test
-        run: yarn test
-      - name: Build
-        run: yarn build
+        run: yarn install --immutable
+
+      - name: Dependency audit (production, blocking on critical)
+        # High/moderate findings are transitive inside @backstage/*
+        # with no upstream fix; they are reported below and by Snyk/Dependabot.
+        run: yarn npm audit --environment production --severity critical
+
+      - name: Dependency audit (full report)
+        if: always()
+        continue-on-error: true
+        run: yarn npm audit --all
+
+      - name: Secret scan (gitleaks)
+        env:
+          GITLEAKS_VERSION: 8.28.0
+        run: |
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfLO "$base/$archive"
+          curl -sSfL "$base/gitleaks_${GITLEAKS_VERSION}_checksums.txt" \
+            | grep " $archive\$" | sha256sum -c -
+          tar xzf "$archive" gitleaks
+          ./gitleaks git --no-banner --redact --verbose .
+
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Review dependency changes
+        # Needs Settings → Code security → Dependency graph enabled on the
+        # repository; until then the action errors out, so it doesn't block.
+        continue-on-error: true
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: critical
+          comment-summary-in-pr: on-failure

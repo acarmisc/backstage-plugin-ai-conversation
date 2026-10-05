@@ -1,16 +1,19 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
-  Accordion,
-  AccordionDetails,
-  AccordionSummary,
   Box,
   Chip,
+  Collapse,
   Divider,
+  IconButton,
   Tooltip,
   Typography,
+  useTheme,
 } from '@mui/material';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
+import PublicIcon from '@mui/icons-material/Public';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { safeHref } from '../safeUrl';
+import { RADIUS, surface, subtleBorder } from '../theme';
 import type { Citation } from '../types';
 
 export interface SourcesPanelProps {
@@ -37,6 +40,12 @@ function relevanceLabel(score: number): 'High' | 'Medium' | 'Low' {
   if (score >= 0.7) return 'High';
   if (score >= 0.4) return 'Medium';
   return 'Low';
+}
+
+function getRelevanceColor(label: 'High' | 'Medium' | 'Low') {
+  if (label === 'High') return 'success';
+  if (label === 'Medium') return 'info';
+  return 'default';
 }
 
 function dedupe(citations: Citation[]): DedupedSource[] {
@@ -78,113 +87,201 @@ function groupSources(citations: Citation[]): SourceGroup[] {
 }
 
 const SourceRow: React.FC<{ source: DedupedSource }> = ({ source }) => {
+  const theme = useTheme();
+  const [expanded, setExpanded] = useState(false);
   const href = safeHref(source.url);
   const rel = relevanceLabel(source.bestScore);
   const passages = source.snippets.length;
+  const isWeb = source.source === 'web';
+  const isKb = source.source === 'kb';
+
   return (
-    <Accordion
-      disableGutters
-      variant="outlined"
-      sx={{ '&:before': { display: 'none' }, mb: 0.5 }}
+    <Box
+      sx={{
+        p: 1.25,
+        bgcolor: surface(theme, 1),
+        borderRadius: RADIUS.sm,
+        border: subtleBorder(theme),
+        mb: 1,
+      }}
     >
-      <AccordionSummary
-        expandIcon={<ExpandMoreIcon fontSize="small" />}
+      {/* Header row */}
+      <Box
         sx={{
-          minHeight: 0,
-          '& .MuiAccordionSummary-content': {
-            my: 0.75,
-            mr: 1,
-            minWidth: 0,
-            overflow: 'hidden',
-          },
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 1,
+          mb: passages > 0 ? 1 : 0,
         }}
       >
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25, minWidth: 0, width: '100%' }}>
+        {/* Icon */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 24,
+            height: 24,
+            color: 'text.secondary',
+            flexShrink: 0,
+          }}
+        >
+          {isKb && <MenuBookIcon fontSize="small" />}
+          {isWeb && <PublicIcon fontSize="small" />}
+        </Box>
+
+        {/* Title and metadata */}
+        <Box sx={{ flex: 1, minWidth: 0 }}>
           <Tooltip title={source.filename}>
             <Typography
               variant="body2"
               fontWeight={500}
-              sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              sx={{
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                mb: 0.5,
+              }}
             >
               {source.filename}
             </Typography>
           </Tooltip>
-          <Typography variant="caption" color="text.secondary">
-            <Tooltip title={`Score ${source.bestScore.toFixed(3)}`}>
-              <span>{rel} relevance</span>
-            </Tooltip>
-            {passages > 1 ? ` · ${passages} passages` : ''}
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+            <Chip
+              size="small"
+              label={rel}
+              variant="filled"
+              color={getRelevanceColor(rel)}
+              sx={{ height: 20 }}
+            />
+            {passages > 1 && (
+              <Typography variant="caption" color="text.secondary">
+                {passages} passages
+              </Typography>
+            )}
+          </Box>
         </Box>
-      </AccordionSummary>
-      <AccordionDetails sx={{ pt: 0 }}>
-        {href && (
-          <Typography variant="caption" sx={{ display: 'block', mb: 1 }}>
-            <a href={href} target="_blank" rel="noopener noreferrer">
-              Open source
-            </a>
-          </Typography>
+
+        {/* Expand button */}
+        {passages > 0 && (
+          <IconButton
+            size="small"
+            onClick={() => setExpanded(!expanded)}
+            sx={{
+              transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s',
+            }}
+            aria-label={expanded ? 'Collapse' : 'Expand'}
+          >
+            <ExpandMoreIcon fontSize="small" />
+          </IconButton>
         )}
-        {source.snippets.map((snippet, i) => (
-          <Box key={i}>
-            {i > 0 && <Divider sx={{ my: 1 }} />}
+      </Box>
+
+      {/* Expanded snippets */}
+      <Collapse in={expanded} timeout="auto" unmountOnExit>
+        <Box sx={{ pt: 1 }}>
+          {href && (
             <Typography
-              variant="body2"
-              color="text.secondary"
+              variant="caption"
               sx={{
-                whiteSpace: 'pre-wrap',
-                overflowWrap: 'anywhere',
-                maxHeight: 220,
-                overflow: 'auto',
+                display: 'block',
+                mb: 1,
+                '& a': { color: 'primary.main', textDecoration: 'none' },
+                '& a:hover': { textDecoration: 'underline' },
               }}
             >
-              {snippet}
+              <a href={href} target="_blank" rel="noopener noreferrer">
+                Open source
+              </a>
             </Typography>
-          </Box>
-        ))}
-        {source.snippets.length === 0 && (
-          <Typography variant="body2" color="text.secondary">
-            No excerpt available.
-          </Typography>
-        )}
-      </AccordionDetails>
-    </Accordion>
+          )}
+          {source.snippets.map((snippet, i) => (
+            <Box key={i}>
+              {i > 0 && <Divider sx={{ my: 1 }} />}
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{
+                  display: 'block',
+                  whiteSpace: 'pre-wrap',
+                  overflowWrap: 'anywhere',
+                  maxHeight: 200,
+                  overflow: 'auto',
+                }}
+              >
+                {snippet}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+      </Collapse>
+    </Box>
   );
 };
 
 export const SourcesPanel: React.FC<SourcesPanelProps> = ({ citations }) => {
+  const theme = useTheme();
   const groups = groupSources(citations);
   const total = groups.reduce((n, g) => n + g.items.length, 0);
 
-  return (
-    <Box sx={{ p: 1.5, minWidth: 0, overflow: 'hidden' }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        <Typography variant="overline" color="text.secondary">
-          Sources
+  if (total === 0) {
+    return (
+      <Box
+        sx={{
+          p: 2,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: 200,
+          textAlign: 'center',
+        }}
+      >
+        <Box
+          sx={{
+            width: 48,
+            height: 48,
+            borderRadius: '50%',
+            bgcolor: surface(theme, 2),
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            mb: 1,
+            color: 'text.secondary',
+          }}
+        >
+          <MenuBookIcon />
+        </Box>
+        <Typography variant="body2" color="text.secondary">
+          Sources appear here when a reply uses a knowledge base or web search.
         </Typography>
-        {total > 0 && <Chip size="small" label={total} variant="outlined" />}
       </Box>
+    );
+  }
 
-      {total === 0 ? (
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-          No sources for the latest reply yet.
-        </Typography>
-      ) : (
-        groups.map(group => (
-          <Box key={group.key} sx={{ mt: 1 }}>
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ display: 'block', mb: 0.5, fontWeight: 600 }}
-            >
-              {group.label} ({group.items.length})
-            </Typography>
-            {group.items.map((s, i) => (
-              <SourceRow key={`${group.key}-${i}`} source={s} />
-            ))}
-          </Box>
-        ))
-      )}
+  return (
+    <Box sx={{ p: 2 }}>
+      {groups.map(group => (
+        <Box key={group.key} sx={{ mb: 2 }}>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{
+              display: 'block',
+              mb: 1,
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+            }}
+          >
+            {group.label} ({group.items.length})
+          </Typography>
+          {group.items.map((s, i) => (
+            <SourceRow key={`${group.key}-${i}`} source={s} />
+          ))}
+        </Box>
+      ))}
     </Box>
   );
 };

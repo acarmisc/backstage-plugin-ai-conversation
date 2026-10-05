@@ -1,0 +1,9 @@
+apiVersion: backstage.io/v1alpha1
+kind: Location
+metadata:
+  name: backstage-plugin-ai-conversation
+  description: Packages of the AI Conversation Backstage plugin.
+spec:
+  targets:
+    - ./packages/plugin-ai-conversation/catalog-info.yaml
+    - ./packages/plugin-ai-conversation-backend/catalog-info.yaml
