@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.20.0 — 2026-10-05
+
+No functional changes. Released to keep the version aligned with
+`@acarmisc/backstage-plugin-ai-conversation@0.20.0`; 0.19.0 and 0.20.0 of the
+two packages work together in any combination.
+
 ## 0.19.0 — 2026-10-05
 
 ### Security
