@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.20.0 — 2026-10-05
 
 ### Changed
 
@@ -13,6 +13,11 @@
   the KaTeX stylesheet (`cdn.jsdelivr.net`) is still needed in your Content
   Security Policy.
 - New dependency: `@backstage/core-components`.
+- Tone, focus and verbosity start unset ("Default") in every conversation, and
+  **Reset to defaults** clears them. Before, only the first page load
+  preselected Friendly / Explain reasoning / Concise, while new and reopened
+  conversations started unset.
+- The Tune button shows a dot when any conversation setting is set.
 
 ## 0.19.0 — 2026-10-05
 

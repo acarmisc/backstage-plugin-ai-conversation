@@ -124,12 +124,9 @@ export const ChatPage: React.FC = () => {
 
     chatApi
       .getChatTraits()
-      .then(t => {
-        setTraits(t);
-        setToneId(prev => prev || t.tones[0]?.id || '');
-        setFocusId(prev => prev || t.focuses[0]?.id || '');
-        setVerbosityId(prev => prev || t.verbosities[0]?.id || '');
-      })
+      // No trait is preselected: "Default" (none) is what every conversation
+      // starts with, and what Reset to defaults goes back to.
+      .then(setTraits)
       .catch(() => {})
       .finally(() => setTraitsLoading(false));
 

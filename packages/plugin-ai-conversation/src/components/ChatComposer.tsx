@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Badge,
   Box,
   Button,
   Chip,
@@ -29,7 +30,7 @@ import { TeamPicker } from './TeamPicker';
 import { ModelPicker } from './ModelPicker';
 import { VectorStorePicker } from './VectorStorePicker';
 import { SkillPicker } from './SkillPicker';
-import { SettingsDrawer } from './SettingsDrawer';
+import { SettingsDrawer, hasCustomSettings } from './SettingsDrawer';
 import type { ChatConfig, ChatTeamInfo, ChatTraits, ReasoningEffort, Skill, UrlContextPreview } from '../types';
 
 export const ALLOWED_ATTACHMENT_MEDIA_TYPES = 'image/png,image/jpeg,image/webp,image/gif';
@@ -365,7 +366,22 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                     onClick={() => setSettingsDrawerOpen(true)}
                     size="small"
                   >
-                    <TuneIcon fontSize="small" />
+                    <Badge
+                      variant="dot"
+                      color="primary"
+                      invisible={
+                        !hasCustomSettings({
+                          toneId,
+                          focusId,
+                          verbosityId,
+                          reasoningEffort,
+                          webSearch,
+                          customSystemPrompt,
+                        })
+                      }
+                    >
+                      <TuneIcon fontSize="small" />
+                    </Badge>
                   </IconButton>
                 </Box>
               </Tooltip>
@@ -477,10 +493,9 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
         customSystemPrompt={customSystemPrompt}
         onCustomSystemPromptChange={onCustomSystemPromptChange}
         onResetDefaults={() => {
-          // Reset to defaults handled by caller (ChatPage)
-          onToneChange(traits.tones[0]?.id || '');
-          onFocusChange(traits.focuses[0]?.id || '');
-          onVerbosityChange(traits.verbosities[0]?.id || '');
+          onToneChange('');
+          onFocusChange('');
+          onVerbosityChange('');
           onReasoningEffortChange('');
           onWebSearchChange(false);
           onCustomSystemPromptChange('');

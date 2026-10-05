@@ -38,7 +38,7 @@ The buttons under the message box change the next turn of this conversation:
 | **Model** | The model that answers; only models your team can call are listed |
 | **Knowledge** | Knowledge bases to search before answering; the team's own are preselected |
 | **Skill** | A system prompt preset (for example *Code Reviewer*); it may preselect a model and knowledge bases |
-| **Tune** | Style and advanced options (below) |
+| **Tune** (sliders icon) | Opens *Conversation settings* (below); a dot on the icon means something differs from the defaults |
 
 Other inputs:
 
@@ -50,7 +50,7 @@ Other inputs:
 - **Budget** — the line under the composer shows what the conversation's key
   has spent out of its budget.
 
-### Tune
+### Conversation settings (Tune)
 
 ![Conversation settings](images/tune-drawer.png)
 
@@ -59,16 +59,20 @@ Other inputs:
 | Tone | Friendly, formal, direct, Socratic or playful |
 | Focus | Explain reasoning, actionable, code-first, business impact, or risk & edge cases |
 | Verbosity | Concise, balanced or thorough |
-| Reasoning effort | Low, medium or high, for models that support it; *Model default* sends nothing |
+| Reasoning effort | Low, medium or high, for models that support it; *Default* sends nothing |
 | Web search | Lets models with a web search tool look things up, alongside the knowledge bases |
 | Extra instructions | Your own system instructions for this conversation |
 
-Tone, focus and verbosity are added to the skill's prompt on the server, so
-any skill works with any style.
+*Default* leaves tone, focus and verbosity out. They are added to the skill's
+prompt on the server, so any skill works with any style. **Reset to defaults**
+clears everything in the panel.
 
 ## Reading answers
 
-- Code blocks have a copy button; tables scroll sideways; LaTeX is rendered.
+- While the model prepares the answer, placeholder lines show; the avatar has a
+  progress ring until the answer is complete.
+- Code blocks are syntax-highlighted with a copy button; tables scroll
+  sideways; LaTeX is rendered.
 - Under each answer: copy, regenerate, 👍 / 👎 (feedback for the analytics
   page), and **N sources** when the answer used a knowledge base or the web.
 - Hover your own message to copy it or edit and resend it (the conversation
@@ -105,11 +109,11 @@ team can call; turn it off from the same button.
   JSON, Export Markdown, Delete.
 - The header menu: Copy as Markdown, Export Markdown, Export JSON, Keyboard
   shortcuts. Click the title to rename.
-- **Import** (sidebar footer) loads a JSON export. Exports never contain the
+- **Import conversation** (sidebar footer) loads a JSON export. Exports never contain the
   conversation's key.
-- The footer says where conversations are kept: in this browser only, or in
-  your account (with the retention period) when the operator enabled
-  server-side storage.
+- The footer links to **Analytics** and says where conversations are kept: in
+  this browser only, or in your account (with the retention period) when the
+  operator enabled server-side storage; hover it for details.
 
 ## Keyboard shortcuts
 

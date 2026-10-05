@@ -3,6 +3,7 @@ import {
   Box,
   Button,
   Divider,
+  IconButton,
   Drawer,
   FormControlLabel,
   Stack,
@@ -10,6 +11,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 import { OptionPicker } from './OptionPicker';
 import type { ChatTraits, ReasoningEffort } from '../types';
 
@@ -31,6 +33,25 @@ export interface SettingsDrawerProps {
   customSystemPrompt: string;
   onCustomSystemPromptChange: (value: string) => void;
   onResetDefaults?: () => void;
+}
+
+/** True when any conversation setting differs from its default (unset). */
+export function hasCustomSettings(s: {
+  toneId: string;
+  focusId: string;
+  verbosityId: string;
+  reasoningEffort: string;
+  webSearch: boolean;
+  customSystemPrompt: string;
+}): boolean {
+  return (
+    !!s.toneId ||
+    !!s.focusId ||
+    !!s.verbosityId ||
+    !!s.reasoningEffort ||
+    s.webSearch ||
+    s.customSystemPrompt.trim() !== ''
+  );
 }
 
 const REASONING_EFFORTS: { id: ReasoningEffort | ''; label: string }[] = [
@@ -59,13 +80,14 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
   onCustomSystemPromptChange,
   onResetDefaults,
 }) => {
-  const hasNonDefaults =
-    toneId !== (traits.tones[0]?.id || '') ||
-    focusId !== (traits.focuses[0]?.id || '') ||
-    verbosityId !== (traits.verbosities[0]?.id || '') ||
-    reasoningEffort !== '' ||
-    webSearch ||
-    customSystemPrompt.trim() !== '';
+  const hasNonDefaults = hasCustomSettings({
+    toneId,
+    focusId,
+    verbosityId,
+    reasoningEffort,
+    webSearch,
+    customSystemPrompt,
+  });
 
   return (
     <Drawer
@@ -87,7 +109,9 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
           <Typography variant="h6">
             Conversation settings
           </Typography>
-          <Button size="small" onClick={onClose} variant="text">×</Button>
+          <IconButton size="small" aria-label="Close settings" onClick={onClose}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
         </Box>
         <Divider />
 
