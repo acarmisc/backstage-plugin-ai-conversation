@@ -147,6 +147,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Enable Corepack
         run: corepack enable
@@ -166,9 +167,13 @@ jobs:
       - name: Publish to npm
         if: ${{ !inputs.release_only }}
         working-directory: ${{ needs.resolve.outputs.dir }}
-        run: yarn npm publish --access public
+        # npm (not yarn) for --provenance, like the sibling plugins. The
+        # packages have no workspace: dependencies, so npm can publish them
+        # as they are. --ignore-scripts: dist/ was built above, and the
+        # tarball checked in the previous step is exactly what is published.
+        run: npm publish --access public --provenance --ignore-scripts
         env:
-          YARN_NPM_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Verify the release on npm
         env:
