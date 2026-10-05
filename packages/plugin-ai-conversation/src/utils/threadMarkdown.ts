@@ -47,7 +47,7 @@ export function threadToMarkdown(thread: Thread): string {
             if (seen.has(citation.filename)) continue;
             seen.add(citation.filename);
             const source = citation.source ? ` (${citation.source})` : '';
-            lines.push(`- ${citation.filename}${source}: ${citation.snippet}`);
+            lines.push(`- ${citation.filename}${source}: ${citation.snippet ?? (citation as { text?: string }).text ?? ''}`);
           }
         }
       }

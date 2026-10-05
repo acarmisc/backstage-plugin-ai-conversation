@@ -107,6 +107,9 @@ export const ComposerPill: React.FC<ComposerPillProps> = ({
       </Badge>
 
       <Popover
+        // Keep the picker mounted while closed: ModelPicker/VectorStorePicker
+        // apply defaults and team scoping in effects that must run on load.
+        keepMounted
         open={open}
         anchorEl={anchorEl}
         onClose={handleClose}

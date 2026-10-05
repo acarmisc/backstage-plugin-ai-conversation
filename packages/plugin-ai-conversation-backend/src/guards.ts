@@ -19,7 +19,7 @@ export function sanitizeUpstreamMessage(msg: unknown): string {
     return 'Upstream error';
   }
   // Redact LiteLLM `sk-` keys (format: sk-[A-Za-z0-9_-]{20,})
-  let sanitized = trimmed.replace(/sk-[A-Za-z0-9_-]+/g, 'sk-***');
+  let sanitized = trimmed.replace(/\bsk-[A-Za-z0-9_-]+/g, 'sk-***');
   // Redact Bearer tokens in Authorization headers or inline
   sanitized = sanitized.replace(/Bearer\s+[A-Za-z0-9._\-=]+/gi, 'Bearer ***');
   // Truncate to 500 chars
@@ -38,6 +38,8 @@ export function sanitizeUpstreamMessage(msg: unknown): string {
  * - reasoning_effort (optional): one of low|medium|high
  * - top_k (optional): clamped to integer 1..20
  */
+export const MAX_STREAM_MESSAGES = 2000;
+
 export function validateStreamRequest(body: unknown): { ok: true } | { ok: false; error: string } {
   if (!body || typeof body !== 'object') {
     return { ok: false, error: 'Request body must be a JSON object' };
@@ -57,8 +59,10 @@ export function validateStreamRequest(body: unknown): { ok: true } | { ok: false
   if (!Array.isArray(b.messages) || b.messages.length === 0) {
     return { ok: false, error: 'messages must be a non-empty array' };
   }
-  if (b.messages.length > 200) {
-    return { ok: false, error: 'messages must contain ≤ 200 entries' };
+  // The frontend resends the whole thread every turn; the cap only guards
+  // against abuse, the 30mb body limit bounds the size.
+  if (b.messages.length > MAX_STREAM_MESSAGES) {
+    return { ok: false, error: `messages must contain ≤ ${MAX_STREAM_MESSAGES} entries` };
   }
   for (let i = 0; i < b.messages.length; i++) {
     const msg = b.messages[i];

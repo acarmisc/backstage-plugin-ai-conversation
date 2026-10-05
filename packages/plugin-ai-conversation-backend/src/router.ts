@@ -505,7 +505,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
 
       // Validate models field
       const models = validateModelsField(body.models);
-      if (body.models !== undefined && models === undefined) {
+      if (body.models !== undefined && body.models !== null && models === undefined) {
         res.status(400).json({ error: 'models must be an array of strings (max 50 entries)' });
         return;
       }
@@ -915,7 +915,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
             userKey: body.user_key,
             vectorStoreIds: body.vector_store_ids,
             query: lastUserText(withSystemPrompt),
-            topK: body.top_k ?? 5,
+            topK: body.top_k === undefined || body.top_k === null ? 5 : Number(body.top_k),
           });
         } catch (err: any) {
           // A KB outage must not take down plain chat. The turn remains

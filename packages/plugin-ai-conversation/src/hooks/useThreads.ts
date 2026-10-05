@@ -778,15 +778,11 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
       if (!thread) return;
       const { keyToken: _keyToken, keyAlias: _keyAlias, ...portable } = thread;
       const payload: ThreadExport = { version: THREAD_EXPORT_VERSION, thread: portable };
-      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${thread.title.replace(/[^\w-]+/g, '_').slice(0, 60) || 'thread'}.json`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      downloadFile(
+        `${thread.title.replace(/[^\w-]+/g, '_').slice(0, 60) || 'thread'}.json`,
+        'application/json',
+        JSON.stringify(payload, null, 2),
+      );
     },
     [threads],
   );

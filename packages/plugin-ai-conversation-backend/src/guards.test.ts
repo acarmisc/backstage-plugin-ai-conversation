@@ -1,6 +1,7 @@
 import {
   sanitizeUpstreamMessage,
   validateStreamRequest,
+  MAX_STREAM_MESSAGES,
   validateSpendAlias,
   computeEffectiveBudget,
   validateModelsField,
@@ -10,6 +11,13 @@ import {
 import { createHash } from 'node:crypto';
 
 describe('sanitizeUpstreamMessage', () => {
+  it('only redacts sk- at a word boundary', () => {
+    expect(sanitizeUpstreamMessage('vector store vs_risk-assessment failed on disk-full')).toBe(
+      'vector store vs_risk-assessment failed on disk-full',
+    );
+    expect(sanitizeUpstreamMessage('bad key sk-abc123')).toBe('bad key sk-***');
+  });
+
   it('redacts sk-* API keys', () => {
     const msg = 'Error from LiteLLM with key sk-1234567890abcdefghij';
     const result = sanitizeUpstreamMessage(msg);
@@ -110,13 +118,21 @@ describe('validateStreamRequest', () => {
     expect(result2.ok).toBe(false);
   });
 
-  it('rejects messages > 200 entries', () => {
+  it('accepts long threads (the whole history is resent every turn)', () => {
     const result = validateStreamRequest({
       ...validBody,
-      messages: Array(201).fill({ id: 'm1', role: 'user', parts: [] }),
+      messages: Array(500).fill({ id: 'm1', role: 'user', parts: [] }),
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('rejects more than MAX_STREAM_MESSAGES messages', () => {
+    const result = validateStreamRequest({
+      ...validBody,
+      messages: Array(MAX_STREAM_MESSAGES + 1).fill({ id: 'm1', role: 'user', parts: [] }),
     });
     expect(result.ok).toBe(false);
-    expect(result.error).toContain('200');
+    expect(result.error).toContain(String(MAX_STREAM_MESSAGES));
   });
 
   it('rejects messages with invalid role', () => {

@@ -23,7 +23,6 @@ import { MessageList } from './MessageList';
 import { ThreadSidebar } from './ThreadSidebar';
 import { ChatHeader } from './ChatHeader';
 import { WelcomeScreen } from './WelcomeScreen';
-import { SettingsDrawer } from './SettingsDrawer';
 import { ErrorBanner } from './ErrorBanner';
 import { ContextPanel } from './ContextPanel';
 import type {
@@ -86,7 +85,6 @@ export const ChatPage: React.FC = () => {
   const [importError, setImportError] = useState<string | null>(null);
   const [traits, setTraits] = useState<ChatTraits>(EMPTY_TRAITS);
   const [traitsLoading, setTraitsLoading] = useState(true);
-  const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false);
   const [contextTab, setContextTab] = useState<'sources' | 'usage'>('sources');
   const [compareAnchor, setCompareAnchor] = useState<HTMLElement | null>(null);
   const [compareModels, setCompareModels] = useState<ModelInfo[]>([]);
@@ -174,10 +172,13 @@ export const ChatPage: React.FC = () => {
     onKeyChange: setKeyVal,
   });
 
-  const selectedTeam = useMemo(() => {
-    const effectiveId = teamId || (teams.length === 1 ? teams[0].team_id : '');
-    return teams.find(t => t.team_id === effectiveId);
-  }, [teams, teamId]);
+  // A single-team user's only team is the implicit default (handleSend
+  // mints against it), so pickers must show and scope by it too.
+  const effectiveTeamId = teamId || (teams.length === 1 ? teams[0].team_id : '');
+  const selectedTeam = useMemo(
+    () => teams.find(t => t.team_id === effectiveTeamId),
+    [teams, effectiveTeamId],
+  );
 
   // Restore thread settings on active thread change
   const activeThreadId = chat.activeThread?.id ?? null;
@@ -252,7 +253,7 @@ export const ChatPage: React.FC = () => {
   const isStreaming = chat.isStreaming;
 
   // Setup scroll behavior
-  const { isAtBottom, scrollToBottom } = useStickToBottom(messagesScrollRef, []);
+  const { isAtBottom, scrollToBottom } = useStickToBottom(messagesScrollRef, [messages, isStreaming]);
 
   // Scroll to top for welcome screen (no messages), scroll to bottom for messages
   useLayoutEffect(() => {
@@ -320,18 +321,8 @@ export const ChatPage: React.FC = () => {
     }
   };
 
-  const handleResetSettings = () => {
-    setToneId(traits.tones[0]?.id || '');
-    setFocusId(traits.focuses[0]?.id || '');
-    setVerbosityId(traits.verbosities[0]?.id || '');
-    setReasoningEffort('');
-    setWebSearch(false);
-    setCustomSystemPrompt('');
-  };
-
   const handleSend = async () => {
     if (!input.trim() || isStreaming) return;
-    const effectiveTeamId = teamId || (teams.length === 1 ? teams[0].team_id : '');
 
     if (config.teamRequired && !effectiveTeamId) {
       setKeyError('Select a team before sending a message.');
@@ -559,7 +550,7 @@ export const ChatPage: React.FC = () => {
                 teamsLoading={teamsLoading}
                 teamsError={teamsError}
                 skills={skills}
-                teamId={teamId}
+                teamId={effectiveTeamId}
                 onTeamChange={handleTeamChange}
                 onSkillSelect={handleSkillChange}
                 onPromptClick={setInput}
@@ -625,7 +616,7 @@ export const ChatPage: React.FC = () => {
             teamsLoading={teamsLoading}
             teamsError={teamsError}
             skills={skills}
-            teamId={teamId}
+            teamId={effectiveTeamId}
             onTeamChange={handleTeamChange}
             model={model}
             onModelChange={setModel}
@@ -697,26 +688,6 @@ export const ChatPage: React.FC = () => {
         </>
       )}
 
-      {/* Settings drawer */}
-      <SettingsDrawer
-        open={settingsDrawerOpen}
-        onClose={() => setSettingsDrawerOpen(false)}
-        traits={traits}
-        traitsLoading={traitsLoading}
-        toneId={toneId}
-        onToneChange={setToneId}
-        focusId={focusId}
-        onFocusChange={setFocusId}
-        verbosityId={verbosityId}
-        onVerbosityChange={setVerbosityId}
-        reasoningEffort={reasoningEffort}
-        onReasoningEffortChange={setReasoningEffort}
-        webSearch={webSearch}
-        onWebSearchChange={setWebSearch}
-        customSystemPrompt={customSystemPrompt}
-        onCustomSystemPromptChange={setCustomSystemPrompt}
-        onResetDefaults={handleResetSettings}
-      />
     </Box>
   );
 };

@@ -99,7 +99,22 @@ export function useChatShortcuts(handlers: ChatShortcutHandlers): void {
       // Escape: Stop generation
       // Only while there is something to stop, so Escape keeps closing
       // menus and dialogs otherwise.
-      if (event.key === 'Escape' && current.onStop) {
+      // Escape meant for a menu, popover, dialog or an input (other than the
+      // message box) closes or cancels that instead of stopping the answer.
+      const inOverlay =
+        focusedElement instanceof Element &&
+        !!focusedElement.closest('[role="dialog"],[role="presentation"],[role="menu"],[role="listbox"]');
+      const inOtherField =
+        focusedElement instanceof HTMLInputElement ||
+        (focusedElement instanceof HTMLTextAreaElement &&
+          focusedElement.getAttribute('aria-label') !== 'Message');
+      if (
+        event.key === 'Escape' &&
+        current.onStop &&
+        !event.defaultPrevented &&
+        !inOverlay &&
+        !inOtherField
+      ) {
         event.preventDefault();
         current.onStop();
         return;
