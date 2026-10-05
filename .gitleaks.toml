@@ -1,0 +1,12 @@
+# Default gitleaks rules, plus two path allowlists for known false positives.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Build output committed early in the history (dist/ is gitignored now). The matches are text bundled from dependencies, such as Backstage's GitHub integration error message quoting '-----BEGIN RSA PRIVATE KEY-----'."
+paths = ['''(^|/)dist/''']
+
+[[allowlists]]
+description = "Redaction tests use fake sk- keys and bearer tokens on purpose."
+paths = ['''^packages/plugin-ai-conversation-backend/src/guards\.test\.ts$''']

@@ -117,6 +117,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Review dependency changes
+        # Needs Settings → Code security → Dependency graph enabled on the
+        # repository; until then the action errors out, so it doesn't block.
+        continue-on-error: true
         uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: critical
