@@ -1,9 +1,14 @@
+import type { FileUIPart } from 'ai';
 import type { AiConversationUIMessage } from '../types';
 import { extractText } from './messageShape';
 
 export interface RegenerateTarget {
   baseMessages: AiConversationUIMessage[];
   text: string;
+  /** The resent message's image attachments, so regenerate and
+   * edit-and-resend keep them. Attachments dropped by storage (empty url,
+   * see threadPersistence.ts) are left out. */
+  files: FileUIPart[];
   /** Whether this target participated in a compare-mode turn — an
    * assistant message only counts if it actually carries a compareModel
    * tag, guarding against stale/pre-compare-mode thread data. A user
@@ -31,6 +36,11 @@ export interface RegenerateTarget {
  * verified against the SDK's own behavior without a live backend. See
  * `useThreads.ts`'s module comment.
  */
+/** A message's file parts that still carry their data. */
+export function attachedFiles(message: AiConversationUIMessage): FileUIPart[] {
+  return message.parts.filter((p): p is FileUIPart => p.type === 'file' && !!p.url);
+}
+
 export function computeRegenerateTarget(
   messages: AiConversationUIMessage[],
   messageId: string,
@@ -43,6 +53,7 @@ export function computeRegenerateTarget(
     return {
       baseMessages: messages.slice(0, idx),
       text: extractText(target),
+      files: attachedFiles(target),
       isCompareEligible: true,
     };
   }
@@ -60,12 +71,14 @@ export function computeRegenerateTarget(
   return {
     baseMessages: messages.slice(0, userIdx),
     text: extractText(messages[userIdx]),
+    files: attachedFiles(messages[userIdx]),
     isCompareEligible: !!target.metadata?.compareModel,
   };
 }
 
 export interface EditTarget {
   baseMessages: AiConversationUIMessage[];
+  files: FileUIPart[];
 }
 
 /** Pure truncation logic behind editAndResend: the target must be a user
@@ -77,5 +90,5 @@ export function computeEditTarget(
 ): EditTarget | null {
   const idx = messages.findIndex(m => m.id === messageId);
   if (idx === -1 || messages[idx].role !== 'user') return null;
-  return { baseMessages: messages.slice(0, idx) };
+  return { baseMessages: messages.slice(0, idx), files: attachedFiles(messages[idx]) };
 }

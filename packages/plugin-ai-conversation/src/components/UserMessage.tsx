@@ -102,7 +102,7 @@ export const UserMessage: React.FC<UserMessageProps> = ({ message, onEditAndRese
       {fileParts.length > 0 && (
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, justifyContent: 'flex-end' }}>
           {fileParts.map((p, i) =>
-            p.mediaType.startsWith('image/') ? (
+            p.mediaType.startsWith('image/') && p.url ? (
               <Box
                 key={i}
                 component="img"
@@ -111,7 +111,12 @@ export const UserMessage: React.FC<UserMessageProps> = ({ message, onEditAndRese
                 sx={{ maxWidth: 160, maxHeight: 160, borderRadius: 1 }}
               />
             ) : (
-              <Chip key={i} size="small" label={p.filename ?? p.mediaType} variant="outlined" />
+              <Tooltip
+                key={i}
+                title={p.url ? '' : 'Attachments are not kept after the page is reloaded'}
+              >
+                <Chip size="small" label={p.filename ?? p.mediaType} variant="outlined" />
+              </Tooltip>
             ),
           )}
         </Box>

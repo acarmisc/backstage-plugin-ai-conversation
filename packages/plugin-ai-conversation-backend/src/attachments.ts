@@ -49,14 +49,23 @@ export const MAX_ATTACHMENTS_PER_MESSAGE = 4;
  * best-effort heuristic on well-known model-family naming, overridable via
  * `litellm.aiConversation.multimodalModels` in app-config.yaml for
  * operators who know their actual registered models.
+ *
+ * Patterns are unanchored to match model names with provider/region
+ * prefixes (e.g. openai/gpt-4o, bedrock/eu.anthropic.claude-3-7-sonnet...).
  */
 const DEFAULT_MULTIMODAL_MODEL_PATTERNS: RegExp[] = [
-  /^claude-/i,
-  /^gpt-4/i,
-  /^gpt-5/i,
+  /claude/i,
+  /gpt-4/i,
+  /gpt-5/i,
   /gemini/i,
+  /gemma-?3/i,
   /-vl(\b|[-:])/i,
   /vision/i,
+  /llava/i,
+  /pixtral/i,
+  /llama-?4/i,
+  /llama-?3\.2-(11|90)b/i,
+  /nova-(lite|pro|premier)/i,
 ];
 
 export function isLikelyMultimodal(

@@ -318,7 +318,7 @@ export const ChatPage: React.FC = () => {
   };
 
   const handleSend = async () => {
-    if (!input.trim() || isStreaming) return;
+    if ((!input.trim() && staged.files.length === 0) || isStreaming) return;
 
     if (config.teamRequired && !effectiveTeamId) {
       setKeyError('Select a team before sending a message.');
@@ -395,9 +395,11 @@ export const ChatPage: React.FC = () => {
   };
 
   const handleAttachFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const fileList = e.target.files;
+    // Copy before resetting the input: its FileList is live and resetting
+    // `value` empties it.
+    const picked = Array.from(e.target.files ?? []);
     e.target.value = '';
-    if (fileList) await staged.add(fileList);
+    await staged.add(picked);
   };
 
   const handleShowSources = () => {
@@ -591,6 +593,7 @@ export const ChatPage: React.FC = () => {
             attachInputRef={attachInputRef}
             composerInputRef={composerInputRef}
             onAttachFiles={handleAttachFiles}
+            onAddFiles={staged.add}
             urlPreview={urlContext.preview}
             urlPreviewLoading={urlContext.loading}
             urlPreviewError={urlContext.error}

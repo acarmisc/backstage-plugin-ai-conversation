@@ -29,6 +29,18 @@ export interface ChatRequestSettings {
 
 const BASE_PATH = '/api/ai-conversation';
 
+/** Leaves out attachments whose data wasn't kept in storage (empty url —
+ * see `stripAttachmentData`): the backend would reject them. */
+export function withoutDroppedAttachments(
+  messages: AiConversationUIMessage[],
+): AiConversationUIMessage[] {
+  return messages.map(m =>
+    m.parts.some(p => p.type === 'file' && !p.url)
+      ? { ...m, parts: m.parts.filter(p => p.type !== 'file' || !!p.url) }
+      : m,
+  );
+}
+
 /**
  * Builds the custom Transport `useChat` streams through — points at the
  * new opt-in `/chat/stream/v2` protocol-adapter route (Phase 17), using
@@ -53,7 +65,7 @@ export function createAiConversationTransport(
       return {
         body: {
           model: s.model,
-          messages,
+          messages: withoutDroppedAttachments(messages),
           thread_id: s.threadId,
           skill_id: s.skillId || undefined,
           vector_store_ids: s.vectorStoreIds.length ? s.vectorStoreIds : undefined,

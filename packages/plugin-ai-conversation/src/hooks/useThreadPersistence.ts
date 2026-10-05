@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { AiConversationApiInterface } from '../api';
 import type { Thread } from '../types';
-import { fromPersisted, migrateThreadMessages } from './threadPersistence';
+import { fromPersisted, migrateThreadMessages, stripAttachmentData } from './threadPersistence';
 
 const STORAGE_PREFIX = 'ai-conversation:threads';
 const SAVE_DEBOUNCE_MS = 400;
@@ -22,7 +22,10 @@ export function loadThreads(userId: string): Thread[] {
 
 export function saveThreads(userId: string, threads: Thread[]) {
   try {
-    localStorage.setItem(`${STORAGE_PREFIX}:${userId}`, JSON.stringify(threads));
+    localStorage.setItem(
+      `${STORAGE_PREFIX}:${userId}`,
+      JSON.stringify(threads.map(stripAttachmentData)),
+    );
   } catch {
     // quota or disabled — ignore
   }
