@@ -79,4 +79,32 @@ describe('ModelPicker', () => {
     await screen.findByRole('combobox', { name: 'Model' });
     await waitFor(() => expect(onChange).toHaveBeenCalledWith('team/beta'));
   });
+
+  it('settles on a team-allowed model when the configured default is not callable by the team', async () => {
+    const onChange = jest.fn();
+    const listModels = jest.fn().mockResolvedValue(MODELS);
+    const Harness = () => {
+      const [value, setValue] = React.useState('');
+      return (
+        <ModelPicker
+          value={value}
+          onChange={m => {
+            onChange(m);
+            setValue(m);
+          }}
+          defaultModel="other/gamma"
+          teamModels={['team/alpha']}
+        />
+      );
+    };
+    render(
+      <TestApiProvider apis={[[liteLlmApiRef, { listModels } as any]]}>
+        <Harness />
+      </TestApiProvider>,
+    );
+
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith('team/alpha'));
+    await new Promise(r => setTimeout(r, 100));
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
 });

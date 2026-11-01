@@ -198,11 +198,10 @@ export const ChatPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeThreadId]);
 
-  // Apply default model on fresh load (when no thread is active and model is unset)
-  useEffect(() => {
-    if (!config.defaultModel || model || chat.activeThread) return;
-    setModel(config.defaultModel);
-  }, [config.defaultModel, model, chat.activeThread]);
+  // The default model is applied by ModelPicker (always mounted), which
+  // knows the selected team's allowlist. Do not also set it here: when the
+  // default isn't callable by the team, the picker clears it and this page
+  // would put it back, flipping the model forever.
 
   // Models for the compare picker, loaded the first time it opens.
   useEffect(() => {
