@@ -1,6 +1,6 @@
 {
   "name": "@acarmisc/backstage-plugin-ai-conversation",
-  "version": "0.20.2",
+  "version": "0.20.3",
   "description": "Backstage frontend plugin for LiteLLM RAG chat — streaming UI with model/KB/key pickers.",
   "backstage": {
     "role": "frontend-plugin",

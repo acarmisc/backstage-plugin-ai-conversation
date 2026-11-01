@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.20.3 — 2026-11-01
+
+### Fixed
+
+- The Model, Knowledge and Skill pills under the composer no longer flip
+  back and forth. When the configured default model was not callable by the
+  selected team, the page and the model picker kept overwriting each other's
+  choice. Only the picker, which knows the team's allowlist, applies the default
+  now.
+
 ## 0.20.2 — 2026-11-01
 
 ### Changed
