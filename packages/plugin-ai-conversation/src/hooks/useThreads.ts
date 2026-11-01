@@ -206,6 +206,32 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
   const [error, setError] = useState<string | null>(null);
   const [citations, setCitations] = useState<Citation[]>([]);
   const [keySpend, setKeySpend] = useState<KeySpend | null>(null);
+  // Shared by the auto-create effect and newThread. The caller passes the key
+  // explicitly, so a stale closure can't create a thread with an empty key.
+  const createThread = useCallback(
+    (key: { alias: string; token: string; expiresAt?: number }) => {
+      const thread: Thread = {
+        id: genId(),
+        title: 'New chat',
+        messages: [],
+        model,
+        vectorStoreIds,
+        customSystemPrompt,
+        keyAlias: key.alias,
+        keyToken: key.token,
+        keyExpiresAt: key.expiresAt,
+        skillId,
+        teamId,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        totalTokens: 0,
+        lastTurnUsage: null,
+      };
+      setThreads(prev => [thread, ...prev]);
+      setActiveId(thread.id);
+    },
+    [model, vectorStoreIds, customSystemPrompt, skillId, teamId],
+  );
 
   const activeThread = threads.find(t => t.id === activeId) ?? null;
   const isCompareThread = activeThread?.mode === 'compare';
@@ -421,25 +447,7 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
 
   useEffect(() => {
     if (!keyToken || activeId) return;
-    const thread: Thread = {
-      id: genId(),
-      title: 'New chat',
-      messages: [],
-      model,
-      vectorStoreIds,
-      customSystemPrompt,
-      keyAlias,
-      keyToken,
-      keyExpiresAt,
-      skillId,
-      teamId,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      totalTokens: 0,
-      lastTurnUsage: null,
-    };
-    setThreads(prev => [thread, ...prev]);
-    setActiveId(thread.id);
+    createThread({ alias: keyAlias, token: keyToken, expiresAt: keyExpiresAt });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [keyToken, activeId, persistenceEnabled, api]);
 
@@ -453,32 +461,14 @@ export function useThreads(opts: UseChatOptions): UseChatResult {
     // read it straight back onto keyVal on the next render, wiping out the
     // just-minted key before the second message could use it.
     (overrideKey?: { alias: string; token: string; expiresAt?: number }) => {
-      const thread: Thread = {
-        id: genId(),
-        title: 'New chat',
-        messages: [],
-        model,
-        vectorStoreIds,
-        customSystemPrompt,
-        keyAlias: overrideKey?.alias ?? keyAlias,
-        keyToken: overrideKey?.token ?? keyToken,
-        keyExpiresAt: overrideKey ? overrideKey.expiresAt : keyExpiresAt,
-        skillId,
-        teamId,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        totalTokens: 0,
-        lastTurnUsage: null,
-      };
-      setThreads(prev => [thread, ...prev]);
-      setActiveId(thread.id);
+      createThread(overrideKey ?? { alias: keyAlias, token: keyToken, expiresAt: keyExpiresAt });
       setError(null);
       setCitations([]);
       setKeySpend(null);
       authRetryRef.current = false;
       compareChat.reset();
     },
-    [model, vectorStoreIds, customSystemPrompt, keyAlias, keyToken, keyExpiresAt, skillId, teamId, compareChat],
+    [createThread, keyAlias, keyToken, keyExpiresAt, compareChat],
   );
 
   const selectThread = useCallback(

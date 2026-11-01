@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.20.2 — 2026-11-01
+
+### Changed
+
+- New threads are created by one shared helper, and every caller passes the
+  chat key explicitly. Behaviour is unchanged for users.
+
 ## 0.20.1 — 2026-10-05
 
 ### Fixed
